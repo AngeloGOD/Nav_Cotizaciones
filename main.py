@@ -1,9 +1,8 @@
 import flet as ft
-from fuente.presentacion.PantallaClientes import PantallaClientes
+from fuente.presentacion.PantallaPrincipal import PantallaPrincipal
 from fuente.utilidades.Colores import *
 
 def main(page: ft.Page):
-
     page.bgcolor = COLOR_FONDO
     page.padding = 0
     page.spacing = 0
@@ -15,14 +14,13 @@ def main(page: ft.Page):
                 ft.Container(
                     expand=True,
                     bgcolor=COLOR_FONDO,
-                    content=PantallaClientes(),
+                    content=PantallaPrincipal(page),
                 )
             ],
             expand=True,
             spacing=0,
         )
     )
-
 
 if __name__ == "__main__":
     ft.run(main)

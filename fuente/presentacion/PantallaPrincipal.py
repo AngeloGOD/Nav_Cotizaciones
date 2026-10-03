@@ -2,7 +2,7 @@ import flet as ft
 
 from fuente.presentacion.MenuLateral import MenuLateral
 from fuente.presentacion.BarraSuperior import BarraSuperior
-from fuente.presentacion.Dashboard import Dashboard
+from fuente.presentacion.dashboard import Dashboard
 from fuente.presentacion.PantallaClientes import PantallaClientes
 from fuente.utilidades.Colores import COLOR_FONDO
 
@@ -48,9 +48,12 @@ class PantallaPrincipal(ft.Container):
                 expand=True,
                 spacing=0
             )
-            
+
         elif ruta == "ruta_clientes":
-            self.contenido_dinamico.content = PantallaClientes()
-            
-       
+            self.contenido_dinamico.content = ft.Column(
+                controls=[BarraSuperior(), PantallaClientes()],
+                expand=True,
+                spacing=0
+            )
+
         self.contenido_dinamico.update()

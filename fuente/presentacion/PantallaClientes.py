@@ -1,15 +1,19 @@
 import flet as ft
+
 from fuente.utilidades.Colores import *
 from fuente.utilidades.Componentes import *
 from fuente.negocio.controlador.ControladorClientes import ControladorClientes
+from fuente.presentacion.PantallaRegistrarCliente import PantallaRegistrarCliente
 
 
 class PantallaClientes(ft.Container):
-    def __init__(self):
+    def __init__(self, page: ft.Page):
         super().__init__(
             expand=True,
             bgcolor=COLOR_FONDO,
         )
+
+        self._page = page
 
         self.controlador = ControladorClientes()
         self.pagina_actual = 1
@@ -17,6 +21,9 @@ class PantallaClientes(ft.Container):
         self.total_clientes = 0
         self.busqueda = ""
 
+        self.build_ui()
+
+    def build_ui(self):
         contenido = ft.Column(
             spacing=12,
             controls=[
@@ -31,7 +38,12 @@ class PantallaClientes(ft.Container):
             scroll=ft.ScrollMode.AUTO,
             controls=[
                 ft.Container(
-                    padding=ft.Padding(left=14, right=14, top=8, bottom=18),
+                    padding=ft.Padding(
+                        left=14,
+                        right=14,
+                        top=8,
+                        bottom=18,
+                    ),
                     content=contenido,
                 )
             ],
@@ -64,7 +76,11 @@ class PantallaClientes(ft.Container):
                         tight=True,
                         spacing=8,
                         controls=[
-                            ft.Icon(ft.Icons.ADD, size=19, color=COLOR_BLANCO),
+                            ft.Icon(
+                                ft.Icons.ADD,
+                                size=19,
+                                color=COLOR_BLANCO,
+                            ),
                             ft.Text(
                                 "Registrar nuevo cliente",
                                 size=14,
@@ -76,9 +92,17 @@ class PantallaClientes(ft.Container):
                     style=ft.ButtonStyle(
                         bgcolor=COLOR_NARANJA,
                         color=COLOR_BLANCO,
-                        padding=ft.Padding(left=18, right=18, top=13, bottom=13),
-                        shape=ft.RoundedRectangleBorder(radius=8),
+                        padding=ft.Padding(
+                            left=18,
+                            right=18,
+                            top=13,
+                            bottom=13,
+                        ),
+                        shape=ft.RoundedRectangleBorder(
+                            radius=8
+                        ),
                     ),
+                    on_click=self.ir_a_registro,
                 ),
             ],
         )
@@ -92,7 +116,9 @@ class PantallaClientes(ft.Container):
                         hint="Buscar por nombre, RFC o contacto...",
                         on_change=self.buscar,
                     ),
-                    boton_filtros(on_click=self.abrir_filtros),
+                    boton_filtros(
+                        on_click=self.abrir_filtros
+                    ),
                 ],
             ),
             padding=10,
@@ -107,6 +133,13 @@ class PantallaClientes(ft.Container):
     def abrir_filtros(self, e):
         pass
 
+    def ir_a_registro(self, e):
+        self.content = PantallaRegistrarCliente(
+            self._page,
+            vista_anterior=self,
+        )
+        self.update()
+
     def cambiar_pagina(self, pagina):
         self.pagina_actual = pagina
         self.actualizar_directorio()
@@ -116,18 +149,26 @@ class PantallaClientes(ft.Container):
         self.update()
 
     def directorio(self):
-        offset = (self.pagina_actual - 1) * self.registros_por_pagina
+        offset = (
+            self.pagina_actual - 1
+        ) * self.registros_por_pagina
 
-        clientes, self.total_clientes = self.controlador.obtener_clientes(
-            texto=self.busqueda,
-            limit=self.registros_por_pagina,
-            offset=offset,
+        clientes, self.total_clientes = (
+            self.controlador.obtener_clientes(
+                texto=self.busqueda,
+                limit=self.registros_por_pagina,
+                offset=offset,
+            )
         )
 
         filas = []
 
         for cliente in clientes:
-            color_inicial = COLOR_NARANJA if cliente.tipo_cliente == "Armador" else COLOR_AZUL
+            color_inicial = (
+                COLOR_NARANJA
+                if cliente.tipo_cliente == "Armador"
+                else COLOR_AZUL
+            )
 
             inicial = ft.Container(
                 content=ft.Text(
@@ -242,6 +283,7 @@ class PantallaClientes(ft.Container):
                                 ),
                             )
                         ),
+
                         ft.DataCell(
                             ft.Container(
                                 width=115,
@@ -254,6 +296,7 @@ class PantallaClientes(ft.Container):
                                 ),
                             )
                         ),
+
                         ft.DataCell(
                             ft.Container(
                                 width=250,
@@ -266,6 +309,7 @@ class PantallaClientes(ft.Container):
                                 ),
                             )
                         ),
+
                         ft.DataCell(
                             ft.Container(
                                 width=155,
@@ -278,7 +322,9 @@ class PantallaClientes(ft.Container):
                                 ),
                             )
                         ),
+
                         ft.DataCell(info_contacto),
+
                         ft.DataCell(acciones),
                     ],
                 )
@@ -310,13 +356,14 @@ class PantallaClientes(ft.Container):
                 ft.Container(
                     content=ft.Icon(
                         ft.Icons.GROUPS_OUTLINED,
-                        color=COLOR_AZUL,
+                        color=COLOR_BLANCO,
                         size=24,
                     ),
-                    bgcolor=COLOR_GRIS_CLARO,
+                    bgcolor=COLOR_NARANJA,
                     border_radius=10,
                     padding=10,
                 ),
+
                 ft.Column(
                     expand=True,
                     spacing=2,
@@ -334,6 +381,7 @@ class PantallaClientes(ft.Container):
                         ),
                     ],
                 ),
+
                 boton_exportar(
                     on_click=self.exportar_clientes
                 ),
@@ -349,6 +397,7 @@ class PantallaClientes(ft.Container):
                     size=14,
                     color=COLOR_GRIS,
                 ),
+
                 paginacion(
                     total_registros=self.total_clientes,
                     registros_por_pagina=self.registros_por_pagina,
@@ -376,15 +425,19 @@ class PantallaClientes(ft.Container):
                 spacing=10,
                 controls=[
                     titulo,
+
                     ft.Divider(
                         height=1,
                         color=COLOR_GRIS_CLARO,
                     ),
+
                     tabla_contenedor,
+
                     ft.Divider(
                         height=1,
                         color=COLOR_GRIS_CLARO,
                     ),
+
                     pie,
                 ],
             ),

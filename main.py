@@ -5,7 +5,14 @@ from sqlalchemy import create_engine
 from sqlalchemy.orm import sessionmaker
 from fuente.persistencia.uow.UnitOFWork import AlchemyUnitOfWork
 from fuente.negocio.modelo.Base import Base
-from fuente.negocio.modelo import *
+from fuente.negocio.modelo.Cliente import Clientefinal
+from fuente.negocio.modelo.Usuario import Usuario
+from fuente.negocio.modelo.Embarcacion import Embarcacion
+from fuente.negocio.modelo.CategoriaProductos import CategoriaProductos
+from fuente.negocio.modelo.CategoriaServicios import CategServicios
+from fuente.negocio.modelo.Concepto import Concepto
+from fuente.negocio.modelo.Producto import Producto
+from fuente.negocio.modelo.Servicio import Servicio
 
 def main(page: ft.Page):
     page.bgcolor = COLOR_FONDO

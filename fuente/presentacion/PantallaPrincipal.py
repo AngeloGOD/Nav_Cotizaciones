@@ -2,7 +2,7 @@ import flet as ft
 
 from fuente.presentacion.MenuLateral import MenuLateral
 from fuente.presentacion.BarraSuperior import BarraSuperior
-from fuente.presentacion.dashboard import Dashboard
+from fuente.presentacion.dashboard import dashboard
 from fuente.presentacion.PantallaClientes import PantallaClientes
 from fuente.utilidades.Colores import COLOR_FONDO
 
@@ -19,7 +19,7 @@ class PantallaPrincipal(ft.Container):
 
         self.content_area = ft.Container(
             expand=True,
-            content=Dashboard(),
+            content=dashboard(),
         )
 
         self.menu_lateral = MenuLateral(
@@ -44,7 +44,7 @@ class PantallaPrincipal(ft.Container):
 
     def cambiar_pantalla(self, ruta):
         if ruta == "ruta_dashboard":
-            self.content_area.content = Dashboard()
+            self.content_area.content = dashboard()
 
         elif ruta == "ruta_clientes":
             self.content_area.content = PantallaClientes(

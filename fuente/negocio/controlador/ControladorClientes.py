@@ -1,6 +1,5 @@
 from fuente.negocio.modelo.Cliente import Cliente
 
-
 class ControladorClientes:
     def __init__(self):
         self.clientes = [

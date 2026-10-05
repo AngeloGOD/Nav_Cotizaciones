@@ -4,21 +4,8 @@ from fuente.utilidades.Colores import *
 from sqlalchemy import create_engine
 from sqlalchemy.orm import sessionmaker
 from fuente.persistencia.uow.UnitOFWork import AlchemyUnitOfWork
-
-engine = create_engine(
-    "postgresql+psycopg://",
-    pool_size=2,
-    max_overflow=4,
-    pool_pre_ping=True,
-    pool_recycle=3600,
-    hide_parameters=True,
-    isolation_level="READ COMMITTED" 
-)
-
-sessionFactory = sessionmaker(bind=engine)
-uow = AlchemyUnitOfWork(sessionFactory)
-
-#A partir de aquí se puede inyectar el uow al servicio
+from fuente.negocio.modelo.Base import Base
+from fuente.negocio.modelo import *
 
 def main(page: ft.Page):
     page.bgcolor = COLOR_FONDO
@@ -40,5 +27,27 @@ def main(page: ft.Page):
         )
     )
 
-if __name__ == "__main__":
+def run():
+    engine = create_engine(
+    "postgresql+psycopg://",
+    pool_size=2,
+    max_overflow=4,
+    pool_pre_ping=True,
+    pool_recycle=3600,
+    hide_parameters=True,
+    isolation_level="READ COMMITTED",
+    echo=True
+)
+
+    base = Base()
+    base.metadata.create_all(engine)
+
+    sessionFactory = sessionmaker(bind=engine)
+    uow = AlchemyUnitOfWork(sessionFactory)
+    #A partir de aquí se puede inyectar el uow al servicio
+
     ft.run(main)
+
+
+if __name__ == "__main__":
+    run()

@@ -25,10 +25,9 @@ class PantallaClientes(ft.Container):
 
     def build_ui(self):
         contenido = ft.Column(
-            spacing=12,
+            spacing=10,
             controls=[
-                self.encabezado(),
-                self.barra_filtros(),
+                self.cabecera_clientes(),
                 self.directorio(),
             ],
         )
@@ -48,81 +47,142 @@ class PantallaClientes(ft.Container):
                 )
             ],
         )
-
-    def encabezado(self):
-        return ft.Row(
-            alignment=ft.MainAxisAlignment.SPACE_BETWEEN,
-            vertical_alignment=ft.CrossAxisAlignment.CENTER,
-            controls=[
-                ft.Column(
-                    spacing=4,
-                    expand=True,
-                    controls=[
-                        ft.Text(
-                            "Gestión de Clientes",
-                            size=28,
-                            weight=ft.FontWeight.BOLD,
-                            color=COLOR_BANNER,
-                        ),
-                        ft.Text(
-                            "Administra la información fiscal y de contacto de agencias navieras, armadores y clientes.",
-                            size=14,
-                            color=COLOR_GRIS,
-                        ),
-                    ],
-                ),
-                ft.FilledButton(
-                    content=ft.Row(
-                        tight=True,
-                        spacing=8,
-                        controls=[
-                            ft.Icon(
-                                ft.Icons.ADD,
-                                size=19,
-                                color=COLOR_BLANCO,
-                            ),
-                            ft.Text(
-                                "Registrar nuevo cliente",
-                                size=14,
-                                weight=ft.FontWeight.BOLD,
-                                color=COLOR_BLANCO,
-                            ),
-                        ],
-                    ),
-                    style=ft.ButtonStyle(
-                        bgcolor=COLOR_NARANJA,
-                        color=COLOR_BLANCO,
-                        padding=ft.Padding(
-                            left=18,
-                            right=18,
-                            top=13,
-                            bottom=13,
-                        ),
-                        shape=ft.RoundedRectangleBorder(
-                            radius=8
-                        ),
-                    ),
-                    on_click=self.ir_a_registro,
-                ),
-            ],
-        )
-
-    def barra_filtros(self):
+    def cabecera_clientes(self):
         return card(
-            ft.Row(
-                spacing=10,
+            ft.Column(
+                spacing=0,
                 controls=[
-                    barra_busqueda(
-                        hint="Buscar por nombre, RFC o contacto...",
-                        on_change=self.buscar,
+                    ft.Container(
+                        height=150,
+                        border_radius=12,
+                        clip_behavior=ft.ClipBehavior.HARD_EDGE,
+                        content=ft.Stack(
+                            expand=True,
+                            controls=[
+                                ft.Container(
+                                    expand=True,
+                                    image=ft.DecorationImage(
+                                        src="fondo_PantallaClientes.jpg",
+                                        fit=ft.BoxFit.COVER,
+                                        alignment=ft.Alignment(1, 0),
+                                    ),
+                                ),
+
+                                ft.Container(
+                                    expand=True,
+                                    gradient=ft.LinearGradient(
+                                        begin=ft.Alignment(-1, 0),
+                                        end=ft.Alignment(1, 0),
+                                        colors=[
+                                            ft.Colors.WHITE,
+                                            ft.Colors.WHITE_70,
+                                            ft.Colors.WHITE_54,
+                                            ft.Colors.TRANSPARENT,
+                                        ],
+                                        stops=[
+                                            0.0,
+                                            0.38,
+                                            0.65,
+                                            1.0,
+                                        ],
+                                    ),
+                                ),
+
+                                ft.Container(
+                                    expand=True,
+                                    padding=ft.Padding(
+                                        left=26,
+                                        right=26,
+                                        top=20,
+                                        bottom=20,
+                                    ),
+                                    content=ft.Column(
+                                        expand=True,
+                                        alignment=ft.MainAxisAlignment.CENTER,
+                                        spacing=4,
+                                        controls=[
+                                            ft.Text(
+                                                "Gestión de Clientes",
+                                                size=28,
+                                                weight=ft.FontWeight.BOLD,
+                                                color=COLOR_BANNER,
+                                            ),
+                                            ft.Text(
+                                                "Administra la información fiscal y de contacto de agencias navieras, armadores y clientes.",
+                                                size=14,
+                                                color=COLOR_GRIS,
+                                            ),
+                                        ],
+                                    ),
+                                ),
+                            ],
+                        ),
                     ),
-                    boton_filtros(
-                        on_click=self.abrir_filtros
+
+                    ft.Container(
+                        padding=ft.Padding(
+                            left=10,
+                            right=10,
+                            top=10,
+                            bottom=10,
+                        ),
+                        content=ft.Row(
+                            spacing=8,
+                            controls=[
+                                ft.Container(
+                                    expand=True,
+                                    content=barra_busqueda(
+                                        hint="Buscar por nombre, RFC o contacto...",
+                                        on_change=self.buscar,
+                                    ),
+                                ),
+
+                                boton_filtros(
+                                    on_click=self.abrir_filtros,
+                                ),
+
+                                ft.FilledButton(
+                                    width=185,
+                                    content=ft.Row(
+                                        tight=True,
+                                        spacing=7,
+                                        controls=[
+                                            ft.Icon(
+                                                ft.Icons.ADD,
+                                                size=18,
+                                                color=COLOR_BLANCO,
+                                            ),
+                                            ft.Text(
+                                                "Registrar cliente",
+                                                size=14,
+                                                weight=ft.FontWeight.BOLD,
+                                                color=COLOR_BLANCO,
+                                            ),
+                                        ],
+                                    ),
+                                    style=ft.ButtonStyle(
+                                        bgcolor=COLOR_NARANJA,
+                                        color=COLOR_BLANCO,
+                                        shape=ft.RoundedRectangleBorder(
+                                            radius=8,
+                                        ),
+                                        padding=ft.Padding(
+                                            left=18,
+                                            right=18,
+                                            top=12,
+                                            bottom=12,
+                                        ),
+                                    ),
+                                    on_click=self.ir_a_registro,
+                                ),
+                            ],
+                        ),
                     ),
                 ],
             ),
-            padding=10,
-            radius=10,
+            padding=0,
+            radius=12,
+            shadow=sombra_suave(),
         )
 
     def buscar(self, e):
@@ -145,7 +205,7 @@ class PantallaClientes(ft.Container):
         self.actualizar_directorio()
 
     def actualizar_directorio(self):
-        self.content.controls[0].content.controls[2] = self.directorio()
+        self.content.controls[0].content.controls[1] = self.directorio()
         self.update()
 
     def directorio(self):
@@ -283,7 +343,6 @@ class PantallaClientes(ft.Container):
                                 ),
                             )
                         ),
-
                         ft.DataCell(
                             ft.Container(
                                 width=115,
@@ -296,7 +355,6 @@ class PantallaClientes(ft.Container):
                                 ),
                             )
                         ),
-
                         ft.DataCell(
                             ft.Container(
                                 width=250,
@@ -309,7 +367,6 @@ class PantallaClientes(ft.Container):
                                 ),
                             )
                         ),
-
                         ft.DataCell(
                             ft.Container(
                                 width=155,
@@ -322,9 +379,7 @@ class PantallaClientes(ft.Container):
                                 ),
                             )
                         ),
-
                         ft.DataCell(info_contacto),
-
                         ft.DataCell(acciones),
                     ],
                 )
@@ -363,7 +418,6 @@ class PantallaClientes(ft.Container):
                     border_radius=10,
                     padding=10,
                 ),
-
                 ft.Column(
                     expand=True,
                     spacing=2,
@@ -381,7 +435,6 @@ class PantallaClientes(ft.Container):
                         ),
                     ],
                 ),
-
                 boton_exportar(
                     on_click=self.exportar_clientes
                 ),
@@ -397,7 +450,6 @@ class PantallaClientes(ft.Container):
                     size=14,
                     color=COLOR_GRIS,
                 ),
-
                 paginacion(
                     total_registros=self.total_clientes,
                     registros_por_pagina=self.registros_por_pagina,
@@ -425,24 +477,21 @@ class PantallaClientes(ft.Container):
                 spacing=10,
                 controls=[
                     titulo,
-
                     ft.Divider(
                         height=1,
                         color=COLOR_GRIS_CLARO,
                     ),
-
                     tabla_contenedor,
-
                     ft.Divider(
                         height=1,
                         color=COLOR_GRIS_CLARO,
                     ),
-
                     pie,
                 ],
             ),
             padding=16,
             radius=10,
+            shadow=sombra_suave(),
         )
 
     def exportar_clientes(self, e):

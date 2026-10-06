@@ -245,11 +245,7 @@ class PantallaRegistrarCliente(ft.Container):
             padding=24,
             radius=14,
             border_color=COLOR_GRIS_CLARO,
-            shadow=ft.BoxShadow(
-                blur_radius=18,
-                color="black12",
-                offset=ft.Offset(0, 4),
-            ),
+            shadow=sombra_suave(),
             expand=True,
         )
 
@@ -257,10 +253,11 @@ class PantallaRegistrarCliente(ft.Container):
             padding=ft.Padding(
                 left=24,
                 right=18,
-                top=18,
-                bottom=18,
+                top=10,
+                bottom=10,
             ),
             border_radius=14,
+            shadow=sombra_suave(),
             bgcolor=COLOR_BLANCO,
             border=ft.Border.all(
                 1,
@@ -297,13 +294,13 @@ class PantallaRegistrarCliente(ft.Container):
 
                     ft.Container(
                         width=330,
-                        height=105,
+                        height=80,
                         border_radius=12,
                         clip_behavior=ft.ClipBehavior.HARD_EDGE,
                         content=ft.Image(
-                            src="assets/barco_banner_opl.png",
+                            src="fondo_PantallaRegistrarClientes.jpg",
                             width=330,
-                            height=105,
+                            height=80,
                             fit=ft.BoxFit.COVER,
                         ),
                     ),

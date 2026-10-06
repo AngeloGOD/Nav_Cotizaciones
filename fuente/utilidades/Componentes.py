@@ -1,6 +1,12 @@
 import flet as ft
 from .Colores import *
 
+def sombra_suave():
+    return ft.BoxShadow(
+        blur_radius=30,
+        color="black12",
+        offset=ft.Offset(0, 10),
+    )
 
 def card(content, padding=16, bgcolor=COLOR_BLANCO, border_color=COLOR_GRIS_CLARO, radius=10, shadow=None, expand=False):
     return ft.Container(

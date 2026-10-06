@@ -4,6 +4,7 @@ from fuente.presentacion.MenuLateral import MenuLateral
 from fuente.presentacion.BarraSuperior import BarraSuperior
 from fuente.presentacion.dashboard import dashboard
 from fuente.presentacion.PantallaClientes import PantallaClientes
+from fuente.presentacion.PantallaEmbarcaciones import PantallaEmbarcaciones
 from fuente.utilidades.Colores import COLOR_FONDO
 
 
@@ -48,6 +49,11 @@ class PantallaPrincipal(ft.Container):
 
         elif ruta == "ruta_clientes":
             self.content_area.content = PantallaClientes(
+                self.main_page
+            )
+
+        elif ruta == "ruta_buques":
+            self.content_area.content = PantallaEmbarcaciones(
                 self.main_page
             )
 

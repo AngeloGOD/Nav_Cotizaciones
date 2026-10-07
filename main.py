@@ -1,4 +1,5 @@
 import flet as ft
+from decimal import Decimal
 from fuente.presentacion.PantallaPrincipal import PantallaPrincipal
 from fuente.utilidades.Colores import *
 from sqlalchemy import create_engine
@@ -14,6 +15,7 @@ from fuente.negocio.modelo.Concepto import Concepto
 from fuente.negocio.modelo.Producto import Producto
 from fuente.negocio.modelo.Servicio import Servicio
 from fuente.negocio.servicio.ServicioCliente import ServicioCliente
+from fuente.negocio.servicio.ServicioEmbarcacion import ServicioEmbarcacion
 
 def main(page: ft.Page):
     page.bgcolor = COLOR_FONDO
@@ -49,18 +51,37 @@ def run():
 
     base = Base()
     base.metadata.create_all(engine)
-    """
-    args = {"razon_social":"ETDA", "direccion":"Carretera a Puerto Madero KM 51", "rfc":"1", "telefono":"9618084041",
-            "correo_elect":"etda@unach.mx","tipo_cliente":"armador"}"""
+    """datos_embarcacion = {
+    # 'id_embarcacion': 1,  # Normalmente se omite al instanciar porque la BD lo genera automáticamente (autoincremental)
+    'id_cliente': 1,
+    'nombre': "Santa María",
+    'matricula': "MEX-987654",
+    'imo': "9876543",
+    'bandera': "México",
+    'tipo_embarcacion': "Buque de Carga General",
+    'loa': Decimal('120.50'),
+    'gtr': Decimal('4500.75'),
+    'trb': Decimal('2100.00'),
+    'tonelaje': Decimal('8500.00'),
+    'manga': Decimal('18.20'),
+    'puntual': Decimal('10.50'),
+    'calado_draft': Decimal('7.80'),
+    'volumen_cubico': Decimal('15000.00')
+}"""
+
+    args = {"id_cliente":"31", "razon_social":"ETDA", "direccion":"Carretera a Puerto Madero KM 51", "rfc":"1", "telefono":"9618084041",
+            "correo_elect":"etda@unach.mx","tipo_cliente":"armador"}
     sessionFactory = sessionmaker(bind=engine)
     uow = AlchemyUnitOfWork(sessionFactory)
     serv_cliente = ServicioCliente(uow=uow)
+    serv_embarcacion = ServicioEmbarcacion(uow=uow)
+    #serv_embarcacion.registrar_embarcacion(Embarcacion(**datos_embarcacion))
     """
     res = serv_cliente.obtener_pagina(3);
     for cliente in res:
         print(cliente.rfc + " " + cliente.razon_social)
         """
-    #serv_cliente.registrar_cliente(cliente= Clientefinal(**args))
+   #serv_cliente.registrar_cliente(cliente= Clientefinal(**args))
     #A partir de aquí se puede inyectar el uow al servicio
 
     ft.run(main)

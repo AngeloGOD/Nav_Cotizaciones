@@ -1,5 +1,6 @@
 from fuente.persistencia.uow.AbstractUnitOfWork import AbstractUnitOfWork
 from fuente.persistencia.repositorio.RepositorioCliente import RepositorioCliente
+from fuente.persistencia.repositorio.RepositorioEmbarcaciones import RepositorioEmbarcacion
 
 class AlchemyUnitOfWork(AbstractUnitOfWork):
 
@@ -11,6 +12,7 @@ class AlchemyUnitOfWork(AbstractUnitOfWork):
         self.session.begin()
 
         self.cliente = RepositorioCliente(self.session)
+        self.embarcacion = RepositorioEmbarcacion(self.session)
         return super().__enter__()
 
     def commit(self):

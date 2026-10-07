@@ -1,20 +1,20 @@
 from sqlalchemy.orm.session import Session
-from fuente.negocio.modelo.Cliente import Clientefinal
+from fuente.negocio.modelo.Embarcacion import Embarcacion
 from fuente.persistencia.repositorio.Repositorio import Repositorio
 from sqlalchemy import select
 
-class RepositorioCliente(Repositorio):
+class RepositorioEmbarcacion(Repositorio):
 
     def __init__(self, sesion: Session):
         super().__init__(sesion=sesion)
 
-    def insertar(self, cliente: Clientefinal):
-        self.sesion.add(cliente)
+    def insertar(self, embarcacion: Embarcacion):
+        self.sesion.add(embarcacion)
     
     def consultar_pagina(self, desplazamiento, limite):
         stmt = (
-            select(Clientefinal)
-            .order_by(Clientefinal.id_cliente)
+            select(Embarcacion)
+            .order_by(Embarcacion.id_embarcacion)
             .limit(limite)
             .offset(desplazamiento)
         )

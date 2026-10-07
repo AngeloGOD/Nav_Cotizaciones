@@ -14,7 +14,6 @@ class PantallaClientes(ft.Container):
         )
 
         self._page = page
-
         self.controlador = ControladorClientes()
         self.pagina_actual = 1
         self.registros_por_pagina = 10
@@ -24,7 +23,7 @@ class PantallaClientes(ft.Container):
         self.build_ui()
 
     def build_ui(self):
-        contenido = ft.Column(
+        self._contenido = ft.Column(
             spacing=10,
             controls=[
                 self.cabecera_clientes(),
@@ -37,142 +36,66 @@ class PantallaClientes(ft.Container):
             scroll=ft.ScrollMode.AUTO,
             controls=[
                 ft.Container(
-                    padding=ft.Padding(
-                        left=14,
-                        right=14,
-                        top=8,
-                        bottom=18,
-                    ),
-                    content=contenido,
+                    padding=ft.Padding(14, 8, 14, 18),
+                    content=self._contenido,
                 )
             ],
         )
+
     def cabecera_clientes(self):
         return card(
             ft.Column(
                 spacing=0,
                 controls=[
-                    ft.Container(
-                        height=150,
-                        border_radius=12,
-                        clip_behavior=ft.ClipBehavior.HARD_EDGE,
-                        content=ft.Stack(
+                    banner_imagen_desvanecida(
+                        "fondo_PantallaClientes.jpg",
+                        altura=150,
+                        content=ft.Container(
                             expand=True,
-                            controls=[
-                                ft.Container(
-                                    expand=True,
-                                    image=ft.DecorationImage(
-                                        src="fondo_PantallaClientes.jpg",
-                                        fit=ft.BoxFit.COVER,
-                                        alignment=ft.Alignment(1, 0),
+                            padding=ft.Padding(26, 20, 26, 20),
+                            content=ft.Column(
+                                expand=True,
+                                alignment=ft.MainAxisAlignment.CENTER,
+                                spacing=4,
+                                controls=[
+                                    ft.Text(
+                                        "Gestión de Clientes",
+                                        size=28,
+                                        weight=ft.FontWeight.BOLD,
+                                        color=COLOR_BANNER,
                                     ),
-                                ),
-
-                                ft.Container(
-                                    expand=True,
-                                    gradient=ft.LinearGradient(
-                                        begin=ft.Alignment(-1, 0),
-                                        end=ft.Alignment(1, 0),
-                                        colors=[
-                                            ft.Colors.WHITE,
-                                            ft.Colors.WHITE_70,
-                                            ft.Colors.WHITE_54,
-                                            ft.Colors.TRANSPARENT,
-                                        ],
-                                        stops=[
-                                            0.0,
-                                            0.38,
-                                            0.65,
-                                            1.0,
-                                        ],
+                                    ft.Text(
+                                        "Administra la información fiscal y de contacto de agencias navieras, armadores y clientes.",
+                                        size=14,
+                                        color=COLOR_GRIS,
                                     ),
-                                ),
-
-                                ft.Container(
-                                    expand=True,
-                                    padding=ft.Padding(
-                                        left=26,
-                                        right=26,
-                                        top=20,
-                                        bottom=20,
-                                    ),
-                                    content=ft.Column(
-                                        expand=True,
-                                        alignment=ft.MainAxisAlignment.CENTER,
-                                        spacing=4,
-                                        controls=[
-                                            ft.Text(
-                                                "Gestión de Clientes",
-                                                size=28,
-                                                weight=ft.FontWeight.BOLD,
-                                                color=COLOR_BANNER,
-                                            ),
-                                            ft.Text(
-                                                "Administra la información fiscal y de contacto de agencias navieras, armadores y clientes.",
-                                                size=14,
-                                                color=COLOR_GRIS,
-                                            ),
-                                        ],
-                                    ),
-                                ),
-                            ],
+                                ],
+                            ),
                         ),
                     ),
-
                     ft.Container(
-                        padding=ft.Padding(
-                            left=10,
-                            right=10,
-                            top=10,
-                            bottom=10,
-                        ),
+                        padding=ft.Padding(10, 10, 10, 10),
                         content=ft.Row(
                             spacing=8,
                             controls=[
-                                ft.Container(
-                                    expand=True,
-                                    content=barra_busqueda(
-                                        hint="Buscar por nombre, RFC o contacto...",
-                                        on_change=self.buscar,
-                                    ),
+                                barra_busqueda(
+                                    hint="Buscar por nombre, RFC o contacto...",
+                                    on_change=self.buscar,
                                 ),
-
-                                boton_filtros(
+                                boton(
+                                    texto="Filtros",
+                                    icono=ft.Icons.TUNE,
+                                    tipo="secundario",
+                                    width=150,
+                                    height=44,
                                     on_click=self.abrir_filtros,
                                 ),
-
-                                ft.FilledButton(
-                                    width=185,
-                                    content=ft.Row(
-                                        tight=True,
-                                        spacing=7,
-                                        controls=[
-                                            ft.Icon(
-                                                ft.Icons.ADD,
-                                                size=18,
-                                                color=COLOR_BLANCO,
-                                            ),
-                                            ft.Text(
-                                                "Registrar cliente",
-                                                size=14,
-                                                weight=ft.FontWeight.BOLD,
-                                                color=COLOR_BLANCO,
-                                            ),
-                                        ],
-                                    ),
-                                    style=ft.ButtonStyle(
-                                        bgcolor=COLOR_NARANJA,
-                                        color=COLOR_BLANCO,
-                                        shape=ft.RoundedRectangleBorder(
-                                            radius=8,
-                                        ),
-                                        padding=ft.Padding(
-                                            left=18,
-                                            right=18,
-                                            top=12,
-                                            bottom=12,
-                                        ),
-                                    ),
+                                boton(
+                                    texto="Registrar cliente",
+                                    icono=ft.Icons.ADD,
+                                    tipo="principal",
+                                    width=200,
+                                    height=44,
                                     on_click=self.ir_a_registro,
                                 ),
                             ],
@@ -205,20 +128,44 @@ class PantallaClientes(ft.Container):
         self.actualizar_directorio()
 
     def actualizar_directorio(self):
-        self.content.controls[0].content.controls[1] = self.directorio()
+        self._contenido.controls[1] = self.directorio()
         self.update()
 
-    def directorio(self):
-        offset = (
-            self.pagina_actual - 1
-        ) * self.registros_por_pagina
+    def contacto(self, icono, texto):
+        return ft.Row(
+            spacing=5,
+            controls=[
+                ft.Icon(
+                    icono,
+                    size=15,
+                    color=COLOR_GRIS,
+                ),
+                ft.Text(
+                    texto or "-",
+                    size=14,
+                    color=COLOR_NEGRO,
+                    max_lines=1,
+                    overflow=ft.TextOverflow.ELLIPSIS,
+                ),
+            ],
+        )
 
-        clientes, self.total_clientes = (
-            self.controlador.obtener_clientes(
-                texto=self.busqueda,
-                limit=self.registros_por_pagina,
-                offset=offset,
-            )
+    def ver_cliente(self, cliente):
+        pass
+
+    def editar_cliente(self, cliente):
+        pass
+
+    def eliminar_cliente(self, cliente):
+        pass
+
+    def directorio(self):
+        offset = (self.pagina_actual - 1) * self.registros_por_pagina
+
+        clientes, self.total_clientes = self.controlador.obtener_clientes(
+            texto=self.busqueda,
+            limit=self.registros_por_pagina,
+            offset=offset,
         )
 
         filas = []
@@ -232,7 +179,7 @@ class PantallaClientes(ft.Container):
 
             inicial = ft.Container(
                 content=ft.Text(
-                    cliente.nombre[:1],
+                    (cliente.nombre or "?")[:1].upper(),
                     size=14,
                     color=COLOR_BLANCO,
                     weight=ft.FontWeight.BOLD,
@@ -247,7 +194,7 @@ class PantallaClientes(ft.Container):
             nombre = ft.Container(
                 width=175,
                 content=ft.Text(
-                    cliente.nombre,
+                    cliente.nombre or "-",
                     size=14,
                     color=COLOR_NEGRO,
                     weight=ft.FontWeight.BOLD,
@@ -262,70 +209,41 @@ class PantallaClientes(ft.Container):
                     spacing=3,
                     alignment=ft.MainAxisAlignment.CENTER,
                     controls=[
-                        ft.Row(
-                            spacing=5,
-                            controls=[
-                                ft.Icon(
-                                    ft.Icons.PHONE_OUTLINED,
-                                    size=15,
-                                    color=COLOR_GRIS,
-                                ),
-                                ft.Container(
-                                    width=230,
-                                    content=ft.Text(
-                                        cliente.telefono,
-                                        size=14,
-                                        color=COLOR_NEGRO,
-                                        max_lines=1,
-                                        overflow=ft.TextOverflow.ELLIPSIS,
-                                    ),
-                                ),
-                            ],
+                        self.contacto(
+                            ft.Icons.PHONE_OUTLINED,
+                            cliente.telefono,
                         ),
-                        ft.Row(
-                            spacing=5,
-                            controls=[
-                                ft.Icon(
-                                    ft.Icons.MAIL_OUTLINE,
-                                    size=15,
-                                    color=COLOR_GRIS,
-                                ),
-                                ft.Container(
-                                    width=230,
-                                    content=ft.Text(
-                                        cliente.correo_elect,
-                                        size=14,
-                                        color=COLOR_NEGRO,
-                                        max_lines=2,
-                                        overflow=ft.TextOverflow.ELLIPSIS,
-                                    ),
-                                ),
-                            ],
+                        self.contacto(
+                            ft.Icons.MAIL_OUTLINE,
+                            cliente.correo_elect,
                         ),
                     ],
                 ),
             )
 
-            acciones = ft.Container(
-                width=125,
-                content=ft.Row(
-                    spacing=0,
-                    controls=[
-                        boton_accion(
-                            ft.Icons.VISIBILITY_OUTLINED,
-                            "Ver cliente",
-                        ),
-                        boton_accion(
-                            ft.Icons.EDIT_OUTLINED,
-                            "Editar cliente",
-                        ),
-                        boton_accion(
-                            ft.Icons.DELETE_OUTLINE,
-                            "Eliminar cliente",
-                            COLOR_ROJO,
-                        ),
-                    ],
-                ),
+            acciones = ft.Row(
+                spacing=0,
+                controls=[
+                    boton(
+                        icono=ft.Icons.VISIBILITY_OUTLINED,
+                        tooltip="Ver cliente",
+                        tipo="accion",
+                        on_click=lambda e, c=cliente: self.ver_cliente(c),
+                    ),
+                    boton(
+                        icono=ft.Icons.EDIT_OUTLINED,
+                        tooltip="Editar cliente",
+                        tipo="accion",
+                        on_click=lambda e, c=cliente: self.editar_cliente(c),
+                    ),
+                    boton(
+                        icono=ft.Icons.DELETE_OUTLINE,
+                        tooltip="Eliminar cliente",
+                        tipo="accion",
+                        color=COLOR_ROJO,
+                        on_click=lambda e, c=cliente: self.eliminar_cliente(c),
+                    ),
+                ],
             )
 
             filas.append(
@@ -347,7 +265,7 @@ class PantallaClientes(ft.Container):
                             ft.Container(
                                 width=115,
                                 content=ft.Text(
-                                    cliente.rfc,
+                                    cliente.rfc or "-",
                                     size=14,
                                     color=COLOR_NEGRO,
                                     max_lines=1,
@@ -359,7 +277,7 @@ class PantallaClientes(ft.Container):
                             ft.Container(
                                 width=250,
                                 content=ft.Text(
-                                    cliente.direccion_fiscal,
+                                    cliente.direccion_fiscal or "-",
                                     size=14,
                                     color=COLOR_NEGRO,
                                     max_lines=2,
@@ -371,7 +289,7 @@ class PantallaClientes(ft.Container):
                             ft.Container(
                                 width=155,
                                 content=ft.Text(
-                                    cliente.tipo_cliente,
+                                    cliente.tipo_cliente or "-",
                                     size=14,
                                     color=COLOR_NEGRO,
                                     max_lines=2,
@@ -380,28 +298,26 @@ class PantallaClientes(ft.Container):
                             )
                         ),
                         ft.DataCell(info_contacto),
-                        ft.DataCell(acciones),
+                        ft.DataCell(
+                            ft.Container(
+                                width=125,
+                                content=acciones,
+                            )
+                        ),
                     ],
                 )
             )
 
-        columnas = [
-            ("Cliente", 235),
-            ("RFC", 120),
-            ("Dirección fiscal", 250),
-            ("Tipo de cliente", 155),
-            ("Información de contacto", 280),
-            ("Acciones", 125),
-        ]
-
         tabla_clientes = tabla(
-            columnas=columnas,
+            columnas=[
+                ("Cliente", 235),
+                ("RFC", 120),
+                ("Dirección fiscal", 250),
+                ("Tipo de cliente", 155),
+                ("Información de contacto", 280),
+                ("Acciones", 125),
+            ],
             filas=filas,
-            column_spacing=10,
-            horizontal_margin=6,
-            heading_row_height=44,
-            data_row_min_height=60,
-            data_row_max_height=float("inf"),
         )
 
         titulo = ft.Row(
@@ -435,8 +351,13 @@ class PantallaClientes(ft.Container):
                         ),
                     ],
                 ),
-                boton_exportar(
-                    on_click=self.exportar_clientes
+                boton(
+                    texto="Exportar",
+                    icono=ft.Icons.DOWNLOAD_OUTLINED,
+                    tipo="secundario",
+                    width=180,
+                    height=44,
+                    on_click=self.exportar_clientes,
                 ),
             ],
         )
@@ -459,18 +380,6 @@ class PantallaClientes(ft.Container):
             ],
         )
 
-        tabla_contenedor = ft.Row(
-            expand=True,
-            scroll=ft.ScrollMode.AUTO,
-            controls=[
-                ft.Container(
-                    content=tabla_clientes,
-                    expand=True,
-                    expand_loose=True,
-                )
-            ],
-        )
-
         return card(
             ft.Column(
                 expand=True,
@@ -481,7 +390,19 @@ class PantallaClientes(ft.Container):
                         height=1,
                         color=COLOR_GRIS_CLARO,
                     ),
-                    tabla_contenedor,
+
+                    ft.Row(
+                        expand=True,
+                        scroll=ft.ScrollMode.AUTO,
+                        controls=[
+                            ft.Container(
+                                content=tabla_clientes,
+                                expand=True,
+                                expand_loose=True,
+                            )
+                        ],
+                    ),
+
                     ft.Divider(
                         height=1,
                         color=COLOR_GRIS_CLARO,

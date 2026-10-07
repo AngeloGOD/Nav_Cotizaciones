@@ -16,6 +16,8 @@ from fuente.negocio.modelo.Producto import Producto
 from fuente.negocio.modelo.Servicio import Servicio
 from fuente.negocio.servicio.ServicioCliente import ServicioCliente
 from fuente.negocio.servicio.ServicioEmbarcacion import ServicioEmbarcacion
+from fuente.negocio.servicio.ServicioProducto import ServicioProducto
+
 
 def main(page: ft.Page):
     page.bgcolor = COLOR_FONDO
@@ -75,6 +77,7 @@ def run():
     uow = AlchemyUnitOfWork(sessionFactory)
     serv_cliente = ServicioCliente(uow=uow)
     serv_embarcacion = ServicioEmbarcacion(uow=uow)
+    servicio_producto = servicio_producto(uow= uow)
     #serv_embarcacion.registrar_embarcacion(Embarcacion(**datos_embarcacion))
     """
     res = serv_cliente.obtener_pagina(3);

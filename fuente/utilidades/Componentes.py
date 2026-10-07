@@ -7,8 +7,201 @@ def sombra_suave():
         color="black12",
         offset=ft.Offset(0, 10),
     )
+def campo(
+    hint,
+    icono,
+    expand=False,
+    multiline=False,
+    min_lines=None,
+    max_lines=None,
+):
+    return ft.TextField(
+        expand=expand,
+        hint_text=hint,
+        prefix_icon=icono,
+        multiline=multiline,
+        min_lines=min_lines,
+        max_lines=max_lines,
+        border=ft.InputBorder.OUTLINE,
+        border_color=COLOR_GRIS_CLARO,
+        focused_border_color=COLOR_NARANJA,
+        border_radius=9,
+        text_size=14,
+        content_padding=14,
+    )
 
-def card(content, padding=16, bgcolor=COLOR_BLANCO, border_color=COLOR_GRIS_CLARO, radius=10, shadow=None, expand=False):
+def boton(
+    texto=None,
+    on_click=None,
+    icono=None,
+    tipo="principal",
+    width=None,
+    height=None,
+    tooltip=None,
+    color=None,
+):
+    if tipo == "accion":
+        return ft.IconButton(
+            icon=icono,
+            tooltip=tooltip or texto,
+            icon_color=color or COLOR_AZUL,
+            icon_size=19,
+            width=width or 38,
+            height=height or 38,
+            padding=ft.Padding(2, 2, 2, 2),
+            on_click=on_click,
+        )
+
+    if tipo == "secundario":
+        return ft.OutlinedButton(
+            width=width,
+            height=height,
+            content=ft.Row(
+                tight=True,
+                spacing=7,
+                controls=[
+                    ft.Icon(
+                        icono,
+                        size=18,
+                        color=color or COLOR_AZUL,
+                    ),
+                    ft.Text(
+                        texto,
+                        size=14,
+                        color=color or COLOR_AZUL,
+                    ),
+                ],
+            ),
+            style=ft.ButtonStyle(
+                color=color or COLOR_AZUL,
+                side=ft.BorderSide(1, COLOR_GRIS_CLARO),
+                shape=ft.RoundedRectangleBorder(radius=8),
+                padding=ft.Padding(14, 0, 14, 0),
+            ),
+            on_click=on_click,
+        )
+
+    return ft.FilledButton(
+        width=width,
+        height=height,
+        content=ft.Row(
+            tight=True,
+            spacing=7,
+            controls=[
+                ft.Icon(
+                    icono or ft.Icons.ADD,
+                    size=19,
+                    color=COLOR_BLANCO,
+                ),
+                ft.Text(
+                    texto,
+                    size=14,
+                    weight=ft.FontWeight.BOLD,
+                    color=COLOR_BLANCO,
+                ),
+            ],
+        ),
+        style=ft.ButtonStyle(
+            bgcolor=color or COLOR_NARANJA,
+            color=COLOR_BLANCO,
+            shape=ft.RoundedRectangleBorder(radius=8),
+            padding=ft.Padding(18, 0, 18, 0),
+        ),
+        on_click=on_click,
+    )
+
+
+def banner_imagen_desvanecida(
+    src,
+    content=None,
+    altura=150,
+):
+    imagen = ft.Container(
+        expand=True,
+        image=ft.DecorationImage(
+            src=src,
+            fit=ft.BoxFit.COVER,
+            alignment=ft.Alignment(1, 0),
+        ),
+    )
+
+    imagen = ft.ShaderMask(
+        content=imagen,
+        blend_mode=ft.BlendMode.DST_IN,
+        border_radius=12,
+        shader=ft.LinearGradient(
+            begin=ft.Alignment(-1, 0),
+            end=ft.Alignment(1, 0),
+            colors=[
+                ft.Colors.TRANSPARENT,
+                ft.Colors.WHITE,
+                ft.Colors.WHITE,
+                ft.Colors.TRANSPARENT,
+            ],
+            stops=[0.0, 0.01, 0.99, 1.0],
+        ),
+    )
+
+    imagen = ft.ShaderMask(
+        content=imagen,
+        blend_mode=ft.BlendMode.DST_IN,
+        border_radius=12,
+        shader=ft.LinearGradient(
+            begin=ft.Alignment(0, -1),
+            end=ft.Alignment(0, 1),
+            colors=[
+                ft.Colors.TRANSPARENT,
+                ft.Colors.WHITE,
+                ft.Colors.WHITE,
+                ft.Colors.TRANSPARENT,
+            ],
+            stops=[0.0, 0.01, 0.99, 1.0],
+        ),
+    )
+
+    return ft.Container(
+        height=altura,
+        bgcolor=COLOR_BLANCO,
+        border_radius=12,
+        clip_behavior=ft.ClipBehavior.HARD_EDGE,
+        content=ft.Stack(
+            expand=True,
+            controls=[
+                imagen,
+
+                ft.Container(
+                    expand=True,
+                    gradient=ft.LinearGradient(
+                        begin=ft.Alignment(-1, 0),
+                        end=ft.Alignment(1, 0),
+                        colors=[
+                            ft.Colors.WHITE,
+                            ft.Colors.WHITE_70,
+                            ft.Colors.WHITE_54,
+                            ft.Colors.TRANSPARENT,
+                        ],
+                        stops=[0.0, 0.38, 0.65, 1.0],
+                    ),
+                ),
+
+                ft.Container(
+                    expand=True,
+                    content=content,
+                ),
+            ],
+        ),
+    )
+
+
+def card(
+    content,
+    padding=16,
+    bgcolor=COLOR_BLANCO,
+    border_color=COLOR_GRIS_CLARO,
+    radius=10,
+    shadow=None,
+    expand=False,
+):
     return ft.Container(
         content=content,
         bgcolor=bgcolor,
@@ -20,7 +213,12 @@ def card(content, padding=16, bgcolor=COLOR_BLANCO, border_color=COLOR_GRIS_CLAR
     )
 
 
-def barra_busqueda(hint="Buscar...", on_change=None, expand=True, width=None):
+def barra_busqueda(
+    hint="Buscar...",
+    on_change=None,
+    expand=True,
+    width=None,
+):
     return ft.TextField(
         hint_text=hint,
         prefix_icon=ft.Icons.SEARCH,
@@ -33,59 +231,6 @@ def barra_busqueda(hint="Buscar...", on_change=None, expand=True, width=None):
         text_size=14,
         content_padding=12,
         on_change=on_change,
-    )
-
-
-def boton_filtros(texto="Filtros", on_click=None, icono=ft.Icons.TUNE):
-    return ft.OutlinedButton(
-        content=ft.Row(
-            tight=True,
-            spacing=7,
-            controls=[
-                ft.Icon(icono, size=17, color=COLOR_AZUL),
-                ft.Text(texto, size=14, color=COLOR_AZUL),
-            ],
-        ),
-        style=ft.ButtonStyle(
-            color=COLOR_AZUL,
-            side=ft.BorderSide(1, COLOR_GRIS_CLARO),
-            shape=ft.RoundedRectangleBorder(radius=8),
-            padding=ft.Padding(left=14, right=14, top=13, bottom=13),
-        ),
-        on_click=on_click,
-    )
-
-
-def boton_exportar(texto="Exportar", on_click=None, icono=ft.Icons.DOWNLOAD_OUTLINED):
-    return ft.OutlinedButton(
-        content=ft.Row(
-            tight=True,
-            spacing=6,
-            controls=[
-                ft.Icon(icono, size=17, color=COLOR_AZUL),
-                ft.Text(texto, size=14, color=COLOR_AZUL),
-            ],
-        ),
-        style=ft.ButtonStyle(
-            color=COLOR_AZUL,
-            side=ft.BorderSide(1, COLOR_GRIS_CLARO),
-            shape=ft.RoundedRectangleBorder(radius=8),
-            padding=ft.Padding(left=14, right=14, top=12, bottom=12),
-        ),
-        on_click=on_click,
-    )
-
-
-def boton_accion(icono, tooltip, color=COLOR_AZUL, on_click=None):
-    return ft.IconButton(
-        icon=icono,
-        tooltip=tooltip,
-        icon_color=color,
-        icon_size=19,
-        width=38,
-        height=38,
-        padding=ft.Padding(left=2, right=2, top=2, bottom=2),
-        on_click=on_click,
     )
 
 
@@ -129,11 +274,16 @@ def tabla(
     )
 
 
-def paginacion(total_registros, registros_por_pagina, pagina_actual, on_change):
+def paginacion(
+    total_registros,
+    registros_por_pagina,
+    pagina_actual,
+    on_change,
+):
     total_paginas = max(
         1,
         (total_registros // registros_por_pagina)
-        + (1 if total_registros % registros_por_pagina else 0),
+        + bool(total_registros % registros_por_pagina),
     )
 
     def cambiar_pagina(pagina):
@@ -157,17 +307,19 @@ def paginacion(total_registros, registros_por_pagina, pagina_actual, on_change):
 
     if total_paginas <= 7:
         paginas = list(range(1, total_paginas + 1))
+
     else:
         paginas = [1]
 
         if pagina_actual > 3:
             paginas.append("...")
 
-        inicio = max(2, pagina_actual - 2)
-        fin = min(total_paginas - 1, pagina_actual + 2)
-
-        for pagina in range(inicio, fin + 1):
-            paginas.append(pagina)
+        paginas.extend(
+            range(
+                max(2, pagina_actual - 2),
+                min(total_paginas - 1, pagina_actual + 2) + 1,
+            )
+        )
 
         if pagina_actual < total_paginas - 2:
             paginas.append("...")
@@ -183,6 +335,7 @@ def paginacion(total_registros, registros_por_pagina, pagina_actual, on_change):
                     color=COLOR_GRIS,
                 )
             )
+
         else:
             botones.append(
                 ft.TextButton(
@@ -191,11 +344,19 @@ def paginacion(total_registros, registros_por_pagina, pagina_actual, on_change):
                         size=14,
                     ),
                     style=ft.ButtonStyle(
-                        bgcolor=COLOR_AZUL if pagina == pagina_actual else "transparent",
-                        color=COLOR_BLANCO if pagina == pagina_actual else COLOR_AZUL,
+                        bgcolor=(
+                            COLOR_AZUL
+                            if pagina == pagina_actual
+                            else "transparent"
+                        ),
+                        color=(
+                            COLOR_BLANCO
+                            if pagina == pagina_actual
+                            else COLOR_AZUL
+                        ),
                         shape=ft.RoundedRectangleBorder(radius=8),
                     ),
-                    on_click=lambda e, pagina=pagina: cambiar_pagina(pagina),
+                    on_click=lambda e, p=pagina: cambiar_pagina(p),
                 )
             )
 
@@ -214,25 +375,25 @@ def paginacion(total_registros, registros_por_pagina, pagina_actual, on_change):
         ),
     ])
 
-    entrada = ft.TextField(
-        width=55,
-        height=35,
-        value=str(pagina_actual),
-        text_align=ft.TextAlign.CENTER,
-        content_padding=5,
-        border_radius=8,
-        border_color=COLOR_GRIS_CLARO,
-        focused_border_color=COLOR_AZUL,
-        color=COLOR_GRIS,
-        text_size=13,
-        on_submit=lambda e: cambiar_pagina(
-            int(e.control.value)
-            if e.control.value.isdigit()
-            else pagina_actual
-        ),
+    botones.append(
+        ft.TextField(
+            width=55,
+            height=35,
+            value=str(pagina_actual),
+            text_align=ft.TextAlign.CENTER,
+            content_padding=5,
+            border_radius=8,
+            border_color=COLOR_GRIS_CLARO,
+            focused_border_color=COLOR_AZUL,
+            color=COLOR_GRIS,
+            text_size=13,
+            on_submit=lambda e: cambiar_pagina(
+                int(e.control.value)
+                if e.control.value.isdigit()
+                else pagina_actual
+            ),
+        )
     )
-
-    botones.append(entrada)
 
     return ft.Row(
         controls=botones,

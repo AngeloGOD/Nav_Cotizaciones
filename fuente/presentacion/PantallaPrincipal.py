@@ -5,6 +5,7 @@ from fuente.presentacion.BarraSuperior import BarraSuperior
 from fuente.presentacion.dashboard import dashboard
 from fuente.presentacion.PantallaClientes import PantallaClientes
 from fuente.presentacion.PantallaEmbarcaciones import PantallaEmbarcaciones
+from fuente.presentacion.PantallaCotizaciones import PantallaCotizaciones
 from fuente.utilidades.Colores import COLOR_FONDO
 
 
@@ -56,6 +57,10 @@ class PantallaPrincipal(ft.Container):
             self.content_area.content = PantallaEmbarcaciones(
                 self.main_page
             )
-
+        elif ruta == "ruta_cotizaciones":
+            self.content_area.content = PantallaCotizaciones(
+                self.main_page
+            )
+        
         if self.page is not None:
             self.content_area.update()

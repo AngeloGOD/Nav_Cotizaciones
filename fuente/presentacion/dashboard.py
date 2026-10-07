@@ -18,23 +18,31 @@ class dashboard(ft.Container):
             border_radius=15,
             clip_behavior=ft.ClipBehavior.HARD_EDGE,
             content=ft.Stack([
+                # Capa 1: Fotografía
                 ft.Container(
                     expand=True,
                     image=ft.DecorationImage(
                         src="fondo_puerto.jpg",
                         fit="cover",
-                        alignment=ft.alignment.Alignment(1, 0)
+                        alignment=ft.alignment.Alignment(1, 0) 
                     )
                 ),
+                # Capa 2: Difuminado desde casi el inicio
                 ft.Container(
                     expand=True,
                     gradient=ft.LinearGradient(
-                        begin=ft.alignment.Alignment(-1, 0),
-                        end=ft.alignment.Alignment(1, 0),
-                        colors=[COLOR_BLANCO, COLOR_BLANCO, ft.Colors.TRANSPARENT],
-                        stops=[0.0, 0.45, 1.0]
+                        begin=ft.alignment.Alignment(-1, 0), 
+                        end=ft.alignment.Alignment(1, 0),    
+                        colors=[
+                            COLOR_BLANCO, 
+                            ft.Colors.with_opacity(0.85, COLOR_BLANCO), 
+                            ft.Colors.TRANSPARENT
+                        ],
+                        
+                        stops=[0.0, 0.1, 0.65] 
                     )
                 ),
+                # textos
                 ft.Container(
                     padding=30,
                     content=ft.Column([

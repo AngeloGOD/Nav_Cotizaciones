@@ -1,4 +1,5 @@
 from fuente.persistencia.uow.AbstractUnitOfWork import AbstractUnitOfWork
+from fuente.persistencia.repositorio.RepositorioCliente import RepositorioCliente
 
 class AlchemyUnitOfWork(AbstractUnitOfWork):
 
@@ -8,6 +9,8 @@ class AlchemyUnitOfWork(AbstractUnitOfWork):
     def __enter__(self):
         self.session = self.session_factory()
         self.session.begin()
+
+        self.cliente = RepositorioCliente(self.session)
         return super().__enter__()
 
     def commit(self):

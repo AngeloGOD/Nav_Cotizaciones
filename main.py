@@ -13,6 +13,7 @@ from fuente.negocio.modelo.CategoriaServicios import CategServicios
 from fuente.negocio.modelo.Concepto import Concepto
 from fuente.negocio.modelo.Producto import Producto
 from fuente.negocio.modelo.Servicio import Servicio
+from fuente.negocio.servicio.ServicioCliente import ServicioCliente
 
 def main(page: ft.Page):
     page.bgcolor = COLOR_FONDO
@@ -48,13 +49,15 @@ def run():
 
     base = Base()
     base.metadata.create_all(engine)
-
+    args = {"razon_social":"ETDA", "direccion":"Carretera a Puerto Madero KM 51", "rfc":"12312312312312312312", "telefono":"9618084041",
+            "correo_elect":"etda@unach.mx","tipo_cliente":"armador"}
     sessionFactory = sessionmaker(bind=engine)
     uow = AlchemyUnitOfWork(sessionFactory)
+    serv_cliente = ServicioCliente(uow=uow)
+    serv_cliente.registrar_cliente(cliente= Clientefinal(**args))
     #A partir de aquí se puede inyectar el uow al servicio
 
     ft.run(main)
-
-
+    
 if __name__ == "__main__":
     run()

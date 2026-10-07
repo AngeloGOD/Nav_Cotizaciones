@@ -49,15 +49,21 @@ def run():
 
     base = Base()
     base.metadata.create_all(engine)
-    args = {"razon_social":"ETDA", "direccion":"Carretera a Puerto Madero KM 51", "rfc":"12312312312312312312", "telefono":"9618084041",
-            "correo_elect":"etda@unach.mx","tipo_cliente":"armador"}
+    """
+    args = {"razon_social":"ETDA", "direccion":"Carretera a Puerto Madero KM 51", "rfc":"1", "telefono":"9618084041",
+            "correo_elect":"etda@unach.mx","tipo_cliente":"armador"}"""
     sessionFactory = sessionmaker(bind=engine)
     uow = AlchemyUnitOfWork(sessionFactory)
     serv_cliente = ServicioCliente(uow=uow)
-    serv_cliente.registrar_cliente(cliente= Clientefinal(**args))
+    """
+    res = serv_cliente.obtener_pagina(3);
+    for cliente in res:
+        print(cliente.rfc + " " + cliente.razon_social)
+        """
+    #serv_cliente.registrar_cliente(cliente= Clientefinal(**args))
     #A partir de aquí se puede inyectar el uow al servicio
 
     ft.run(main)
-    
+
 if __name__ == "__main__":
     run()

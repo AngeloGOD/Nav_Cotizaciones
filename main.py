@@ -77,7 +77,7 @@ def run():
     uow = AlchemyUnitOfWork(sessionFactory)
     serv_cliente = ServicioCliente(uow=uow)
     serv_embarcacion = ServicioEmbarcacion(uow=uow)
-    servicio_producto = servicio_producto(uow= uow)
+    servicio_producto = ServicioProducto(uow= uow)
     #serv_embarcacion.registrar_embarcacion(Embarcacion(**datos_embarcacion))
     """
     res = serv_cliente.obtener_pagina(3);

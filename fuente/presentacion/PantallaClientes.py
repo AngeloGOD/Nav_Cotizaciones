@@ -1,3 +1,4 @@
+
 import flet as ft
 
 from fuente.utilidades.Colores import *
@@ -24,6 +25,7 @@ class PantallaClientes(ft.Container):
 
     def build_ui(self):
         self._contenido = ft.Column(
+            expand=True,
             spacing=10,
             controls=[
                 self.cabecera_clientes(),
@@ -36,6 +38,7 @@ class PantallaClientes(ft.Container):
             scroll=ft.ScrollMode.AUTO,
             controls=[
                 ft.Container(
+                    expand=True,
                     padding=ft.Padding(14, 8, 14, 18),
                     content=self._contenido,
                 )
@@ -160,12 +163,16 @@ class PantallaClientes(ft.Container):
         pass
 
     def directorio(self):
-        offset = (self.pagina_actual - 1) * self.registros_por_pagina
+        offset = (
+            self.pagina_actual - 1
+        ) * self.registros_por_pagina
 
-        clientes, self.total_clientes = self.controlador.obtener_clientes(
-            texto=self.busqueda,
-            limit=self.registros_por_pagina,
-            offset=offset,
+        clientes, self.total_clientes = (
+            self.controlador.obtener_clientes(
+                texto=self.busqueda,
+                limit=self.registros_por_pagina,
+                offset=offset,
+            )
         )
 
         filas = []
@@ -318,6 +325,12 @@ class PantallaClientes(ft.Container):
                 ("Acciones", 125),
             ],
             filas=filas,
+            column_spacing=10,
+            horizontal_margin=6,
+            heading_row_height=44,
+            data_row_min_height=60,
+            data_row_max_height=float("inf"),
+            columnas_flexibles=True,
         )
 
         titulo = ft.Row(
@@ -367,7 +380,8 @@ class PantallaClientes(ft.Container):
             vertical_alignment=ft.CrossAxisAlignment.CENTER,
             controls=[
                 ft.Text(
-                    f"Mostrando {len(clientes)} de {self.total_clientes} clientes",
+                    f"Mostrando {len(clientes)} de "
+                    f"{self.total_clientes} clientes",
                     size=14,
                     color=COLOR_GRIS,
                 ),
@@ -390,19 +404,10 @@ class PantallaClientes(ft.Container):
                         height=1,
                         color=COLOR_GRIS_CLARO,
                     ),
-
-                    ft.Row(
+                    ft.Container(
                         expand=True,
-                        scroll=ft.ScrollMode.AUTO,
-                        controls=[
-                            ft.Container(
-                                content=tabla_clientes,
-                                expand=True,
-                                expand_loose=True,
-                            )
-                        ],
+                        content=tabla_clientes,
                     ),
-
                     ft.Divider(
                         height=1,
                         color=COLOR_GRIS_CLARO,
@@ -413,6 +418,7 @@ class PantallaClientes(ft.Container):
             padding=16,
             radius=10,
             shadow=sombra_suave(),
+            expand=True,
         )
 
     def exportar_clientes(self, e):

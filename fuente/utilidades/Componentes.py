@@ -1,5 +1,8 @@
+
 import flet as ft
 from .Colores import *
+import flet_datatable2 as ftd
+
 
 def sombra_suave():
     return ft.BoxShadow(
@@ -7,6 +10,8 @@ def sombra_suave():
         color="black12",
         offset=ft.Offset(0, 10),
     )
+
+
 def campo(
     hint,
     icono,
@@ -29,6 +34,7 @@ def campo(
         text_size=14,
         content_padding=14,
     )
+
 
 def boton(
     texto=None,
@@ -168,7 +174,6 @@ def banner_imagen_desvanecida(
             expand=True,
             controls=[
                 imagen,
-
                 ft.Container(
                     expand=True,
                     gradient=ft.LinearGradient(
@@ -183,7 +188,6 @@ def banner_imagen_desvanecida(
                         stops=[0.0, 0.38, 0.65, 1.0],
                     ),
                 ),
-
                 ft.Container(
                     expand=True,
                     content=content,
@@ -242,34 +246,55 @@ def tabla(
     heading_row_height=44,
     data_row_min_height=60,
     data_row_max_height=float("inf"),
+    columnas_flexibles=False,
 ):
-    return ft.DataTable(
+    columnas_tabla = []
+
+    for texto, ancho in columnas:
+        encabezado = ft.Container(
+            width=None if columnas_flexibles else ancho,
+            alignment=ft.Alignment(0, 0),
+            content=ft.Text(
+                texto,
+                size=14,
+                weight=ft.FontWeight.BOLD,
+                color=COLOR_NEGRO,
+                text_align=ft.TextAlign.CENTER,
+            ),
+        )
+
+        if columnas_flexibles:
+            # Las columnas grandes reciben más espacio.
+            if ancho <= 140:
+                tamano = ftd.DataColumnSize.S
+            elif ancho <= 200:
+                tamano = ftd.DataColumnSize.M
+            else:
+                tamano = ftd.DataColumnSize.L
+
+            columna = ftd.DataColumn2(
+                label=encabezado,
+                size=tamano,
+            )
+        else:
+            columna = ftd.DataColumn2(
+                label=encabezado,
+                fixed_width=ancho,
+            )
+
+        columnas_tabla.append(columna)
+
+    return ftd.DataTable2(
         expand=True,
         column_spacing=column_spacing,
         horizontal_margin=horizontal_margin,
         heading_row_height=heading_row_height,
-        data_row_min_height=data_row_min_height,
-        data_row_max_height=data_row_max_height,
+        data_row_height=data_row_min_height,
         heading_row_color=COLOR_FONDO,
         border=ft.Border.all(1, COLOR_GRIS_CLARO),
         vertical_lines=ft.BorderSide(1, COLOR_GRIS_CLARO),
         horizontal_lines=ft.BorderSide(1, COLOR_GRIS_CLARO),
-        columns=[
-            ft.DataColumn(
-                ft.Container(
-                    width=ancho,
-                    alignment=ft.Alignment(0, 0),
-                    content=ft.Text(
-                        texto,
-                        size=14,
-                        weight=ft.FontWeight.BOLD,
-                        color=COLOR_NEGRO,
-                        text_align=ft.TextAlign.CENTER,
-                    ),
-                )
-            )
-            for texto, ancho in columnas
-        ],
+        columns=columnas_tabla,
         rows=filas,
     )
 
@@ -307,7 +332,6 @@ def paginacion(
 
     if total_paginas <= 7:
         paginas = list(range(1, total_paginas + 1))
-
     else:
         paginas = [1]
 
@@ -335,7 +359,6 @@ def paginacion(
                     color=COLOR_GRIS,
                 )
             )
-
         else:
             botones.append(
                 ft.TextButton(

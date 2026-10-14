@@ -6,7 +6,7 @@ from sqlalchemy import create_engine
 from sqlalchemy.orm import sessionmaker
 from fuente.persistencia.uow.UnitOFWork import AlchemyUnitOfWork
 from fuente.negocio.modelo.Base import Base
-from fuente.negocio.modelo.Cliente import Clientefinal
+from fuente.negocio.modelo.Cliente import Cliente
 from fuente.negocio.modelo.Usuario import Usuario
 from fuente.negocio.modelo.Embarcacion import Embarcacion
 from fuente.negocio.modelo.CategoriaProductos import CategoriaProductos
@@ -19,7 +19,7 @@ from fuente.negocio.servicio.ServicioEmbarcacion import ServicioEmbarcacion
 from fuente.negocio.servicio.ServicioProducto import ServicioProducto
 
 
-def main(page: ft.Page):
+def main(page: ft.Page, servicio_cliente, servicio_embarcacion):
     page.bgcolor = COLOR_FONDO
     page.padding = 0
     page.spacing = 0
@@ -31,7 +31,11 @@ def main(page: ft.Page):
                 ft.Container(
                     expand=True,
                     bgcolor=COLOR_FONDO,
-                    content=PantallaPrincipal(page),
+                    content=PantallaPrincipal(
+                        page,
+                        servicio_cliente,
+                        servicio_embarcacion,
+                    ),
                 )
             ],
             expand=True,
@@ -84,10 +88,10 @@ def run():
     for cliente in res:
         print(cliente.rfc + " " + cliente.razon_social)
         """
-   #serv_cliente.registrar_cliente(cliente= Clientefinal(**args))
+   #serv_cliente.registrar_cliente(cliente= Cliente(**args))
     #A partir de aquí se puede inyectar el uow al servicio
 
-    ft.run(main)
+    ft.run(lambda page: main(page, serv_cliente, serv_embarcacion))
 
 if __name__ == "__main__":
     run()

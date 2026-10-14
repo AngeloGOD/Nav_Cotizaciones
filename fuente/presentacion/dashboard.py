@@ -47,7 +47,7 @@ class dashboard(ft.Container):
                     padding=30,
                     content=ft.Column([
                         ft.Text("OPL PACÍFICO SUR", size=10, color=COLOR_GRIS, weight=ft.FontWeight.BOLD),
-                        ft.Text("Bienvenido, José", size=32, weight=ft.FontWeight.BOLD, color=COLOR_AZUL),
+                        ft.Text("Bienvenido, Alexis", size=32, weight=ft.FontWeight.BOLD, color=COLOR_AZUL),
                         ft.Text("Aquí tienes un resumen de tus cotizaciones.", size=16, color=COLOR_GRIS),
                         ft.Container(height=10),
                         ft.Text('"Conectamos puertos, impulsamos oportunidades"', size=12, color=COLOR_GRIS, italic=True),

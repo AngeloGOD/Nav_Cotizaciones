@@ -30,12 +30,12 @@ class BarraSuperior(ft.Container):
         
             ft.Row([
                 ft.Column([
-                    ft.Text("José Aguilar", weight=ft.FontWeight.BOLD, color=COLOR_NEGRO),
+                    ft.Text("Alexis Castro", weight=ft.FontWeight.BOLD, color=COLOR_NEGRO),
                     ft.Text("Gerente Administrativo", size=12, color=COLOR_GRIS)
                 ], spacing=2, alignment=ft.MainAxisAlignment.CENTER, horizontal_alignment=ft.CrossAxisAlignment.END),
                 
                 ft.Container(width=5),
-                ft.CircleAvatar(content=ft.Text("JA", color=COLOR_BLANCO, weight=ft.FontWeight.BOLD), bgcolor=COLOR_SIDEBAR)
+                ft.CircleAvatar(content=ft.Text("AC", color=COLOR_BLANCO, weight=ft.FontWeight.BOLD), bgcolor=COLOR_SIDEBAR)
             ])
             
         ], alignment=ft.MainAxisAlignment.END) 

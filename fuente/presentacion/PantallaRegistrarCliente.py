@@ -2,10 +2,11 @@ import flet as ft
 
 from fuente.utilidades.Colores import *
 from fuente.utilidades.Componentes import *
+from fuente.negocio.controlador.ControladorClientes import ControladorClientes
 
 
 class PantallaRegistrarCliente(ft.Container):
-    def __init__(self, page: ft.Page, vista_anterior=None):
+    def __init__(self, page: ft.Page, servicio_cliente, vista_anterior=None):
         super().__init__(
             expand=True,
             bgcolor=COLOR_FONDO,
@@ -13,6 +14,8 @@ class PantallaRegistrarCliente(ft.Container):
 
         self._page = page
         self.vista_anterior = vista_anterior
+        self.servicio_cliente = servicio_cliente
+        self.controlador = ControladorClientes(servicio_cliente)
 
         self.nombre = campo(
             "Nombre o razón social *",
@@ -34,15 +37,15 @@ class PantallaRegistrarCliente(ft.Container):
             text_size=14,
             options=[
                 ft.DropdownOption(
-                    key="Agencia",
+                    key="agencia",
                     text="Agencia naviera",
                 ),
                 ft.DropdownOption(
-                    key="Armador",
+                    key="armador",
                     text="Armador",
                 ),
                 ft.DropdownOption(
-                    key="Cliente",
+                    key="cliente",
                     text="Cliente",
                 ),
             ],
@@ -254,4 +257,39 @@ class PantallaRegistrarCliente(ft.Container):
             self._page.update()
 
     def guardar(self, e):
-        pass
+        razon_social = (self.nombre.value or "").strip()
+        rfc = (self.rfc.value or "").strip()
+        direccion = (self.direccion_fiscal.value or "").strip()
+        telefono = (self.telefono.value or "").strip()
+        correo = (self.correo.value or "").strip()
+        tipo_cliente = (self.tipo_cliente.value or "").strip()
+
+        if not razon_social or not rfc or not direccion or not telefono or not correo or not tipo_cliente:
+            self._page.show_dialog(
+                ft.SnackBar(content=ft.Text("Completa todos los campos obligatorios."))
+            )
+            self._page.update()
+            return
+
+        try:
+            self.controlador.registrar_cliente(
+                razon_social=razon_social,
+                direccion=direccion,
+                rfc=rfc,
+                telefono=telefono,
+                correo_elect=correo,
+                tipo_cliente=tipo_cliente,
+            )
+            self._page.show_dialog(
+                ft.SnackBar(content=ft.Text("Cliente registrado correctamente."))
+            )
+            if self.vista_anterior:
+                self.vista_anterior.build_ui()
+                self.vista_anterior.actualizar_directorio()
+            self._page.update()
+        except Exception:
+            self._page.show_dialog(
+                ft.SnackBar(content=ft.Text("No se pudo guardar el cliente."))
+            )
+            self._page.update()
+        print("Tipo seleccionado:", repr(tipo_cliente))

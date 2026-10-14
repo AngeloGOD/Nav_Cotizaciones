@@ -8,14 +8,15 @@ from fuente.presentacion.PantallaRegistrarCliente import PantallaRegistrarClient
 
 
 class PantallaClientes(ft.Container):
-    def __init__(self, page: ft.Page):
+    def __init__(self, page: ft.Page, servicio_cliente):
         super().__init__(
             expand=True,
             bgcolor=COLOR_FONDO,
         )
 
         self._page = page
-        self.controlador = ControladorClientes()
+        self.servicio_cliente = servicio_cliente
+        self.controlador = ControladorClientes(servicio_cliente)
         self.pagina_actual = 1
         self.registros_por_pagina = 10
         self.total_clientes = 0
@@ -122,6 +123,7 @@ class PantallaClientes(ft.Container):
     def ir_a_registro(self, e):
         self.content = PantallaRegistrarCliente(
             self._page,
+            self.servicio_cliente,
             vista_anterior=self,
         )
         self.update()
@@ -163,30 +165,23 @@ class PantallaClientes(ft.Container):
         pass
 
     def directorio(self):
-        offset = (
-            self.pagina_actual - 1
-        ) * self.registros_por_pagina
+        offset = (self.pagina_actual - 1) * self.registros_por_pagina
 
-        clientes, self.total_clientes = (
-            self.controlador.obtener_clientes(
-                texto=self.busqueda,
-                limit=self.registros_por_pagina,
-                offset=offset,
-            )
+        clientes, self.total_clientes = self.controlador.obtener_clientes(
+            texto=self.busqueda,
+            limit=self.registros_por_pagina,
+            offset=offset,
         )
 
         filas = []
-
         for cliente in clientes:
             color_inicial = (
-                COLOR_NARANJA
-                if cliente.tipo_cliente == "Armador"
-                else COLOR_AZUL
+                COLOR_NARANJA if (cliente.tipo_cliente or "").lower() == "armador" else COLOR_AZUL
             )
 
             inicial = ft.Container(
                 content=ft.Text(
-                    (cliente.nombre or "?")[:1].upper(),
+                    (cliente.razon_social or "?")[:1].upper(),
                     size=14,
                     color=COLOR_BLANCO,
                     weight=ft.FontWeight.BOLD,
@@ -201,7 +196,7 @@ class PantallaClientes(ft.Container):
             nombre = ft.Container(
                 width=175,
                 content=ft.Text(
-                    cliente.nombre or "-",
+                    cliente.razon_social or "-",
                     size=14,
                     color=COLOR_NEGRO,
                     weight=ft.FontWeight.BOLD,
@@ -216,14 +211,8 @@ class PantallaClientes(ft.Container):
                     spacing=3,
                     alignment=ft.MainAxisAlignment.CENTER,
                     controls=[
-                        self.contacto(
-                            ft.Icons.PHONE_OUTLINED,
-                            cliente.telefono,
-                        ),
-                        self.contacto(
-                            ft.Icons.MAIL_OUTLINE,
-                            cliente.correo_elect,
-                        ),
+                        self.contacto(ft.Icons.PHONE_OUTLINED, cliente.telefono),
+                        self.contacto(ft.Icons.MAIL_OUTLINE, cliente.correo_elect),
                     ],
                 ),
             )
@@ -261,10 +250,7 @@ class PantallaClientes(ft.Container):
                                 width=230,
                                 content=ft.Row(
                                     spacing=9,
-                                    controls=[
-                                        inicial,
-                                        nombre,
-                                    ],
+                                    controls=[inicial, nombre],
                                 ),
                             )
                         ),
@@ -284,7 +270,7 @@ class PantallaClientes(ft.Container):
                             ft.Container(
                                 width=250,
                                 content=ft.Text(
-                                    cliente.direccion_fiscal or "-",
+                                    cliente.direccion or "-",
                                     size=14,
                                     color=COLOR_NEGRO,
                                     max_lines=2,
@@ -319,7 +305,7 @@ class PantallaClientes(ft.Container):
             columnas=[
                 ("Cliente", 235),
                 ("RFC", 120),
-                ("Dirección fiscal", 250),
+                ("Dirección", 250),
                 ("Tipo de cliente", 155),
                 ("Información de contacto", 280),
                 ("Acciones", 125),
@@ -380,8 +366,7 @@ class PantallaClientes(ft.Container):
             vertical_alignment=ft.CrossAxisAlignment.CENTER,
             controls=[
                 ft.Text(
-                    f"Mostrando {len(clientes)} de "
-                    f"{self.total_clientes} clientes",
+                    f"Mostrando {len(clientes)} de {self.total_clientes} clientes",
                     size=14,
                     color=COLOR_GRIS,
                 ),
@@ -400,18 +385,9 @@ class PantallaClientes(ft.Container):
                 spacing=10,
                 controls=[
                     titulo,
-                    ft.Divider(
-                        height=1,
-                        color=COLOR_GRIS_CLARO,
-                    ),
-                    ft.Container(
-                        expand=True,
-                        content=tabla_clientes,
-                    ),
-                    ft.Divider(
-                        height=1,
-                        color=COLOR_GRIS_CLARO,
-                    ),
+                    ft.Divider(height=1, color=COLOR_GRIS_CLARO),
+                    ft.Container(expand=True, content=tabla_clientes),
+                    ft.Divider(height=1, color=COLOR_GRIS_CLARO),
                     pie,
                 ],
             ),

@@ -2,10 +2,11 @@ import flet as ft
 
 from fuente.utilidades.Colores import *
 from fuente.utilidades.Componentes import *
+from fuente.negocio.controlador.ControladorBuque import ControladorBuque
 
 
-class PantallaRegistrarEmbarcacion(ft.Container):
-    def __init__(self, page: ft.Page, vista_anterior=None):
+class PantallaRegistrarBuque(ft.Container):
+    def __init__(self, page: ft.Page, servicio_buque, vista_anterior=None):
         super().__init__(
             expand=True,
             bgcolor=COLOR_FONDO,
@@ -13,14 +14,17 @@ class PantallaRegistrarEmbarcacion(ft.Container):
 
         self._page = page
         self.vista_anterior = vista_anterior
+        self.servicio_buque = servicio_buque
+        self.controlador = ControladorBuque(servicio_buque)
 
         self.nombre = self._crear_campo_texto("Nombre del buque *", ft.Icons.DIRECTIONS_BOAT_OUTLINED)
-        self.matricula = self._crear_campo_texto("Matrícula *", ft.Icons.BADGE_OUTLINED)
-        self.imo = self._crear_campo_texto("Número IMO", ft.Icons.NUMBERS_OUTLINED)
-        self.bandera = self._crear_campo_texto("Bandera", ft.Icons.FLAG_OUTLINED)
-        
-        self.tipo_embarcacion = ft.Dropdown(
-            hint_text="Tipo de embarcación *",
+        self.numero_imo = self._crear_campo_texto("Número IMO", ft.Icons.NUMBERS_OUTLINED)
+        self.cliente_id = self._crear_campo_entero("ID del cliente (opcional)", ft.Icons.PERSON_OUTLINE)
+        self.bandera_pais = self._crear_campo_texto("Bandera / País", ft.Icons.FLAG_OUTLINED)
+        self.subtipo_descripcion = self._crear_campo_texto("Subtipo o descripción", ft.Icons.DESCRIPTION_OUTLINED)
+
+        self.categoria_buque = ft.Dropdown(
+            hint_text="Categoría del buque *",
             leading_icon=ft.Icons.CATEGORY_OUTLINED,
             border=ft.InputBorder.OUTLINE,
             border_color=COLOR_GRIS_CLARO,
@@ -28,25 +32,36 @@ class PantallaRegistrarEmbarcacion(ft.Container):
             border_radius=9,
             text_size=14,
             options=[
-                ft.DropdownOption(key="TUNA PURSE SEINER", text="Atunero (Tuna Purse Seiner)"),
-                ft.DropdownOption(key="CARGO", text="Buque de Carga (Cargo)"),
-                ft.DropdownOption(key="TANKER", text="Buque Tanque (Tanker)"),
-                ft.DropdownOption(key="YACHT", text="Yate (Yacht)"),
-                ft.DropdownOption(key="TUG", text="Remolcador (Tug)"),
-                ft.DropdownOption(key="OTHER", text="Otro"),
+                ft.DropdownOption(key="COMERCIAL", text="Comercial (Carga general, portacontenedores, granelero)"),
+                ft.DropdownOption(key="TURISTICO", text="Turístico (Cruceros)"),
+                ft.DropdownOption(key="PESQUERO", text="Pesquero (Atuneros, camaroneros, etc.)"),
+                ft.DropdownOption(key="PETROLERO", text="Petrolero (Tanqueros, gaseros, petroquímicos)"),
+                ft.DropdownOption(key="RO_RO", text="Ro-Ro (Roll On - Roll Off)"),
+                ft.DropdownOption(key="RECREO_MENOR", text="Recreo y Embarcación Menor (Yates, veleros)"),
             ],
         )
 
         # Campos numéricos para especificaciones técnicas
-        self.loa = self._crear_campo_numerico("Eslora / LOA (m)")
-        self.manga = self._crear_campo_numerico("Manga (m)")
-        self.puntual = self._crear_campo_numerico("Puntal (m)")
-        self.calado_draft = self._crear_campo_numerico("Calado / Draft (m)")
-        
-        self.gtr = self._crear_campo_numerico("Arqueo Bruto / GTR")
-        self.trb = self._crear_campo_numerico("TRB")
-        self.tonelaje = self._crear_campo_numerico("Tonelaje (t)")
-        self.volumen_cubico = self._crear_campo_numerico("Vol. Cúbico (m³)")
+        self.trb_arqueo_bruto = self._crear_campo_numerico("Arqueo Bruto / TRB *")
+        self.eslora_metros = self._crear_campo_numerico("Eslora (m) *")
+        self.calado_metros = self._crear_campo_numerico("Calado (m)")
+
+        # Controles booleanos de propulsión y estado
+        self.es_autopropulsado = ft.Switch(
+            label="Es autopropulsado",
+            value=True,
+            active_color=COLOR_NARANJA,
+        )
+        self.propulsores_proa_popa = ft.Switch(
+            label="Propulsores proa/popa",
+            value=False,
+            active_color=COLOR_NARANJA,
+        )
+        self.activo = ft.Switch(
+            label="Buque activo",
+            value=True,
+            active_color=COLOR_NARANJA,
+        )
 
         self.build_ui()
 
@@ -75,6 +90,19 @@ class PantallaRegistrarEmbarcacion(ft.Container):
             input_filter=ft.InputFilter(allow=True, regex_string=r"^[0-9.]*$", replacement_string="")
         )
 
+    def _crear_campo_entero(self, hint, icono):
+        return ft.TextField(
+            hint_text=hint,
+            prefix_icon=icono,
+            border=ft.InputBorder.OUTLINE,
+            border_color=COLOR_GRIS_CLARO,
+            focused_border_color=COLOR_NARANJA,
+            border_radius=9,
+            text_size=14,
+            content_padding=14,
+            input_filter=ft.InputFilter(allow=True, regex_string=r"^[0-9]*$", replacement_string="")
+        )
+
     def build_ui(self):
         formulario = card(
             ft.Column(
@@ -95,11 +123,11 @@ class PantallaRegistrarEmbarcacion(ft.Container):
                                         ),
                                         ft.Container(
                                             expand=True,
-                                            content=self.matricula,
+                                            content=self.numero_imo,
                                         ),
                                         ft.Container(
                                             expand=True,
-                                            content=self.imo,
+                                            content=self.cliente_id,
                                         ),
                                     ],
                                 ),
@@ -108,11 +136,15 @@ class PantallaRegistrarEmbarcacion(ft.Container):
                                     controls=[
                                         ft.Container(
                                             expand=True,
-                                            content=self.tipo_embarcacion,
+                                            content=self.categoria_buque,
                                         ),
                                         ft.Container(
                                             expand=True,
-                                            content=self.bandera,
+                                            content=self.subtipo_descripcion,
+                                        ),
+                                        ft.Container(
+                                            expand=True,
+                                            content=self.bandera_pais,
                                         ),
                                     ],
                                 ),
@@ -122,26 +154,25 @@ class PantallaRegistrarEmbarcacion(ft.Container):
 
                     self.seccion(
                         ft.Icons.SQUARE_FOOT_OUTLINED,
-                        "Especificaciones físicas y arqueo",
+                        "Especificaciones físicas, arqueo y propulsión",
                         ft.Column(
-                            spacing=12,
+                            spacing=16,
                             controls=[
                                 ft.Row(
                                     spacing=14,
                                     controls=[
-                                        ft.Container(expand=True, content=self.loa),
-                                        ft.Container(expand=True, content=self.manga),
-                                        ft.Container(expand=True, content=self.puntual),
-                                        ft.Container(expand=True, content=self.calado_draft),
+                                        ft.Container(expand=True, content=self.trb_arqueo_bruto),
+                                        ft.Container(expand=True, content=self.eslora_metros),
+                                        ft.Container(expand=True, content=self.calado_metros),
                                     ],
                                 ),
                                 ft.Row(
-                                    spacing=14,
+                                    spacing=24,
+                                    vertical_alignment=ft.CrossAxisAlignment.CENTER,
                                     controls=[
-                                        ft.Container(expand=True, content=self.gtr),
-                                        ft.Container(expand=True, content=self.trb),
-                                        ft.Container(expand=True, content=self.tonelaje),
-                                        ft.Container(expand=True, content=self.volumen_cubico),
+                                        ft.Container(content=self.es_autopropulsado),
+                                        ft.Container(content=self.propulsores_proa_popa),
+                                        ft.Container(content=self.activo),
                                     ],
                                 ),
                             ]
@@ -204,7 +235,7 @@ class PantallaRegistrarEmbarcacion(ft.Container):
                                             color=COLOR_BLANCO,
                                         ),
                                         ft.Text(
-                                            "Guardar embarcación",
+                                            "Guardar buque",
                                             size=14,
                                             weight=ft.FontWeight.BOLD,
                                             color=COLOR_BLANCO,
@@ -270,7 +301,7 @@ class PantallaRegistrarEmbarcacion(ft.Container):
                         spacing=5,
                         controls=[
                             ft.Text(
-                                "Registrar nueva embarcación",
+                                "Registrar nuevo buque",
                                 size=28,
                                 weight=ft.FontWeight.BOLD,
                                 color=COLOR_BANNER,
@@ -360,4 +391,50 @@ class PantallaRegistrarEmbarcacion(ft.Container):
             self.vista_anterior.update()
 
     def guardar(self, e):
-        pass
+        nombre = (self.nombre.value or "").strip()
+        numero_imo = (self.numero_imo.value or "").strip()
+        cliente_id = (self.cliente_id.value or "").strip()
+        categoria_buque = (self.categoria_buque.value or "").strip()
+        subtipo_descripcion = (self.subtipo_descripcion.value or "").strip()
+        bandera_pais = (self.bandera_pais.value or "").strip()
+        trb_arqueo_bruto = (self.trb_arqueo_bruto.value or "").strip()
+        eslora_metros = (self.eslora_metros.value or "").strip()
+        calado_metros = (self.calado_metros.value or "").strip()
+        es_autopropulsado = bool(self.es_autopropulsado.value)
+        propulsores_proa_popa = bool(self.propulsores_proa_popa.value)
+        activo = bool(self.activo.value)
+
+        if not nombre or not categoria_buque or not trb_arqueo_bruto or not eslora_metros:
+            self._page.show_dialog(
+                ft.SnackBar(content=ft.Text("Completa todos los campos obligatorios."))
+            )
+            self._page.update()
+            return
+
+        try:
+            self.controlador.registrar_buque(
+                nombre=nombre,
+                categoria_buque=categoria_buque,
+                trb_arqueo_bruto=trb_arqueo_bruto,
+                eslora_metros=eslora_metros,
+                cliente_id=cliente_id,
+                numero_imo=numero_imo,
+                subtipo_descripcion=subtipo_descripcion,
+                calado_metros=calado_metros,
+                propulsores_proa_popa=propulsores_proa_popa,
+                es_autopropulsado=es_autopropulsado,
+                bandera_pais=bandera_pais,
+                activo=activo,
+            )
+            self._page.show_dialog(
+                ft.SnackBar(content=ft.Text("Buque registrado correctamente."))
+            )
+            if self.vista_anterior:
+                self.vista_anterior.build_ui()
+                self.vista_anterior.actualizar_directorio()
+            self._page.update()
+        except Exception:
+            self._page.show_dialog(
+                ft.SnackBar(content=ft.Text("No se pudo guardar el buque."))
+            )
+            self._page.update()

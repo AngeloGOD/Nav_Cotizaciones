@@ -1,23 +1,27 @@
 from fuente.negocio.modelo.Base import Base
 from sqlalchemy.orm import mapped_column
 from sqlalchemy.orm import Mapped
-from sqlalchemy import ForeignKey, CheckConstraint
+from sqlalchemy import ForeignKey, CheckConstraint, String, Numeric, Boolean
 from decimal import Decimal
-from fuente.negocio.modelo.ENUMs import TipoConcepto
+from fuente.negocio.modelo.ENUMs import TipoConcepto, CategoriaPDA
+
 
 class Concepto(Base):
-    __tablename__ = 'concepto'
+    """tabla general para servicios portuarios y productos de avituallamiento."""
+    __tablename__ = "concepto"
 
-    id_concepto: Mapped[int] = mapped_column(primary_key=True)
-    id_producto: Mapped[int | None] = mapped_column(ForeignKey('producto.id_producto', ondelete='CASCADE'))
-    id_servicio: Mapped[int | None] = mapped_column(ForeignKey('servicio.id_servicio', ondelete='CASCADE'))
-    tipo_concepto: Mapped[TipoConcepto] = mapped_column(nullable=True)
+    id: Mapped[int] = mapped_column(primary_key=True)
+    codigo: Mapped[str] = mapped_column(String(40), unique=True)
+    nombre_es: Mapped[str] = mapped_column(String(200))
+    nombre_en: Mapped[str | None] = mapped_column(String(200))
+    tipo_concepto: Mapped[TipoConcepto]
+    categoria_pda: Mapped[CategoriaPDA]
+    unidad_medida: Mapped[str] = mapped_column(String(40))
+    tasa_iva: Mapped[Decimal] = mapped_column(Numeric(5, 4), default=Decimal("0.1600"))
+    tasa_isr_retencion: Mapped[Decimal] = mapped_column(Numeric(5, 4), default=Decimal("0.0000"))
+    activo: Mapped[bool] = mapped_column(Boolean, default=True)
 
-    __table_args__ = (
-        CheckConstraint(
-            "(tipo_concepto = 'PRODUCTO' AND id_producto IS NOT NULL AND id_servicio IS NULL) OR "
-            "(tipo_concepto = 'SERVICIO' AND id_servicio IS NOT NULL AND id_producto IS NULL) OR "
-            "(tipo_concepto = 'OTRO' AND id_producto IS NULL AND id_servicio IS NULL)",
-            name='chk_concepto_origen'
-        ),
-    )
+    __mapper_args__ = {
+        "polymorphic_on": "tipo_concepto",
+        "polymorphic_identity": "CONCEPTO_BASE",
+    }

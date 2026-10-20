@@ -4,13 +4,13 @@ from fuente.presentacion.MenuLateral import MenuLateral
 from fuente.presentacion.BarraSuperior import BarraSuperior
 from fuente.presentacion.dashboard import dashboard
 from fuente.presentacion.PantallaClientes import PantallaClientes
-from fuente.presentacion.PantallaEmbarcaciones import PantallaEmbarcaciones
+from fuente.presentacion.PantallaBuques import PantallaBuques
 from fuente.presentacion.PantallaCotizaciones import PantallaCotizaciones
 from fuente.utilidades.Colores import COLOR_FONDO
 
 
 class PantallaPrincipal(ft.Container):
-    def __init__(self, page: ft.Page, servicio_cliente, servicio_embarcacion):
+    def __init__(self, page: ft.Page, servicio_cliente, servicio_buque):
         super().__init__(
             expand=True,
             bgcolor=COLOR_FONDO,
@@ -19,7 +19,7 @@ class PantallaPrincipal(ft.Container):
 
         self.main_page = page
         self.servicio_cliente = servicio_cliente
-        self.servicio_embarcacion = servicio_embarcacion
+        self.servicio_buque = servicio_buque
 
         self.content_area = ft.Container(
             expand=True,
@@ -57,8 +57,9 @@ class PantallaPrincipal(ft.Container):
             )
 
         elif ruta == "ruta_buques":
-            self.content_area.content = PantallaEmbarcaciones(
-                self.main_page
+            self.content_area.content = PantallaBuques(
+                self.main_page,
+                self.servicio_buque,
             )
         elif ruta == "ruta_cotizaciones":
             self.content_area.content = PantallaCotizaciones(

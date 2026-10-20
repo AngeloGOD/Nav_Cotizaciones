@@ -23,12 +23,12 @@ class PantallaRegistrarCliente(ft.Container):
         )
 
         self.rfc = campo(
-            "RFC *",
+            "RFC",
             ft.Icons.BADGE_OUTLINED,
         )
 
-        self.tipo_cliente = ft.Dropdown(
-            hint_text="Tipo de cliente *",
+        self.tipo_persona = ft.Dropdown(
+            hint_text="Tipo de persona *",
             leading_icon=ft.Icons.GROUP_OUTLINED,
             border=ft.InputBorder.OUTLINE,
             border_color=COLOR_GRIS_CLARO,
@@ -37,32 +37,44 @@ class PantallaRegistrarCliente(ft.Container):
             text_size=14,
             options=[
                 ft.DropdownOption(
-                    key="agencia",
-                    text="Agencia naviera",
+                    key="FISICA",
+                    text="Persona Física",
                 ),
                 ft.DropdownOption(
-                    key="armador",
-                    text="Armador",
+                    key="MORAL",
+                    text="Persona Moral",
                 ),
                 ft.DropdownOption(
-                    key="cliente",
-                    text="Cliente",
+                    key="EXTRANJERO",
+                    text="Extranjero",
                 ),
             ],
         )
 
+        self.es_nuevo_cliente = ft.Switch(
+            label="Es nuevo cliente",
+            value=False,
+            active_color=COLOR_NARANJA,
+        )
+
+        self.activo = ft.Switch(
+            label="Cliente activo",
+            value=True,
+            active_color=COLOR_NARANJA,
+        )
+
         self.telefono = campo(
-            "Número telefónico *",
+            "Número telefónico",
             ft.Icons.PHONE_OUTLINED,
         )
 
         self.correo = campo(
-            "Correo electrónico *",
+            "Correo electrónico",
             ft.Icons.MAIL_OUTLINE,
         )
 
         self.direccion_fiscal = campo(
-            "Dirección fiscal completa *",
+            "Dirección fiscal completa",
             ft.Icons.LOCATION_ON_OUTLINED,
             expand=True,
             multiline=True,
@@ -114,9 +126,21 @@ class PantallaRegistrarCliente(ft.Container):
                                         ),
                                     ],
                                 ),
-                                ft.Container(
-                                    width=560,
-                                    content=self.tipo_cliente,
+                                ft.Row(
+                                    spacing=24,
+                                    vertical_alignment=ft.CrossAxisAlignment.CENTER,
+                                    controls=[
+                                        ft.Container(
+                                            expand=True,
+                                            content=self.tipo_persona,
+                                        ),
+                                        ft.Container(
+                                            content=self.es_nuevo_cliente,
+                                        ),
+                                        ft.Container(
+                                            content=self.activo,
+                                        ),
+                                    ],
                                 ),
                             ],
                         ),
@@ -262,9 +286,11 @@ class PantallaRegistrarCliente(ft.Container):
         direccion = (self.direccion_fiscal.value or "").strip()
         telefono = (self.telefono.value or "").strip()
         correo = (self.correo.value or "").strip()
-        tipo_cliente = (self.tipo_cliente.value or "").strip()
+        tipo_persona = (self.tipo_persona.value or "").strip()
+        es_nuevo_cliente = bool(self.es_nuevo_cliente.value)
+        activo = bool(self.activo.value)
 
-        if not razon_social or not rfc or not direccion or not telefono or not correo or not tipo_cliente:
+        if not razon_social or not tipo_persona:
             self._page.show_dialog(
                 ft.SnackBar(content=ft.Text("Completa todos los campos obligatorios."))
             )
@@ -274,11 +300,13 @@ class PantallaRegistrarCliente(ft.Container):
         try:
             self.controlador.registrar_cliente(
                 razon_social=razon_social,
+                tipo_persona=tipo_persona,
                 direccion=direccion,
                 rfc=rfc,
                 telefono=telefono,
                 correo_elect=correo,
-                tipo_cliente=tipo_cliente,
+                es_nuevo_cliente=es_nuevo_cliente,
+                activo=activo,
             )
             self._page.show_dialog(
                 ft.SnackBar(content=ft.Text("Cliente registrado correctamente."))
@@ -292,4 +320,3 @@ class PantallaRegistrarCliente(ft.Container):
                 ft.SnackBar(content=ft.Text("No se pudo guardar el cliente."))
             )
             self._page.update()
-        print("Tipo seleccionado:", repr(tipo_cliente))

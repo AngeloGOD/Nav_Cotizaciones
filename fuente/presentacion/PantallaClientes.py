@@ -1,4 +1,3 @@
-
 import flet as ft
 
 from fuente.utilidades.Colores import *
@@ -83,7 +82,7 @@ class PantallaClientes(ft.Container):
                             spacing=8,
                             controls=[
                                 barra_busqueda(
-                                    hint="Buscar por nombre, RFC o contacto...",
+                                    hint="Buscar por razón social, RFC, tipo de persona o contacto...",
                                     on_change=self.buscar,
                                 ),
                                 boton(
@@ -173,10 +172,25 @@ class PantallaClientes(ft.Container):
             offset=offset,
         )
 
+        etiquetas_persona = {
+            "FISICA": "Persona Física",
+            "MORAL": "Persona Moral",
+            "EXTRANJERO": "Extranjero",
+        }
+
         filas = []
         for cliente in clientes:
+            valor_tipo = (
+                cliente.tipo_persona.value
+                if hasattr(cliente.tipo_persona, "value")
+                else str(cliente.tipo_persona or "")
+            )
+            texto_tipo_persona = etiquetas_persona.get(
+                valor_tipo.upper(), valor_tipo or "-"
+            )
+
             color_inicial = (
-                COLOR_NARANJA if (cliente.tipo_cliente or "").lower() == "armador" else COLOR_AZUL
+                COLOR_NARANJA if valor_tipo.upper() == "MORAL" else COLOR_AZUL
             )
 
             inicial = ft.Container(
@@ -193,32 +207,75 @@ class PantallaClientes(ft.Container):
                 alignment=ft.Alignment(0, 0),
             )
 
-            nombre = ft.Container(
-                width=175,
-                content=ft.Text(
-                    cliente.razon_social or "-",
-                    size=14,
-                    color=COLOR_NEGRO,
-                    weight=ft.FontWeight.BOLD,
-                    max_lines=2,
-                    overflow=ft.TextOverflow.ELLIPSIS,
-                ),
+            fecha_creacion = (
+                cliente.creado_en.strftime("%d/%m/%Y")
+                if getattr(cliente, "creado_en", None)
+                else "-"
             )
 
-            info_contacto = ft.Container(
-                width=260,
+            nombre = ft.Container(
+                expand=True,
                 content=ft.Column(
-                    spacing=3,
+                    spacing=2,
                     alignment=ft.MainAxisAlignment.CENTER,
                     controls=[
-                        self.contacto(ft.Icons.PHONE_OUTLINED, cliente.telefono),
-                        self.contacto(ft.Icons.MAIL_OUTLINE, cliente.correo_elect),
+                        ft.Text(
+                            cliente.razon_social or "-",
+                            size=14,
+                            color=COLOR_NEGRO,
+                            weight=ft.FontWeight.BOLD,
+                            max_lines=2,
+                            overflow=ft.TextOverflow.ELLIPSIS,
+                        ),
+                        ft.Text(
+                            f"Registro: {fecha_creacion}",
+                            size=12,
+                            color=COLOR_GRIS,
+                        ),
                     ],
                 ),
             )
 
+            info_contacto = ft.Column(
+                spacing=3,
+                alignment=ft.MainAxisAlignment.CENTER,
+                controls=[
+                    self.contacto(ft.Icons.PHONE_OUTLINED, cliente.telefono),
+                    self.contacto(ft.Icons.MAIL_OUTLINE, cliente.correo_elect),
+                ],
+            )
+
+            estado_cliente = ft.Column(
+                spacing=3,
+                alignment=ft.MainAxisAlignment.CENTER,
+                controls=[
+                    ft.Row(
+                        spacing=5,
+                        controls=[
+                            ft.Icon(
+                                ft.Icons.CIRCLE,
+                                size=10,
+                                color=COLOR_VERDE if cliente.activo else COLOR_ROJO,
+                            ),
+                            ft.Text(
+                                "Activo" if cliente.activo else "Inactivo",
+                                size=13,
+                                color=COLOR_NEGRO,
+                                weight=ft.FontWeight.W_500,
+                            ),
+                        ],
+                    ),
+                    ft.Text(
+                        f"Nuevo cliente: {'Sí' if cliente.es_nuevo_cliente else 'No'}",
+                        size=12,
+                        color=COLOR_GRIS,
+                    ),
+                ],
+            )
+
             acciones = ft.Row(
                 spacing=0,
+                alignment=ft.MainAxisAlignment.CENTER,
                 controls=[
                     boton(
                         icono=ft.Icons.VISIBILITY_OUTLINED,
@@ -246,68 +303,54 @@ class PantallaClientes(ft.Container):
                 ft.DataRow(
                     cells=[
                         ft.DataCell(
-                            ft.Container(
-                                width=230,
-                                content=ft.Row(
-                                    spacing=9,
-                                    controls=[inicial, nombre],
-                                ),
+                            ft.Row(
+                                spacing=9,
+                                vertical_alignment=ft.CrossAxisAlignment.CENTER,
+                                controls=[inicial, nombre],
                             )
                         ),
                         ft.DataCell(
-                            ft.Container(
-                                width=115,
-                                content=ft.Text(
-                                    cliente.rfc or "-",
-                                    size=14,
-                                    color=COLOR_NEGRO,
-                                    max_lines=1,
-                                    overflow=ft.TextOverflow.ELLIPSIS,
-                                ),
+                            ft.Text(
+                                cliente.rfc or "-",
+                                size=14,
+                                color=COLOR_NEGRO,
+                                max_lines=1,
+                                overflow=ft.TextOverflow.ELLIPSIS,
                             )
                         ),
                         ft.DataCell(
-                            ft.Container(
-                                width=250,
-                                content=ft.Text(
-                                    cliente.direccion or "-",
-                                    size=14,
-                                    color=COLOR_NEGRO,
-                                    max_lines=2,
-                                    overflow=ft.TextOverflow.ELLIPSIS,
-                                ),
+                            ft.Text(
+                                texto_tipo_persona,
+                                size=14,
+                                color=COLOR_NEGRO,
+                                max_lines=1,
+                                overflow=ft.TextOverflow.ELLIPSIS,
                             )
                         ),
                         ft.DataCell(
-                            ft.Container(
-                                width=155,
-                                content=ft.Text(
-                                    cliente.tipo_cliente or "-",
-                                    size=14,
-                                    color=COLOR_NEGRO,
-                                    max_lines=2,
-                                    overflow=ft.TextOverflow.ELLIPSIS,
-                                ),
+                            ft.Text(
+                                cliente.direccion or "-",
+                                size=14,
+                                color=COLOR_NEGRO,
+                                max_lines=2,
+                                overflow=ft.TextOverflow.ELLIPSIS,
                             )
                         ),
                         ft.DataCell(info_contacto),
-                        ft.DataCell(
-                            ft.Container(
-                                width=125,
-                                content=acciones,
-                            )
-                        ),
+                        ft.DataCell(estado_cliente),
+                        ft.DataCell(acciones),
                     ],
                 )
             )
 
         tabla_clientes = tabla(
             columnas=[
-                ("Cliente", 235),
+                ("Cliente", 230),
                 ("RFC", 120),
-                ("Dirección", 250),
-                ("Tipo de cliente", 155),
-                ("Información de contacto", 280),
+                ("Tipo de persona", 145),
+                ("Dirección", 220),
+                ("Información de contacto", 240),
+                ("Estado", 150),
                 ("Acciones", 125),
             ],
             filas=filas,

@@ -17,4 +17,3 @@ class ServicioCliente():
         with self.uow:
             resultado = self.uow.cliente.consultar_pagina(desplazamiento, limite)
         return resultado
-

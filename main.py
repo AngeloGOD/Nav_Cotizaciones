@@ -8,18 +8,19 @@ from fuente.persistencia.uow.UnitOFWork import AlchemyUnitOfWork
 from fuente.negocio.modelo.Base import Base
 from fuente.negocio.modelo.Cliente import Cliente
 from fuente.negocio.modelo.Usuario import Usuario
-from fuente.negocio.modelo.Embarcacion import Embarcacion
+from fuente.negocio.modelo.Buque import Buque
 from fuente.negocio.modelo.CategoriaProductos import CategoriaProductos
 from fuente.negocio.modelo.CategoriaServicios import CategServicios
 from fuente.negocio.modelo.Concepto import Concepto
 from fuente.negocio.modelo.Producto import Producto
 from fuente.negocio.modelo.Servicio import Servicio
+from fuente.negocio.modelo.Buque import Buque
 from fuente.negocio.servicio.ServicioCliente import ServicioCliente
-from fuente.negocio.servicio.ServicioEmbarcacion import ServicioEmbarcacion
+from fuente.negocio.servicio.ServicioBuque import ServicioBuque
 from fuente.negocio.servicio.ServicioProducto import ServicioProducto
 
 
-def main(page: ft.Page, servicio_cliente, servicio_embarcacion):
+def main(page: ft.Page, servicio_cliente, servicio_buque):
     page.bgcolor = COLOR_FONDO
     page.padding = 0
     page.spacing = 0
@@ -34,7 +35,7 @@ def main(page: ft.Page, servicio_cliente, servicio_embarcacion):
                     content=PantallaPrincipal(
                         page,
                         servicio_cliente,
-                        servicio_embarcacion,
+                        servicio_buque,
                     ),
                 )
             ],
@@ -57,41 +58,46 @@ def run():
 
     base = Base()
     base.metadata.create_all(engine)
-    """datos_embarcacion = {
-    # 'id_embarcacion': 1,  # Normalmente se omite al instanciar porque la BD lo genera automáticamente (autoincremental)
-    'id_cliente': 1,
+    """datos_buque = {
+    'cliente_id': 1,
     'nombre': "Santa María",
-    'matricula': "MEX-987654",
-    'imo': "9876543",
-    'bandera': "México",
-    'tipo_embarcacion': "Buque de Carga General",
-    'loa': Decimal('120.50'),
-    'gtr': Decimal('4500.75'),
-    'trb': Decimal('2100.00'),
-    'tonelaje': Decimal('8500.00'),
-    'manga': Decimal('18.20'),
-    'puntual': Decimal('10.50'),
-    'calado_draft': Decimal('7.80'),
-    'volumen_cubico': Decimal('15000.00')
+    'numero_imo': "9876543",
+    'categoria_buque': "COMERCIAL",
+    'subtipo_descripcion': "Buque de Carga General",
+    'trb_arqueo_bruto': Decimal('2100.00'),
+    'eslora_metros': Decimal('120.50'),
+    'calado_metros': Decimal('7.80'),
+    'propulsores_proa_popa': False,
+    'es_autopropulsado': True,
+    'bandera_pais': "México",
+    'activo': True,
 }"""
 
-    args = {"id_cliente":"31", "razon_social":"ETDA", "direccion":"Carretera a Puerto Madero KM 51", "rfc":"1", "telefono":"9618084041",
-            "correo_elect":"etda@unach.mx","tipo_cliente":"armador"}
+    args = {
+        "razon_social": "ETDA",
+        "direccion": "Carretera a Puerto Madero KM 51",
+        "rfc": "ETD010101AAA",
+        "telefono": "9618084041",
+        "correo_elect": "etda@unach.mx",
+        "tipo_persona": "MORAL",
+        "es_nuevo_cliente": False,
+        "activo": True,
+    }
     sessionFactory = sessionmaker(bind=engine)
     uow = AlchemyUnitOfWork(sessionFactory)
     serv_cliente = ServicioCliente(uow=uow)
-    serv_embarcacion = ServicioEmbarcacion(uow=uow)
+    serv_buque = ServicioBuque(uow=uow)
     servicio_producto = ServicioProducto(uow= uow)
-    #serv_embarcacion.registrar_embarcacion(Embarcacion(**datos_embarcacion))
+    #serv_buque.registrar_buque(Buque(**datos_buque))
     """
     res = serv_cliente.obtener_pagina(3);
     for cliente in res:
-        print(cliente.rfc + " " + cliente.razon_social)
+        print((cliente.rfc or "") + " " + cliente.razon_social)
         """
    #serv_cliente.registrar_cliente(cliente= Cliente(**args))
     #A partir de aquí se puede inyectar el uow al servicio
 
-    ft.run(lambda page: main(page, serv_cliente, serv_embarcacion))
+    ft.run(lambda page: main(page, serv_cliente, serv_buque))
 
 if __name__ == "__main__":
     run()

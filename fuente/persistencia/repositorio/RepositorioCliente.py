@@ -14,7 +14,7 @@ class RepositorioCliente(Repositorio):
     def consultar_pagina(self, desplazamiento, limite):
         stmt = (
             select(Cliente)
-            .order_by(Cliente.id_cliente)
+            .order_by(Cliente.id)
             .limit(limite)
             .offset(desplazamiento)
         )

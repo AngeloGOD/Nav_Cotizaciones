@@ -1,34 +1,30 @@
-
 import flet as ft
 
 from fuente.utilidades.Colores import *
 from fuente.utilidades.Componentes import *
-from fuente.negocio.controlador.ControladorEmbarcaciones import (
-    ControladorEmbarcaciones,
-)
-from fuente.presentacion.PantallaRegistrarEmbarcacion import (
-    PantallaRegistrarEmbarcacion,
-)
+from fuente.negocio.controlador.ControladorBuque import ControladorBuque
+from fuente.presentacion.PantallaRegistrarBuque import PantallaRegistrarBuque
 
 
-class PantallaEmbarcaciones(ft.Container):
-    def __init__(self, page: ft.Page):
+class PantallaBuques(ft.Container):
+    def __init__(self, page: ft.Page, servicio_buque):
         super().__init__(
             expand=True,
             bgcolor=COLOR_FONDO,
         )
 
         self._page = page
-        self.controlador = ControladorEmbarcaciones()
+        self.servicio_buque = servicio_buque
+        self.controlador = ControladorBuque(servicio_buque)
         self.pagina_actual = 1
         self.registros_por_pagina = 10
-        self.total_embarcaciones = 0
+        self.total_buques = 0
         self.busqueda = ""
 
         self.build_ui()
 
     def build_ui(self):
-        contenido = ft.Column(
+        self._contenido = ft.Column(
             expand=True,
             spacing=12,
             controls=[
@@ -50,7 +46,7 @@ class PantallaEmbarcaciones(ft.Container):
                         top=8,
                         bottom=18,
                     ),
-                    content=contenido,
+                    content=self._contenido,
                 )
             ],
         )
@@ -65,7 +61,7 @@ class PantallaEmbarcaciones(ft.Container):
                     expand=True,
                     controls=[
                         ft.Text(
-                            "Gestión de Embarcaciones",
+                            "Gestión de Buques",
                             size=28,
                             weight=ft.FontWeight.BOLD,
                             color=COLOR_BANNER,
@@ -79,7 +75,7 @@ class PantallaEmbarcaciones(ft.Container):
                     ],
                 ),
                 boton(
-                    texto="Registrar embarcación",
+                    texto="Registrar buque",
                     icono=ft.Icons.ADD,
                     tipo="principal",
                     on_click=self.ir_a_registro,
@@ -93,7 +89,7 @@ class PantallaEmbarcaciones(ft.Container):
                 spacing=10,
                 controls=[
                     barra_busqueda(
-                        hint="Buscar por nombre, IMO, matrícula o bandera...",
+                        hint="Buscar por nombre, IMO, categoría, subtipo o bandera...",
                         on_change=self.buscar,
                     ),
                     boton(
@@ -117,8 +113,9 @@ class PantallaEmbarcaciones(ft.Container):
         pass
 
     def ir_a_registro(self, e):
-        self.content = PantallaRegistrarEmbarcacion(
+        self.content = PantallaRegistrarBuque(
             self._page,
+            self.servicio_buque,
             vista_anterior=self,
         )
         self.update()
@@ -128,18 +125,34 @@ class PantallaEmbarcaciones(ft.Container):
         self.actualizar_directorio()
 
     def actualizar_directorio(self):
-        self.content.controls[0].content.controls[2] = (
-            self.directorio()
-        )
+        self._contenido.controls[2] = self.directorio()
         self.update()
 
-    def crear_tabla_embarcaciones(self, embarcaciones):
+    def ver_buque(self, buque):
+        pass
+
+    def editar_buque(self, buque):
+        pass
+
+    def eliminar_buque(self, buque):
+        pass
+
+    def crear_tabla_buques(self, buques):
+        etiquetas_categoria = {
+            "COMERCIAL": "Comercial",
+            "TURISTICO": "Turístico",
+            "PESQUERO": "Pesquero",
+            "PETROLERO": "Petrolero",
+            "RO_RO": "Ro-Ro",
+            "RECREO_MENOR": "Recreo / Menor",
+        }
+
         filas = []
 
-        for emb in embarcaciones:
+        for buque in buques:
             inicial = ft.Container(
                 content=ft.Text(
-                    emb.nombre[:1] if emb.nombre else "?",
+                    buque.nombre[:1].upper() if buque.nombre else "?",
                     size=14,
                     color=COLOR_BLANCO,
                     weight=ft.FontWeight.BOLD,
@@ -151,6 +164,14 @@ class PantallaEmbarcaciones(ft.Container):
                 alignment=ft.Alignment(0, 0),
             )
 
+            cliente_obj = getattr(buque, "cliente", None)
+            if cliente_obj and getattr(cliente_obj, "razon_social", None):
+                texto_cliente = f"Cliente: {cliente_obj.razon_social}"
+            elif buque.cliente_id is not None:
+                texto_cliente = f"Cliente ID: {buque.cliente_id}"
+            else:
+                texto_cliente = "Sin cliente asignado"
+
             nombre = ft.Row(
                 spacing=9,
                 vertical_alignment=ft.CrossAxisAlignment.CENTER,
@@ -158,13 +179,26 @@ class PantallaEmbarcaciones(ft.Container):
                     inicial,
                     ft.Container(
                         expand=True,
-                        content=ft.Text(
-                            emb.nombre or "Sin nombre",
-                            size=14,
-                            color=COLOR_NEGRO,
-                            weight=ft.FontWeight.BOLD,
-                            max_lines=2,
-                            overflow=ft.TextOverflow.ELLIPSIS,
+                        content=ft.Column(
+                            spacing=2,
+                            alignment=ft.MainAxisAlignment.CENTER,
+                            controls=[
+                                ft.Text(
+                                    buque.nombre or "Sin nombre",
+                                    size=14,
+                                    color=COLOR_NEGRO,
+                                    weight=ft.FontWeight.BOLD,
+                                    max_lines=2,
+                                    overflow=ft.TextOverflow.ELLIPSIS,
+                                ),
+                                ft.Text(
+                                    texto_cliente,
+                                    size=12,
+                                    color=COLOR_GRIS,
+                                    max_lines=1,
+                                    overflow=ft.TextOverflow.ELLIPSIS,
+                                ),
+                            ],
                         ),
                     ),
                 ],
@@ -175,15 +209,10 @@ class PantallaEmbarcaciones(ft.Container):
                 alignment=ft.MainAxisAlignment.CENTER,
                 controls=[
                     ft.Text(
-                        f"IMO: {emb.imo or 'N/A'}",
+                        f"IMO: {buque.numero_imo or 'N/A'}",
                         size=13,
                         color=COLOR_NEGRO,
                         weight=ft.FontWeight.W_500,
-                    ),
-                    ft.Text(
-                        f"MAT: {emb.matricula or 'N/A'}",
-                        size=12,
-                        color=COLOR_GRIS,
                     ),
                 ],
             )
@@ -199,7 +228,7 @@ class PantallaEmbarcaciones(ft.Container):
                     ft.Container(
                         expand=True,
                         content=ft.Text(
-                            emb.bandera or "N/A",
+                            buque.bandera_pais or "N/A",
                             size=14,
                             color=COLOR_NEGRO,
                             max_lines=1,
@@ -209,12 +238,39 @@ class PantallaEmbarcaciones(ft.Container):
                 ],
             )
 
-            tipo = ft.Text(
-                emb.tipo_embarcacion or "N/A",
-                size=14,
-                color=COLOR_NEGRO,
-                max_lines=2,
-                overflow=ft.TextOverflow.ELLIPSIS,
+            valor_cat = (
+                buque.categoria_buque.value
+                if hasattr(buque.categoria_buque, "value")
+                else str(buque.categoria_buque or "")
+            )
+            texto_cat = etiquetas_categoria.get(valor_cat.upper(), valor_cat or "N/A")
+
+            categoria_y_subtipo = ft.Column(
+                spacing=2,
+                alignment=ft.MainAxisAlignment.CENTER,
+                controls=[
+                    ft.Text(
+                        texto_cat,
+                        size=14,
+                        color=COLOR_NEGRO,
+                        weight=ft.FontWeight.W_500,
+                        max_lines=1,
+                        overflow=ft.TextOverflow.ELLIPSIS,
+                    ),
+                    ft.Text(
+                        buque.subtipo_descripcion or "Sin subtipo",
+                        size=12,
+                        color=COLOR_GRIS,
+                        max_lines=1,
+                        overflow=ft.TextOverflow.ELLIPSIS,
+                    ),
+                ],
+            )
+
+            calado_texto = (
+                f"{buque.calado_metros} m"
+                if buque.calado_metros is not None
+                else "N/A"
             )
 
             especificaciones = ft.Column(
@@ -232,8 +288,8 @@ class PantallaEmbarcaciones(ft.Container):
                             ft.Container(
                                 expand=True,
                                 content=ft.Text(
-                                    f"LOA: {emb.loa} m | "
-                                    f"Manga: {emb.manga} m",
+                                    f"Eslora: {buque.eslora_metros} m | "
+                                    f"Calado: {calado_texto}",
                                     size=13,
                                     color=COLOR_NEGRO,
                                     max_lines=1,
@@ -253,7 +309,7 @@ class PantallaEmbarcaciones(ft.Container):
                             ft.Container(
                                 expand=True,
                                 content=ft.Text(
-                                    f"TRB: {emb.trb} | GTR: {emb.gtr}",
+                                    f"TRB: {buque.trb_arqueo_bruto}",
                                     size=13,
                                     color=COLOR_NEGRO,
                                     max_lines=1,
@@ -265,25 +321,59 @@ class PantallaEmbarcaciones(ft.Container):
                 ],
             )
 
+            propulsion_y_estado = ft.Column(
+                spacing=2,
+                alignment=ft.MainAxisAlignment.CENTER,
+                controls=[
+                    ft.Row(
+                        spacing=5,
+                        controls=[
+                            ft.Icon(
+                                ft.Icons.CIRCLE,
+                                size=10,
+                                color=COLOR_VERDE if buque.activo else COLOR_ROJO,
+                            ),
+                            ft.Text(
+                                "Activo" if buque.activo else "Inactivo",
+                                size=13,
+                                color=COLOR_NEGRO,
+                                weight=ft.FontWeight.W_500,
+                            ),
+                        ],
+                    ),
+                    ft.Text(
+                        f"Autoprop.: {'Sí' if buque.es_autopropulsado else 'No'} | "
+                        f"Prop. P/P: {'Sí' if buque.propulsores_proa_popa else 'No'}",
+                        size=12,
+                        color=COLOR_GRIS,
+                        max_lines=1,
+                        overflow=ft.TextOverflow.ELLIPSIS,
+                    ),
+                ],
+            )
+
             acciones = ft.Row(
                 spacing=0,
                 alignment=ft.MainAxisAlignment.CENTER,
                 controls=[
                     boton(
                         icono=ft.Icons.VISIBILITY_OUTLINED,
-                        tooltip="Ver embarcación",
+                        tooltip="Ver buque",
                         tipo="accion",
+                        on_click=lambda e, b=buque: self.ver_buque(b),
                     ),
                     boton(
                         icono=ft.Icons.EDIT_OUTLINED,
-                        tooltip="Editar embarcación",
+                        tooltip="Editar buque",
                         tipo="accion",
+                        on_click=lambda e, b=buque: self.editar_buque(b),
                     ),
                     boton(
                         icono=ft.Icons.DELETE_OUTLINE,
-                        tooltip="Eliminar embarcación",
+                        tooltip="Eliminar buque",
                         color=COLOR_ROJO,
                         tipo="accion",
+                        on_click=lambda e, b=buque: self.eliminar_buque(b),
                     ),
                 ],
             )
@@ -294,19 +384,21 @@ class PantallaEmbarcaciones(ft.Container):
                         ft.DataCell(nombre),
                         ft.DataCell(identificadores),
                         ft.DataCell(bandera),
-                        ft.DataCell(tipo),
+                        ft.DataCell(categoria_y_subtipo),
                         ft.DataCell(especificaciones),
+                        ft.DataCell(propulsion_y_estado),
                         ft.DataCell(acciones),
                     ],
                 )
             )
 
         columnas = [
-            ("Embarcación", 270),
-            ("Identificadores", 140),
-            ("Bandera", 140),
-            ("Tipo", 175),
-            ("Especificaciones", 300),
+            ("Buque", 240),
+            ("IMO", 120),
+            ("Bandera", 135),
+            ("Categoría / Subtipo", 180),
+            ("Dimensiones y Arqueo", 240),
+            ("Propulsión / Estado", 180),
             ("Acciones", 125),
         ]
 
@@ -326,17 +418,15 @@ class PantallaEmbarcaciones(ft.Container):
             self.pagina_actual - 1
         ) * self.registros_por_pagina
 
-        embarcaciones, self.total_embarcaciones = (
-            self.controlador.obtener_embarcaciones(
+        buques, self.total_buques = (
+            self.controlador.obtener_buques(
                 texto=self.busqueda,
                 limit=self.registros_por_pagina,
                 offset=offset,
             )
         )
 
-        tabla_embarcaciones = self.crear_tabla_embarcaciones(
-            embarcaciones
-        )
+        tabla_buques = self.crear_tabla_buques(buques)
 
         titulo = ft.Row(
             spacing=12,
@@ -357,14 +447,14 @@ class PantallaEmbarcaciones(ft.Container):
                     spacing=2,
                     controls=[
                         ft.Text(
-                            "Directorio de embarcaciones",
+                            "Directorio de buques",
                             size=19,
                             weight=ft.FontWeight.BOLD,
                             color=COLOR_NEGRO,
                         ),
                         ft.Text(
-                            f"{self.total_embarcaciones} "
-                            "embarcaciones registradas",
+                            f"{self.total_buques} "
+                            "buques registrados",
                             size=14,
                             color=COLOR_GRIS,
                         ),
@@ -374,7 +464,7 @@ class PantallaEmbarcaciones(ft.Container):
                     texto="Exportar",
                     icono=ft.Icons.DOWNLOAD_OUTLINED,
                     tipo="secundario",
-                    on_click=self.exportar_embarcaciones,
+                    on_click=self.exportar_buques,
                 ),
             ],
         )
@@ -384,13 +474,13 @@ class PantallaEmbarcaciones(ft.Container):
             vertical_alignment=ft.CrossAxisAlignment.CENTER,
             controls=[
                 ft.Text(
-                    f"Mostrando {len(embarcaciones)} de "
-                    f"{self.total_embarcaciones} embarcaciones",
+                    f"Mostrando {len(buques)} de "
+                    f"{self.total_buques} buques",
                     size=14,
                     color=COLOR_GRIS,
                 ),
                 paginacion(
-                    total_registros=self.total_embarcaciones,
+                    total_registros=self.total_buques,
                     registros_por_pagina=self.registros_por_pagina,
                     pagina_actual=self.pagina_actual,
                     on_change=self.cambiar_pagina,
@@ -410,7 +500,7 @@ class PantallaEmbarcaciones(ft.Container):
                     ),
                     ft.Container(
                         expand=True,
-                        content=tabla_embarcaciones,
+                        content=tabla_buques,
                     ),
                     ft.Divider(
                         height=1,
@@ -424,5 +514,5 @@ class PantallaEmbarcaciones(ft.Container):
             expand=True,
         )
 
-    def exportar_embarcaciones(self, e):
+    def exportar_buques(self, e):
         pass

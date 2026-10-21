@@ -19,3 +19,9 @@ class RepositorioProducto(Repositorio):
             .offset(desplazamiento)
         )
         return self.sesion.scalars(stmt).all()
+
+    def modificar(self, producto: Producto):
+        pass
+
+    def eliminar(self, producto: Producto):
+        pass

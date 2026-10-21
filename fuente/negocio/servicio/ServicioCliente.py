@@ -17,3 +17,13 @@ class ServicioCliente():
         with self.uow:
             resultado = self.uow.cliente.consultar_pagina(desplazamiento, limite)
         return resultado
+
+    def modificar_cliente(self, cliente: Cliente):
+        with self.uow:
+            self.uow.cliente.modificar(cliente)
+            self.uow.commit()
+
+    def eliminar_cliente(self, cliente: Cliente):
+        with self.uow:
+            self.uow.cliente.eliminar(cliente)
+            self.uow.commit()

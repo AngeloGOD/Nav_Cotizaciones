@@ -1,7 +1,7 @@
 from sqlalchemy.orm.session import Session
 from fuente.negocio.modelo.Cliente import Cliente
 from fuente.persistencia.repositorio.Repositorio import Repositorio
-from sqlalchemy import select
+from sqlalchemy import select, update, delete
 
 class RepositorioCliente(Repositorio):
 
@@ -19,3 +19,24 @@ class RepositorioCliente(Repositorio):
             .offset(desplazamiento)
         )
         return self.sesion.scalars(stmt).all()
+
+    def modificar(self, cliente: Cliente):
+        stmt = (
+            update(Cliente)
+            .where(Cliente.id == cliente.id)
+            .values(
+                razon_social=cliente.razon_social,
+                direccion=cliente.direccion,
+                rfc=cliente.rfc,
+                correo_elect=cliente.correo_elect,
+                telefono=cliente.telefono,
+                tipo_persona=cliente.tipo_persona,
+                es_nuevo_cliente=cliente.es_nuevo_cliente,
+                activo=cliente.activo,
+            )
+        )
+        self.sesion.execute(stmt)
+
+    def eliminar(self, cliente: Cliente):
+        stmt = delete(Cliente).where(Cliente.id == cliente.id)
+        self.sesion.execute(stmt)

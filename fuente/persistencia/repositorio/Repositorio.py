@@ -12,3 +12,9 @@ class Repositorio(abc.ABC):
     
     @abc.abstractmethod
     def consultar_pagina(self, desplazamiento, limite): pass
+
+    @abc.abstractmethod
+    def modificar(self, objeto: Base): pass
+
+    @abc.abstractmethod
+    def eliminar(self, objeto: Base): pass

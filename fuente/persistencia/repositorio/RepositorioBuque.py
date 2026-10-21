@@ -2,7 +2,7 @@ from sqlalchemy.orm.session import Session
 from sqlalchemy.orm import selectinload
 from fuente.negocio.modelo.Buque import Buque
 from fuente.persistencia.repositorio.Repositorio import Repositorio
-from sqlalchemy import select
+from sqlalchemy import select, update, delete
 
 class RepositorioBuque(Repositorio):
 
@@ -21,3 +21,28 @@ class RepositorioBuque(Repositorio):
             .offset(desplazamiento)
         )
         return self.sesion.scalars(stmt).all()
+
+    def modificar(self, buque: Buque):
+        stmt = (
+            update(Buque)
+            .where(Buque.id == buque.id)
+            .values(
+                cliente_id=buque.cliente_id,
+                nombre=buque.nombre,
+                numero_imo=buque.numero_imo,
+                categoria_buque=buque.categoria_buque,
+                subtipo_descripcion=buque.subtipo_descripcion,
+                trb_arqueo_bruto=buque.trb_arqueo_bruto,
+                eslora_metros=buque.eslora_metros,
+                calado_metros=buque.calado_metros,
+                propulsores_proa_popa=buque.propulsores_proa_popa,
+                es_autopropulsado=buque.es_autopropulsado,
+                bandera_pais=buque.bandera_pais,
+                activo=buque.activo,
+            )
+        )
+        self.sesion.execute(stmt)
+
+    def eliminar(self, buque: Buque):
+        stmt = delete(Buque).where(Buque.id == buque.id)
+        self.sesion.execute(stmt)

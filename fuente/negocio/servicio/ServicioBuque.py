@@ -17,3 +17,13 @@ class ServicioBuque():
         with self.uow:
             resultado = self.uow.buque.consultar_pagina(desplazamiento, limite)
         return resultado
+
+    def modificar_buque(self, buque: Buque):
+        with self.uow:
+            self.uow.buque.modificar(buque)
+            self.uow.commit()
+
+    def eliminar_buque(self, buque: Buque):
+        with self.uow:
+            self.uow.buque.eliminar(buque)
+            self.uow.commit()

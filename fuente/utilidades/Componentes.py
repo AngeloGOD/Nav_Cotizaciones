@@ -423,3 +423,261 @@ def paginacion(
         spacing=5,
         vertical_alignment=ft.CrossAxisAlignment.CENTER,
     )
+def selector_catalogo(
+    texto,
+    icono,
+    opciones,
+    on_change=None,
+    width=None,
+):
+    selector = ft.Dropdown(
+        label=texto,
+        options=[
+            ft.dropdown.Option(
+                key=valor,
+                text=etiqueta,
+            )
+            for valor, etiqueta in opciones
+        ],
+    )
+
+    selector.on_change = on_change
+
+    return ft.Container(
+        width=width,
+        content=ft.Row(
+            spacing=6,
+            controls=[
+                ft.Icon(
+                    icono,
+                    color=COLOR_AZUL,
+                    size=20,
+                ),
+                ft.Container(
+                    content=selector,
+                    expand=True,
+                ),
+            ],
+        ),
+    )
+
+
+def boton_vista(icono, tooltip, seleccionado=False, on_click=None):
+    """Botón para alternar entre cuadrícula y lista."""
+
+    return ft.Container(
+        width=44,
+        height=44,
+        alignment=ft.Alignment(0, 0),
+        bgcolor=COLOR_AZUL if seleccionado else COLOR_BLANCO,
+        border=ft.Border.all(
+            1,
+            COLOR_AZUL if seleccionado else COLOR_GRIS_CLARO,
+        ),
+        border_radius=9,
+        tooltip=tooltip,
+        ink=True,
+        on_click=on_click,
+        content=ft.Icon(
+            icono,
+            size=20,
+            color=COLOR_BLANCO if seleccionado else COLOR_AZUL,
+        ),
+    )
+
+
+def etiqueta_categoria(nombre):
+    """Etiqueta visual de la categoría de un producto."""
+
+    return ft.Container(
+        padding=ft.Padding(8, 4, 8, 4),
+        border_radius=20,
+        bgcolor="#E0F7F4",
+        content=ft.Row(
+            spacing=5,
+            tight=True,
+            controls=[
+                ft.Icon(
+                    ft.Icons.ECO_OUTLINED,
+                    size=14,
+                    color="#079669",
+                ),
+                ft.Text(
+                    nombre,
+                    size=11,
+                    color="#07865F",
+                    weight=ft.FontWeight.W_600,
+                ),
+            ],
+        ),
+    )
+
+
+def tarjeta_producto(producto, on_info=None):
+    """Tarjeta de producto para la vista de cuadrícula."""
+
+    imagen = ft.Container(
+        height=120,
+        border_radius=8,
+        bgcolor="#EAF1F7",
+        alignment=ft.Alignment(0, 0),
+        clip_behavior=ft.ClipBehavior.HARD_EDGE,
+        content=(
+            ft.Image(
+                src=producto.get("imagen", ""),
+                width=float("inf"),
+                height=120,
+                fit=ft.BoxFit.COVER,
+            )
+            if producto.get("imagen")
+            else ft.Icon(
+                ft.Icons.IMAGE_OUTLINED,
+                size=36,
+                color=COLOR_GRIS,
+            )
+        ),
+    )
+
+    contenido = ft.Column(
+        spacing=8,
+        controls=[
+            ft.Stack(
+                controls=[
+                    imagen,
+                    ft.Container(
+                        right=5,
+                        top=5,
+                        content=ft.IconButton(
+                            icon=ft.Icons.INFO_OUTLINE,
+                            tooltip="Ver información",
+                            icon_color=COLOR_AZUL,
+                            bgcolor=COLOR_BLANCO,
+                            on_click=(
+                                lambda e, p=producto: on_info(p)
+                            ) if on_info else None,
+                        ),
+                    ),
+                ],
+            ),
+            etiqueta_categoria(producto["categoria"]),
+            ft.Text(
+                producto["nombre"],
+                size=14,
+                weight=ft.FontWeight.BOLD,
+                color=COLOR_AZUL,
+                max_lines=1,
+                overflow=ft.TextOverflow.ELLIPSIS,
+            ),
+            ft.Text(
+                producto["descripcion"],
+                size=12,
+                color=COLOR_GRIS,
+                max_lines=2,
+                overflow=ft.TextOverflow.ELLIPSIS,
+            ),
+            ft.Row(
+                spacing=7,
+                vertical_alignment=ft.CrossAxisAlignment.CENTER,
+                controls=[
+                    ft.Icon(
+                        ft.Icons.INVENTORY_2_OUTLINED,
+                        size=19,
+                        color=COLOR_AZUL,
+                    ),
+                    ft.Text(
+                        producto["presentacion"],
+                        size=12,
+                        color=COLOR_GRIS,
+                    ),
+                ],
+            ),
+        ],
+    )
+
+    return card(
+        contenido,
+        padding=10,
+        radius=11,
+        shadow=sombra_suave(),
+        expand=True,
+    )
+
+
+def fila_producto(producto, on_info=None):
+    """Fila de producto para la vista de lista."""
+
+    if producto.get("imagen"):
+        imagen = ft.Image(
+            src=producto["imagen"],
+            width=86,
+            height=72,
+            fit=ft.BoxFit.COVER,
+            border_radius=8,
+        )
+    else:
+        imagen = ft.Container(
+            width=86,
+            height=72,
+            bgcolor="#EAF1F7",
+            border_radius=8,
+            alignment=ft.Alignment(0, 0),
+            content=ft.Icon(
+                ft.Icons.IMAGE_OUTLINED,
+                color=COLOR_GRIS,
+            ),
+        )
+
+    return card(
+        ft.Row(
+            spacing=14,
+            vertical_alignment=ft.CrossAxisAlignment.CENTER,
+            controls=[
+                imagen,
+                ft.Column(
+                    expand=True,
+                    spacing=4,
+                    controls=[
+                        ft.Text(
+                            producto["nombre"],
+                            size=14,
+                            weight=ft.FontWeight.BOLD,
+                            color=COLOR_AZUL,
+                        ),
+                        ft.Text(
+                            producto["descripcion"],
+                            size=12,
+                            color=COLOR_GRIS,
+                            max_lines=2,
+                        ),
+                        etiqueta_categoria(producto["categoria"]),
+                    ],
+                ),
+                ft.Row(
+                    width=150,
+                    spacing=6,
+                    controls=[
+                        ft.Icon(
+                            ft.Icons.INVENTORY_2_OUTLINED,
+                            color=COLOR_AZUL,
+                            size=18,
+                        ),
+                        ft.Text(
+                            producto["presentacion"],
+                            size=12,
+                            color=COLOR_GRIS,
+                        ),
+                    ],
+                ),
+                ft.IconButton(
+                    icon=ft.Icons.INFO_OUTLINE,
+                    tooltip="Ver información",
+                    icon_color=COLOR_AZUL,
+                    on_click=(
+                        lambda e, p=producto: on_info(p)
+                    ) if on_info else None,
+                ),
+            ],
+        ),
+        padding=10,
+        radius=10,
+    )

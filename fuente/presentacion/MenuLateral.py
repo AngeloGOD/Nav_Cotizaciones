@@ -17,6 +17,7 @@ class MenuLateral(ft.Container):
             (ft.Icons.HOME_OUTLINED, "Inicio", "ruta_dashboard"),
             (ft.Icons.DESCRIPTION_OUTLINED, "Cotizaciones", "ruta_cotizaciones"),
             (ft.Icons.PEOPLE_OUTLINE, "Clientes", "ruta_clientes"),
+            (ft.Icons.SHOPPING_BAG_OUTLINED, "Productos", "ruta_productos"),
             (ft.Icons.DIRECTIONS_BOAT_OUTLINED, "Buques", "ruta_buques"),
             (ft.Icons.INVENTORY_2_OUTLINED, "Servicios", "ruta_servicios"),
             (ft.Icons.INSERT_CHART_OUTLINED, "Reportes", "ruta_reportes"),

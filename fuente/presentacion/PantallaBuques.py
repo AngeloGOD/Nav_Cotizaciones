@@ -1,3 +1,4 @@
+
 import flet as ft
 
 from fuente.utilidades.Colores import *
@@ -20,6 +21,9 @@ class PantallaBuques(ft.Container):
         self.registros_por_pagina = 10
         self.total_buques = 0
         self.busqueda = ""
+
+        self.buque_seleccionado = None
+        self.dialogo_confirmacion = None
 
         self.build_ui()
 
@@ -134,8 +138,102 @@ class PantallaBuques(ft.Container):
     def editar_buque(self, buque):
         pass
 
+    # ---------------------------------------------------------
+    # ELIMINAR BUQUE CON CONFIRMACIÓN
+    # ---------------------------------------------------------
+
     def eliminar_buque(self, buque):
-        pass
+        self.buque_seleccionado = buque
+
+        self.dialogo_confirmacion = ft.AlertDialog(
+            modal=True,
+            title=ft.Text(
+                "Confirmar eliminación",
+                weight=ft.FontWeight.BOLD,
+                color=COLOR_BANNER,
+            ),
+            content=ft.Text(
+                f"¿Estás seguro de que deseas eliminar el buque "
+                f"'{buque.nombre}'? Esta acción no se puede deshacer.",
+                color=COLOR_NEGRO,
+            ),
+            actions=[
+                ft.TextButton(
+                    "Cancelar",
+                    on_click=self.cancelar_eliminacion,
+                ),
+                ft.TextButton(
+                    "Eliminar",
+                    on_click=self.confirmar_eliminacion,
+                    style=ft.ButtonStyle(
+                        color=COLOR_ROJO,
+                    ),
+                ),
+            ],
+            actions_alignment=ft.MainAxisAlignment.END,
+        )
+
+        self._page.show_dialog(self.dialogo_confirmacion)
+
+    def cancelar_eliminacion(self, e):
+        self._page.pop_dialog()
+        self.buque_seleccionado = None
+        self.dialogo_confirmacion = None
+
+    def confirmar_eliminacion(self, e):
+        buque = self.buque_seleccionado
+
+        self._page.pop_dialog()
+        self.dialogo_confirmacion = None
+        self.buque_seleccionado = None
+
+        if buque is None:
+            return
+
+        try:
+            self.controlador.servicio_buque.eliminar_buque(buque)
+
+            self._mostrar_notificacion(
+                f"Buque '{buque.nombre}' eliminado correctamente.",
+                COLOR_VERDE,
+            )
+
+            # Si eliminamos el último registro de una página,
+            # regresamos a la página anterior cuando corresponda.
+            if (
+                self.pagina_actual > 1
+                and len(
+                    self.controlador.obtener_buques(
+                        texto=self.busqueda,
+                        limit=self.registros_por_pagina,
+                        offset=(self.pagina_actual - 1)
+                        * self.registros_por_pagina,
+                    )[0]
+                ) == 0
+            ):
+                self.pagina_actual -= 1
+
+            self.actualizar_directorio()
+
+        except Exception as error:
+            self._mostrar_notificacion(
+                f"No se pudo eliminar el buque: {error}",
+                COLOR_ROJO,
+            )
+
+    def _mostrar_notificacion(self, mensaje, color):
+        snack = ft.SnackBar(
+            content=ft.Text(
+                mensaje,
+                color=COLOR_BLANCO,
+            ),
+            bgcolor=color,
+        )
+
+        self._page.show_dialog(snack)
+        self._page.update()
+
+    # ---------------------------------------------------------
 
     def crear_tabla_buques(self, buques):
         etiquetas_categoria = {
@@ -243,7 +341,10 @@ class PantallaBuques(ft.Container):
                 if hasattr(buque.categoria_buque, "value")
                 else str(buque.categoria_buque or "")
             )
-            texto_cat = etiquetas_categoria.get(valor_cat.upper(), valor_cat or "N/A")
+            texto_cat = etiquetas_categoria.get(
+                valor_cat.upper(),
+                valor_cat or "N/A",
+            )
 
             categoria_y_subtipo = ft.Column(
                 spacing=2,
@@ -453,8 +554,7 @@ class PantallaBuques(ft.Container):
                             color=COLOR_NEGRO,
                         ),
                         ft.Text(
-                            f"{self.total_buques} "
-                            "buques registrados",
+                            f"{self.total_buques} buques registrados",
                             size=14,
                             color=COLOR_GRIS,
                         ),

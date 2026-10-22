@@ -58,3 +58,41 @@ class ControladorClientes:
 
     def obtener_pagina(self, pagina, limite=10):
         return self.servicio_cliente.obtener_pagina(pagina, limite)
+
+    def modificar_cliente(
+        self,
+        cliente,
+        razon_social,
+        tipo_persona,
+        direccion=None,
+        rfc=None,
+        telefono=None,
+        correo_elect=None,
+        es_nuevo_cliente=False,
+        activo=True,
+    ):
+        if isinstance(tipo_persona, str):
+            tipo_persona = TipoPersona(tipo_persona.strip().upper())
+
+        cliente.razon_social = razon_social.strip()
+        cliente.direccion = (
+            direccion.strip() if direccion and direccion.strip() else None
+        )
+        cliente.rfc = rfc.strip().upper() if rfc and rfc.strip() else None
+        cliente.telefono = (
+            telefono.strip() if telefono and telefono.strip() else None
+        )
+        cliente.correo_elect = (
+            correo_elect.strip()
+            if correo_elect and correo_elect.strip()
+            else None
+        )
+        cliente.tipo_persona = tipo_persona
+        cliente.es_nuevo_cliente = bool(es_nuevo_cliente)
+        cliente.activo = bool(activo)
+
+        self.servicio_cliente.modificar_cliente(cliente)
+        return cliente
+
+    def eliminar_cliente(self, cliente):
+        self.servicio_cliente.eliminar_cliente(cliente)

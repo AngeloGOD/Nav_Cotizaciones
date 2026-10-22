@@ -6,7 +6,13 @@ from fuente.negocio.controlador.ControladorClientes import ControladorClientes
 
 
 class PantallaRegistrarCliente(ft.Container):
-    def __init__(self, page: ft.Page, servicio_cliente, vista_anterior=None):
+    def __init__(
+        self,
+        page: ft.Page,
+        servicio_cliente,
+        vista_anterior=None,
+        cliente=None,
+    ):
         super().__init__(
             expand=True,
             bgcolor=COLOR_FONDO,
@@ -16,6 +22,7 @@ class PantallaRegistrarCliente(ft.Container):
         self.vista_anterior = vista_anterior
         self.servicio_cliente = servicio_cliente
         self.controlador = ControladorClientes(servicio_cliente)
+        self.cliente = cliente
 
         self.nombre = campo(
             "Nombre o razón social *",
@@ -81,6 +88,20 @@ class PantallaRegistrarCliente(ft.Container):
             min_lines=4,
             max_lines=5,
         )
+
+        if self.cliente is not None:
+            self.nombre.value = self.cliente.razon_social
+            self.rfc.value = self.cliente.rfc
+            self.direccion_fiscal.value = self.cliente.direccion
+            self.telefono.value = self.cliente.telefono
+            self.correo.value = self.cliente.correo_elect
+            self.tipo_persona.value = (
+                self.cliente.tipo_persona.value
+                if hasattr(self.cliente.tipo_persona, "value")
+                else self.cliente.tipo_persona
+            )
+            self.es_nuevo_cliente.value = self.cliente.es_nuevo_cliente
+            self.activo.value = self.cliente.activo
 
         self.content = ft.Column(
             expand=True,
@@ -188,7 +209,11 @@ class PantallaRegistrarCliente(ft.Container):
                                 on_click=self.cancelar,
                             ),
                             boton(
-                                texto="Guardar cliente",
+                                texto=(
+                                    "Guardar cambios"
+                                    if self.cliente is not None
+                                    else "Guardar cliente"
+                                ),
                                 icono=ft.Icons.SAVE_OUTLINED,
                                 tipo="principal",
                                 height=44,
@@ -206,6 +231,7 @@ class PantallaRegistrarCliente(ft.Container):
         )
 
     def encabezado(self):
+        es_edicion = self.cliente is not None
         return banner_imagen_desvanecida(
             "fondo_PantallaRegistrarClientes.jpg",
             altura=120,
@@ -218,7 +244,11 @@ class PantallaRegistrarCliente(ft.Container):
                     spacing=18,
                     controls=[
                         ft.Icon(
-                            ft.Icons.PERSON_ADD_OUTLINED,
+                            (
+                                ft.Icons.EDIT_OUTLINED
+                                if es_edicion
+                                else ft.Icons.PERSON_ADD_OUTLINED
+                            ),
                             size=48,
                             color=COLOR_NARANJA,
                         ),
@@ -228,13 +258,21 @@ class PantallaRegistrarCliente(ft.Container):
                             spacing=5,
                             controls=[
                                 ft.Text(
-                                    "Registrar nuevo cliente",
+                                    (
+                                        "Editar cliente"
+                                        if es_edicion
+                                        else "Registrar nuevo cliente"
+                                    ),
                                     size=28,
                                     weight=ft.FontWeight.BOLD,
                                     color=COLOR_BANNER,
                                 ),
                                 ft.Text(
-                                    "Completa la información fiscal y de contacto del cliente.",
+                                    (
+                                        "Actualiza la información fiscal y de contacto del cliente."
+                                        if es_edicion
+                                        else "Completa la información fiscal y de contacto del cliente."
+                                    ),
                                     size=14,
                                     color=COLOR_GRIS,
                                 ),
@@ -291,32 +329,49 @@ class PantallaRegistrarCliente(ft.Container):
         activo = bool(self.activo.value)
 
         if not razon_social or not tipo_persona:
-            self._page.show_dialog(
-                ft.SnackBar(content=ft.Text("Completa todos los campos obligatorios."))
+            mostrar_notificacion(
+                self._page,
+                "Completa los campos obligatorios.",
+                COLOR_ROJO,
             )
-            self._page.update()
             return
 
         try:
-            self.controlador.registrar_cliente(
-                razon_social=razon_social,
-                tipo_persona=tipo_persona,
-                direccion=direccion,
-                rfc=rfc,
-                telefono=telefono,
-                correo_elect=correo,
-                es_nuevo_cliente=es_nuevo_cliente,
-                activo=activo,
+            if self.cliente is not None:
+                self.controlador.modificar_cliente(
+                    cliente=self.cliente,
+                    razon_social=razon_social,
+                    tipo_persona=tipo_persona,
+                    direccion=direccion,
+                    rfc=rfc,
+                    telefono=telefono,
+                    correo_elect=correo,
+                    es_nuevo_cliente=es_nuevo_cliente,
+                    activo=activo,
+                )
+                mensaje = "Cambios guardados correctamente."
+            else:
+                self.controlador.registrar_cliente(
+                    razon_social=razon_social,
+                    tipo_persona=tipo_persona,
+                    direccion=direccion,
+                    rfc=rfc,
+                    telefono=telefono,
+                    correo_elect=correo,
+                    es_nuevo_cliente=es_nuevo_cliente,
+                    activo=activo,
+                )
+                mensaje = "Cliente registrado correctamente."
+        except Exception as error:
+            mostrar_notificacion(
+                self._page,
+                f"No se pudo guardar el cliente: {error}",
+                COLOR_ROJO,
             )
-            self._page.show_dialog(
-                ft.SnackBar(content=ft.Text("Cliente registrado correctamente."))
-            )
-            if self.vista_anterior:
-                self.vista_anterior.build_ui()
-                self.vista_anterior.actualizar_directorio()
-            self._page.update()
-        except Exception:
-            self._page.show_dialog(
-                ft.SnackBar(content=ft.Text("No se pudo guardar el cliente."))
-            )
-            self._page.update()
+            return
+
+        mostrar_notificacion(self._page, mensaje, COLOR_VERDE)
+        if self.vista_anterior:
+            self.vista_anterior.build_ui()
+            self.vista_anterior.actualizar_directorio()
+        self._page.update()

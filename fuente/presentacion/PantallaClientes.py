@@ -154,14 +154,54 @@ class PantallaClientes(ft.Container):
             ],
         )
 
-    def ver_cliente(self, cliente):
-        pass
-
     def editar_cliente(self, cliente):
-        pass
+        self.content = PantallaRegistrarCliente(
+            self._page,
+            self.servicio_cliente,
+            vista_anterior=self,
+            cliente=cliente,
+        )
+        self.update()
 
     def eliminar_cliente(self, cliente):
-        pass
+        dialogo = dialogo_confirmacion(
+            page=self._page,
+            titulo="Confirmar eliminación",
+            mensaje=(
+                f"¿Deseas eliminar el cliente "
+                f"'{cliente.razon_social}'? Esta acción no se puede deshacer."
+            ),
+            on_confirmar=lambda: self._confirmar_eliminacion(cliente),
+            texto_confirmar="Eliminar",
+        )
+        self._page.show_dialog(dialogo)
+
+    def _confirmar_eliminacion(self, cliente):
+        try:
+            self.controlador.eliminar_cliente(cliente)
+        except Exception as error:
+            mostrar_notificacion(
+                self._page,
+                f"No se pudo eliminar el cliente: {error}",
+                COLOR_ROJO,
+            )
+            return
+
+        if self.pagina_actual > 1:
+            clientes, _ = self.controlador.obtener_clientes(
+                texto=self.busqueda,
+                limit=self.registros_por_pagina,
+                offset=(self.pagina_actual - 1) * self.registros_por_pagina,
+            )
+            if not clientes:
+                self.pagina_actual -= 1
+
+        self.actualizar_directorio()
+        mostrar_notificacion(
+            self._page,
+            "Cliente eliminado correctamente.",
+            COLOR_VERDE,
+        )
 
     def directorio(self):
         offset = (self.pagina_actual - 1) * self.registros_por_pagina
@@ -277,12 +317,6 @@ class PantallaClientes(ft.Container):
                 spacing=0,
                 alignment=ft.MainAxisAlignment.CENTER,
                 controls=[
-                    boton(
-                        icono=ft.Icons.VISIBILITY_OUTLINED,
-                        tooltip="Ver cliente",
-                        tipo="accion",
-                        on_click=lambda e, c=cliente: self.ver_cliente(c),
-                    ),
                     boton(
                         icono=ft.Icons.EDIT_OUTLINED,
                         tooltip="Editar cliente",

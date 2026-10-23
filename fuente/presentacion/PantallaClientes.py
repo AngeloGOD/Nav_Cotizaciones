@@ -281,11 +281,8 @@ class PantallaClientes(ft.Container):
                     vertical_alignment=ft.CrossAxisAlignment.END,
                     controls=[
                         campo_tipo_persona,
-                        *(
-                            [campo_cliente_nuevo, campo_cliente_activo]
-                            if self.modo_edicion
-                            else []
-                        ),
+                        campo_cliente_nuevo,
+                        campo_cliente_activo,
                     ],
                 ),
             ],
@@ -317,11 +314,6 @@ class PantallaClientes(ft.Container):
             multiline=True,
         )
 
-        estado = ft.Row(
-            spacing=24,
-            controls=[campo_cliente_nuevo, campo_cliente_activo],
-        )
-
         tarjetas = [
             tarjeta_detalle(
                 "Datos generales",
@@ -339,14 +331,6 @@ class PantallaClientes(ft.Container):
                 domicilio,
             ),
         ]
-        if not self.modo_edicion:
-            tarjetas.append(
-                tarjeta_detalle(
-                    "Estado del cliente",
-                    ft.Icons.VERIFIED_USER_OUTLINED,
-                    estado,
-                )
-            )
 
         return ft.Column(
             tight=True,
@@ -563,7 +547,10 @@ class PantallaClientes(ft.Container):
 
     def _actualizar_ficha(self):
         self.dialogo_cliente.title = self._encabezado_ficha()
-        self.dialogo_cliente.content = self._contenido_ficha_cliente()
+        self.dialogo_cliente.content = ft.Container(
+            width=650,
+            content=self._contenido_ficha_cliente(),
+        )
         self.dialogo_cliente.actions = self._acciones_ficha_cliente()
         self._page.update()
 

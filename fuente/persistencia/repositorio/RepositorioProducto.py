@@ -25,3 +25,9 @@ class RepositorioProducto(Repositorio):
 
     def eliminar(self, producto: Producto):
         pass
+
+    def buscar_por_id(self, id: int):
+        pass
+
+    def buscar_por_nombre(self, nombre: str):
+        pass

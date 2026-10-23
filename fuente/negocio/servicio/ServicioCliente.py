@@ -27,3 +27,15 @@ class ServicioCliente():
         with self.uow:
             self.uow.cliente.eliminar(cliente)
             self.uow.commit()
+
+    def buscar_por_id(self, id: int):
+        resultado = None
+        with self.uow:
+            resultado = self.uow.cliente.buscar_por_id(id)
+        return resultado
+
+    def buscar_por_nombre(self, nombre: str):
+        resultado = None
+        with self.uow:
+            resultado = self.uow.cliente.buscar_por_nombre(nombre)
+        return resultado

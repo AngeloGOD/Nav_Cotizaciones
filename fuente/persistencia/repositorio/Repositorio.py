@@ -18,3 +18,9 @@ class Repositorio(abc.ABC):
 
     @abc.abstractmethod
     def eliminar(self, objeto: Base): pass
+
+    @abc.abstractmethod
+    def buscar_por_id(self, id: int): pass
+
+    @abc.abstractmethod
+    def buscar_por_nombre(self, nombre: str): pass

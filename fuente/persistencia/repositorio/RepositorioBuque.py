@@ -46,3 +46,21 @@ class RepositorioBuque(Repositorio):
     def eliminar(self, buque: Buque):
         stmt = delete(Buque).where(Buque.id == buque.id)
         self.sesion.execute(stmt)
+
+    def buscar_por_id(self, id: int):
+        stmt = (
+            select(Buque)
+            .options(selectinload(Buque.cliente))
+            .where(Buque.id == id)
+        )
+        return self.sesion.scalars(stmt).first()
+
+    def buscar_por_nombre(self, nombre: str):
+        stmt = (
+            select(Buque)
+            .options(selectinload(Buque.cliente))
+            .where(Buque.nombre.ilike(f"%{nombre}%"))
+            .order_by(Buque.id)
+            .limit(10)
+        )
+        return self.sesion.scalars(stmt).all()

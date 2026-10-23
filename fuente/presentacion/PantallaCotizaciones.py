@@ -229,5 +229,6 @@ class PantallaCotizaciones(ft.Container):
         )
     def abrir_nueva_cotizacion(self):
         # vista nueva cotizacion
-        self.parent.content = PantallaNuevaCotizacion(self.main_page)
+        # ¡AQUÍ AGREGAMOS vista_anterior=self!
+        self.parent.content = PantallaNuevaCotizacion(self.main_page, vista_anterior=self)
         self.parent.update()

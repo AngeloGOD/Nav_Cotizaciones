@@ -132,11 +132,249 @@ class PantallaBuques(ft.Container):
         self._contenido.controls[2] = self.directorio()
         self.update()
 
+
     def ver_buque(self, buque):
-        pass
+        categoria = buque.categoria_buque
+        categoria = (
+            categoria.value
+            if hasattr(categoria, "value")
+            else str(categoria or "N/A")
+        )
+
+        cliente_obj = getattr(buque, "cliente", None)
+
+        if cliente_obj and getattr(cliente_obj, "razon_social", None):
+            cliente = cliente_obj.razon_social
+        elif buque.cliente_id is not None:
+            cliente = f"ID {buque.cliente_id}"
+        else:
+            cliente = "Sin cliente asignado"
+
+        color_tarjeta = COLOR_FONDO
+        color_icono = COLOR_BANNER
+
+        def campo(etiqueta, valor):
+            return ft.Column(
+                spacing=2,
+                controls=[
+                    ft.Text(
+                        etiqueta,
+                        size=11,
+                        color=COLOR_GRIS,
+                    ),
+                    ft.Text(
+                        str(
+                            valor
+                            if valor is not None and valor != ""
+                            else "N/A"
+                        ),
+                        size=13,
+                        weight=ft.FontWeight.W_500,
+                        color=COLOR_NEGRO,
+                        selectable=True,
+                    ),
+                ],
+            )
+
+        def tarjeta(titulo, icono, campos):
+            return ft.Container(
+                expand=True,
+                padding=12,
+                border_radius=12,
+                bgcolor=color_tarjeta,
+                content=ft.Column(
+                    spacing=10,
+                    controls=[
+                        ft.Row(
+                            spacing=8,
+                            controls=[
+                                ft.Icon(
+                                    icono,
+                                    size=19,
+                                    color=color_icono,
+                                ),
+                                ft.Text(
+                                    titulo,
+                                    size=14,
+                                    weight=ft.FontWeight.BOLD,
+                                    color=COLOR_BANNER,
+                                ),
+                            ],
+                        ),
+                        ft.Divider(
+                            height=1,
+                            thickness=1,
+                            color=COLOR_GRIS_CLARO,
+                        ),
+                        *campos,
+                    ],
+                ),
+            )
+
+        identificacion = tarjeta(
+            "Identificación",
+            ft.Icons.FOLDER_OUTLINED,
+            [
+                campo("ID del buque", getattr(buque, "id", "N/A")),
+                campo("Número IMO", buque.numero_imo),
+                campo("Cliente", cliente),
+            ],
+        )
+
+        clasificacion = tarjeta(
+            "Clasificación",
+            ft.Icons.CATEGORY_OUTLINED,
+            [
+                campo("Categoría", categoria),
+                campo("Subtipo / descripción", buque.subtipo_descripcion),
+                campo("Bandera / país", buque.bandera_pais),
+            ],
+        )
+
+        caracteristicas = tarjeta(
+            "Características técnicas",
+            ft.Icons.STRAIGHTEN,
+            [
+                campo("Arqueo bruto / TRB", buque.trb_arqueo_bruto),
+                campo(
+                    "Eslora",
+                    f"{buque.eslora_metros} m"
+                    if buque.eslora_metros is not None
+                    else "N/A",
+                ),
+                campo(
+                    "Calado",
+                    f"{buque.calado_metros} m"
+                    if buque.calado_metros is not None
+                    else "N/A",
+                ),
+            ],
+        )
+
+        propulsion = tarjeta(
+            "Propulsión y estado",
+            ft.Icons.SETTINGS_OUTLINED,
+            [
+                campo(
+                    "Autopropulsado",
+                    "Sí" if buque.es_autopropulsado else "No",
+                ),
+                campo(
+                    "Propulsores de proa/popa",
+                    "Sí" if buque.propulsores_proa_popa else "No",
+                ),
+                campo(
+                    "Estado",
+                    "Activo" if buque.activo else "Inactivo",
+                ),
+            ],
+        )
+
+        dialogo = ft.AlertDialog(
+            modal=True,
+            title_padding=ft.Padding(24, 20, 24, 10),
+            content_padding=ft.Padding(24, 8, 24, 12),
+            actions_padding=ft.Padding(16, 0, 16, 16),
+            title=ft.Row(
+                spacing=14,
+                vertical_alignment=ft.CrossAxisAlignment.CENTER,
+                controls=[
+                    ft.Container(
+                        width=52,
+                        height=52,
+                        border_radius=12,
+                        bgcolor=color_tarjeta,
+                        alignment=ft.Alignment.CENTER,
+                        content=ft.Icon(
+                            ft.Icons.DIRECTIONS_BOAT_OUTLINED,
+                            size=30,
+                            color=COLOR_NARANJA,
+                        ),
+                    ),
+                    ft.Column(
+                        expand=True,
+                        spacing=3,
+                        controls=[
+                            ft.Text(
+                                "Detalles del buque",
+                                size=20,
+                                weight=ft.FontWeight.BOLD,
+                                color=COLOR_BANNER,
+                            ),
+                            ft.Text(
+                                buque.nombre or "Sin nombre",
+                                size=13,
+                                color=COLOR_GRIS,
+                            ),
+                        ],
+                    ),
+                    ft.Container(
+                        padding=ft.Padding(10, 5, 10, 5),
+                        border_radius=20,
+                        bgcolor=(
+                            "#DCFCE7"
+                            if buque.activo
+                            else "#FEE2E2"
+                        ),
+                        content=ft.Text(
+                            "Activo" if buque.activo else "Inactivo",
+                            size=11,
+                            weight=ft.FontWeight.BOLD,
+                            color=(
+                                "#166534"
+                                if buque.activo
+                                else "#991B1B"
+                            ),
+                        ),
+                    ),
+                ],
+            ),
+            content=ft.Container(
+                width=650,
+                content=ft.Column(
+                    spacing=12,
+                    tight=True,
+                    controls=[
+                        ft.Row(
+                            spacing=12,
+                            vertical_alignment=ft.CrossAxisAlignment.START,
+                            controls=[
+                                identificacion,
+                                clasificacion,
+                            ],
+                        ),
+                        ft.Row(
+                            spacing=12,
+                            vertical_alignment=ft.CrossAxisAlignment.START,
+                            controls=[
+                                caracteristicas,
+                                propulsion,
+                            ],
+                        ),
+                    ],
+                ),
+            ),
+            actions=[
+                ft.TextButton(
+                    "Cerrar",
+                    on_click=lambda e: self._page.pop_dialog(),
+                ),
+            ],
+            actions_alignment=ft.MainAxisAlignment.END,
+        )
+
+        self._page.show_dialog(dialogo)
+
 
     def editar_buque(self, buque):
-        pass
+        self.content = PantallaRegistrarBuque(
+            self._page,
+            self.servicio_buque,
+            vista_anterior=self,
+            buque_a_editar=buque,
+        )
+        self.update()
+
 
     # ---------------------------------------------------------
     # ELIMINAR BUQUE CON CONFIRMACIÓN

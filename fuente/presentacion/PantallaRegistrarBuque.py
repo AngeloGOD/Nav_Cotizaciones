@@ -6,7 +6,10 @@ from fuente.negocio.controlador.ControladorBuque import ControladorBuque
 
 
 class PantallaRegistrarBuque(ft.Container):
-    def __init__(self, page: ft.Page, servicio_buque, vista_anterior=None):
+    def __init__(
+        self, page: ft.Page, servicio_buque,
+        vista_anterior=None, buque_a_editar=None
+    ):
         super().__init__(
             expand=True,
             bgcolor=COLOR_FONDO,
@@ -16,6 +19,8 @@ class PantallaRegistrarBuque(ft.Container):
         self.vista_anterior = vista_anterior
         self.servicio_buque = servicio_buque
         self.controlador = ControladorBuque(servicio_buque)
+        self.buque_a_editar = buque_a_editar
+        self.modo_edicion = buque_a_editar is not None
 
         self.nombre = self._crear_campo_texto("Nombre del buque *", ft.Icons.DIRECTIONS_BOAT_OUTLINED)
         self.numero_imo = self._crear_campo_texto("Número IMO", ft.Icons.NUMBERS_OUTLINED)
@@ -62,6 +67,41 @@ class PantallaRegistrarBuque(ft.Container):
             value=True,
             active_color=COLOR_NARANJA,
         )
+        if self.buque_a_editar is not None:
+            self.nombre.value = self.buque_a_editar.nombre or ""
+            self.numero_imo.value = self.buque_a_editar.numero_imo or ""
+            self.cliente_id.value = (
+                str(self.buque_a_editar.cliente_id)
+                if self.buque_a_editar.cliente_id is not None else ""
+            )
+            self.bandera_pais.value = self.buque_a_editar.bandera_pais or ""
+            self.subtipo_descripcion.value = (
+                self.buque_a_editar.subtipo_descripcion or ""
+            )
+
+            categoria = self.buque_a_editar.categoria_buque
+            self.categoria_buque.value = (
+                categoria.value if hasattr(categoria, "value") else str(categoria)
+            ) if categoria else None
+
+            self.trb_arqueo_bruto.value = str(
+                self.buque_a_editar.trb_arqueo_bruto or ""
+            )
+            self.eslora_metros.value = str(
+                self.buque_a_editar.eslora_metros or ""
+            )
+            self.calado_metros.value = (
+                str(self.buque_a_editar.calado_metros)
+                if self.buque_a_editar.calado_metros is not None else ""
+            )
+
+            self.es_autopropulsado.value = bool(
+                self.buque_a_editar.es_autopropulsado
+            )
+            self.propulsores_proa_popa.value = bool(
+                self.buque_a_editar.propulsores_proa_popa
+            )
+            self.activo.value = bool(self.buque_a_editar.activo)
 
         self.build_ui()
 
@@ -235,7 +275,7 @@ class PantallaRegistrarBuque(ft.Container):
                                             color=COLOR_BLANCO,
                                         ),
                                         ft.Text(
-                                            "Guardar buque",
+                                            "Guardar cambios" if self.modo_edicion else "Guardar buque",
                                             size=14,
                                             weight=ft.FontWeight.BOLD,
                                             color=COLOR_BLANCO,
@@ -301,7 +341,7 @@ class PantallaRegistrarBuque(ft.Container):
                         spacing=5,
                         controls=[
                             ft.Text(
-                                "Registrar nuevo buque",
+                                "Editar buque" if self.modo_edicion else "Registrar nuevo buque",
                                 size=28,
                                 weight=ft.FontWeight.BOLD,
                                 color=COLOR_BANNER,
@@ -411,30 +451,51 @@ class PantallaRegistrarBuque(ft.Container):
             self._page.update()
             return
 
+
         try:
-            self.controlador.registrar_buque(
-                nombre=nombre,
-                categoria_buque=categoria_buque,
-                trb_arqueo_bruto=trb_arqueo_bruto,
-                eslora_metros=eslora_metros,
-                cliente_id=cliente_id,
-                numero_imo=numero_imo,
-                subtipo_descripcion=subtipo_descripcion,
-                calado_metros=calado_metros,
-                propulsores_proa_popa=propulsores_proa_popa,
-                es_autopropulsado=es_autopropulsado,
-                bandera_pais=bandera_pais,
-                activo=activo,
-            )
+            datos_buque = {
+                "nombre": nombre,
+                "categoria_buque": categoria_buque,
+                "trb_arqueo_bruto": trb_arqueo_bruto,
+                "eslora_metros": eslora_metros,
+                "cliente_id": cliente_id,
+                "numero_imo": numero_imo,
+                "subtipo_descripcion": subtipo_descripcion,
+                "calado_metros": calado_metros,
+                "propulsores_proa_popa": propulsores_proa_popa,
+                "es_autopropulsado": es_autopropulsado,
+                "bandera_pais": bandera_pais,
+                "activo": activo,
+            }
+
+            if self.modo_edicion:
+                self.controlador.modificar_buque(
+                    buque=self.buque_a_editar,
+                    **datos_buque,
+                )
+                mensaje = "Buque modificado correctamente."
+            else:
+                self.controlador.registrar_buque(**datos_buque)
+                mensaje = "Buque registrado correctamente."
+
             self._page.show_dialog(
-                ft.SnackBar(content=ft.Text("Buque registrado correctamente."))
+                ft.SnackBar(content=ft.Text(mensaje))
             )
+
             if self.vista_anterior:
                 self.vista_anterior.build_ui()
                 self.vista_anterior.actualizar_directorio()
+
             self._page.update()
-        except Exception:
+
+        except Exception as error:
+            print(f"Error al guardar el buque: {error}")
             self._page.show_dialog(
-                ft.SnackBar(content=ft.Text("No se pudo guardar el buque."))
+                ft.SnackBar(
+                    content=ft.Text(
+                        "No se pudieron guardar los cambios del buque."
+                    )
+                )
             )
             self._page.update()
+

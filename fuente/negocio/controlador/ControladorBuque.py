@@ -74,3 +74,45 @@ class ControladorBuque:
 
     def obtener_pagina(self, pagina, limite=10):
         return self.servicio_buque.obtener_pagina(pagina, limite)
+
+    def modificar_buque(
+        self, buque, nombre, categoria_buque, trb_arqueo_bruto,
+        eslora_metros, cliente_id=None, numero_imo=None,
+        subtipo_descripcion=None, calado_metros=None,
+        propulsores_proa_popa=False, es_autopropulsado=True,
+        bandera_pais=None, activo=True
+    ):
+        if isinstance(categoria_buque, str):
+            categoria_buque = CategoriaBuque(categoria_buque.strip().upper())
+
+        cliente_id_val = None
+        if cliente_id is not None and str(cliente_id).strip() != "":
+            cliente_id_val = int(str(cliente_id).strip())
+
+        calado_val = None
+        if calado_metros is not None and str(calado_metros).strip() != "":
+            calado_val = Decimal(str(calado_metros).strip())
+
+        buque.cliente_id = cliente_id_val
+        buque.nombre = nombre.strip()
+        buque.numero_imo = numero_imo.strip() if numero_imo and numero_imo.strip() else None
+        buque.categoria_buque = categoria_buque
+        buque.subtipo_descripcion = (
+            subtipo_descripcion.strip()
+            if subtipo_descripcion and subtipo_descripcion.strip()
+            else None
+        )
+        buque.trb_arqueo_bruto = Decimal(str(trb_arqueo_bruto).strip())
+        buque.eslora_metros = Decimal(str(eslora_metros).strip())
+        buque.calado_metros = calado_val
+        buque.propulsores_proa_popa = bool(propulsores_proa_popa)
+        buque.es_autopropulsado = bool(es_autopropulsado)
+        buque.bandera_pais = (
+            bandera_pais.strip()
+            if bandera_pais and bandera_pais.strip()
+            else None
+        )
+        buque.activo = bool(activo)
+
+        self.servicio_buque.modificar_buque(buque)
+        return buque

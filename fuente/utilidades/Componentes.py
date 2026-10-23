@@ -308,6 +308,8 @@ def tabla(
                 weight=ft.FontWeight.BOLD,
                 color=COLOR_NEGRO,
                 text_align=ft.TextAlign.CENTER,
+                max_lines=1,
+                overflow=ft.TextOverflow.ELLIPSIS,
             ),
         )
 
@@ -342,6 +344,7 @@ def tabla(
         border=ft.Border.all(1, COLOR_GRIS_CLARO),
         vertical_lines=ft.BorderSide(1, COLOR_GRIS_CLARO),
         horizontal_lines=ft.BorderSide(1, COLOR_GRIS_CLARO),
+        clip_behavior=ft.ClipBehavior.HARD_EDGE,
         columns=columnas_tabla,
         rows=filas,
     )

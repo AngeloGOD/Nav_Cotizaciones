@@ -136,45 +136,391 @@ class PantallaClientes(ft.Container):
         self.update()
 
     def contacto(self, icono, texto):
-        return ft.Row(
-            spacing=5,
+        return ft.Container(
+            expand=True,
+            content=ft.Row(
+                expand=True,
+                spacing=5,
+                controls=[
+                    ft.Icon(
+                        icono,
+                        size=15,
+                        color=COLOR_GRIS,
+                    ),
+                    ft.Container(
+                        expand=True,
+                        content=ft.Text(
+                            texto or "-",
+                            size=13,
+                            color=COLOR_NEGRO,
+                            max_lines=1,
+                            overflow=ft.TextOverflow.ELLIPSIS,
+                        ),
+                    ),
+                ],
+            ),
+        )
+
+    def ver_cliente(self, cliente):
+        self.cliente_seleccionado = cliente
+        self.modo_edicion = False
+        self.dialogo_cliente = self._crear_dialogo_cliente()
+        self._page.show_dialog(self.dialogo_cliente)
+
+    def _crear_dialogo_cliente(self):
+        return ft.AlertDialog(
+            modal=True,
+            bgcolor=COLOR_FONDO,
+            shape=ft.RoundedRectangleBorder(radius=14),
+            title=ft.Row(
+                controls=[
+                    ft.Text(
+                        "Ficha del cliente",
+                        expand=True,
+                        color=COLOR_BANNER,
+                        weight=ft.FontWeight.BOLD,
+                        size=20,
+                    ),
+                    ft.IconButton(
+                        icon=ft.Icons.CLOSE,
+                        tooltip="Cerrar",
+                        icon_color=COLOR_GRIS,
+                        on_click=self.cerrar_ficha,
+                    ),
+                ],
+            ),
+            content=self._contenido_ficha_cliente(),
+            actions=self._acciones_ficha_cliente(),
+            actions_alignment=ft.MainAxisAlignment.SPACE_BETWEEN,
+            scrollable=True,
+        )
+
+    def _contenido_ficha_cliente(self):
+        cliente = self.cliente_seleccionado
+        self.campos_ficha = {}
+
+        tipo_persona = (
+            cliente.tipo_persona.value
+            if hasattr(cliente.tipo_persona, "value")
+            else str(cliente.tipo_persona or "")
+        )
+
+        datos_generales = ft.Column(
+            spacing=12,
             controls=[
-                ft.Icon(
-                    icono,
-                    size=15,
-                    color=COLOR_GRIS,
+                ft.Row(
+                    spacing=12,
+                    controls=[
+                        self._campo_ficha(
+                            "Razón social",
+                            "razon_social",
+                            cliente.razon_social,
+                            expand=True,
+                        ),
+                        self._campo_ficha(
+                            "RFC",
+                            "rfc",
+                            cliente.rfc,
+                            expand=True,
+                        ),
+                    ],
                 ),
-                ft.Text(
-                    texto or "-",
-                    size=14,
-                    color=COLOR_NEGRO,
-                    max_lines=1,
-                    overflow=ft.TextOverflow.ELLIPSIS,
+                self._campo_ficha(
+                    "Tipo de persona",
+                    "tipo_persona",
+                    tipo_persona,
+                    tipo_persona=True,
                 ),
             ],
         )
 
-    def editar_cliente(self, cliente):
-        self.content = PantallaRegistrarCliente(
-            self._page,
-            self.servicio_cliente,
-            vista_anterior=self,
-            cliente=cliente,
+        contacto = ft.Row(
+            spacing=12,
+            controls=[
+                self._campo_ficha(
+                    "Teléfono",
+                    "telefono",
+                    cliente.telefono,
+                    expand=True,
+                ),
+                self._campo_ficha(
+                    "Correo electrónico",
+                    "correo_elect",
+                    cliente.correo_elect,
+                    expand=True,
+                ),
+            ],
         )
-        self.update()
 
-    def eliminar_cliente(self, cliente):
-        dialogo = dialogo_confirmacion(
-            page=self._page,
-            titulo="Confirmar eliminación",
-            mensaje=(
-                f"¿Deseas eliminar el cliente "
-                f"'{cliente.razon_social}'? Esta acción no se puede deshacer."
-            ),
-            on_confirmar=lambda: self._confirmar_eliminacion(cliente),
-            texto_confirmar="Eliminar",
+        domicilio = self._campo_ficha(
+            "Dirección fiscal",
+            "direccion",
+            cliente.direccion,
+            expand=True,
+            multiline=True,
         )
-        self._page.show_dialog(dialogo)
+
+        estado = ft.Row(
+            spacing=24,
+            controls=[
+                self._campo_ficha(
+                    "Cliente nuevo",
+                    "es_nuevo_cliente",
+                    cliente.es_nuevo_cliente,
+                    switch=True,
+                    expand=True,
+                ),
+                self._campo_ficha(
+                    "Estado",
+                    "activo",
+                    cliente.activo,
+                    switch=True,
+                    expand=True,
+                ),
+            ],
+        )
+
+        return card(
+            ft.Column(
+                spacing=16,
+                controls=[
+                    self._seccion_ficha(
+                        ft.Icons.BUSINESS_OUTLINED,
+                        "Datos generales",
+                        datos_generales,
+                    ),
+                    ft.Divider(height=1, color=COLOR_GRIS_CLARO),
+                    self._seccion_ficha(
+                        ft.Icons.PHONE_OUTLINED,
+                        "Información de contacto",
+                        contacto,
+                    ),
+                    ft.Divider(height=1, color=COLOR_GRIS_CLARO),
+                    self._seccion_ficha(
+                        ft.Icons.LOCATION_ON_OUTLINED,
+                        "Domicilio fiscal",
+                        domicilio,
+                    ),
+                    ft.Divider(height=1, color=COLOR_GRIS_CLARO),
+                    self._seccion_ficha(
+                        ft.Icons.CHECK_CIRCLE_OUTLINE,
+                        "Estado del cliente",
+                        estado,
+                    ),
+                ],
+            ),
+            padding=18,
+            radius=12,
+            shadow=sombra_suave(),
+            expand=True,
+        )
+
+    def _campo_ficha(
+        self,
+        etiqueta,
+        nombre,
+        valor,
+        expand=False,
+        tipo_persona=False,
+        switch=False,
+        multiline=False,
+    ):
+        if self.modo_edicion:
+            if tipo_persona:
+                control = ft.Dropdown(
+                    value=valor,
+                    options=[
+                        ft.DropdownOption(key="FISICA", text="Persona Física"),
+                        ft.DropdownOption(key="MORAL", text="Persona Moral"),
+                        ft.DropdownOption(key="EXTRANJERO", text="Extranjero"),
+                    ],
+                    height=44,
+                    text_size=14,
+                    border=ft.InputBorder.OUTLINE,
+                    border_color=COLOR_GRIS_CLARO,
+                    focused_border_color=COLOR_NARANJA,
+                    border_radius=9,
+                )
+                self.campos_ficha[nombre] = control
+            elif switch:
+                control = ft.Switch(
+                    value=bool(valor),
+                    active_color=COLOR_NARANJA,
+                )
+                self.campos_ficha[nombre] = control
+            else:
+                control = ft.TextField(
+                    value=str(valor or ""),
+                    multiline=multiline,
+                    min_lines=2 if multiline else 1,
+                    max_lines=3 if multiline else 1,
+                    text_size=14,
+                    border=ft.InputBorder.OUTLINE,
+                    border_color=COLOR_GRIS_CLARO,
+                    focused_border_color=COLOR_NARANJA,
+                    border_radius=9,
+                )
+                self.campos_ficha[nombre] = control
+        elif switch:
+            control = ft.Text(
+                "Sí" if valor else "No",
+                color=COLOR_NEGRO,
+                size=14,
+            )
+        else:
+            texto = valor or "-"
+            if nombre == "tipo_persona":
+                texto = {
+                    "FISICA": "Persona Física",
+                    "MORAL": "Persona Moral",
+                    "EXTRANJERO": "Extranjero",
+                }.get(str(valor).upper(), texto)
+            control = ft.Text(
+                str(texto),
+                color=COLOR_NEGRO,
+                size=14,
+                max_lines=3 if multiline else 1,
+                overflow=ft.TextOverflow.ELLIPSIS,
+            )
+
+        return ft.Column(
+            expand=expand,
+            spacing=5,
+            controls=[
+                ft.Text(
+                    etiqueta,
+                    color=COLOR_BANNER,
+                    size=13,
+                    weight=ft.FontWeight.BOLD,
+                ),
+                control,
+            ],
+        )
+
+    def _seccion_ficha(self, icono, titulo, contenido):
+        return ft.Column(
+            spacing=9,
+            controls=[
+                ft.Row(
+                    spacing=8,
+                    controls=[
+                        ft.Icon(icono, size=19, color=COLOR_NARANJA),
+                        ft.Text(
+                            titulo,
+                            size=16,
+                            color=COLOR_BANNER,
+                            weight=ft.FontWeight.BOLD,
+                        ),
+                    ],
+                ),
+                contenido,
+            ],
+        )
+
+    def _acciones_ficha_cliente(self):
+        if self.modo_edicion:
+            return [
+                ft.TextButton(
+                    "Eliminar",
+                    on_click=self.pedir_confirmacion_eliminacion,
+                    style=ft.ButtonStyle(color=COLOR_ROJO),
+                ),
+                ft.TextButton(
+                    "Cancelar edición",
+                    on_click=self.cancelar_edicion,
+                    style=ft.ButtonStyle(color=COLOR_GRIS),
+                ),
+                ft.FilledButton(
+                    "Guardar cambios",
+                    on_click=self.guardar_cambios_cliente,
+                    style=ft.ButtonStyle(
+                        bgcolor=COLOR_VERDE,
+                        color=COLOR_BLANCO,
+                    ),
+                ),
+            ]
+
+        return [
+            ft.TextButton(
+                "Eliminar",
+                on_click=self.pedir_confirmacion_eliminacion,
+                style=ft.ButtonStyle(color=COLOR_ROJO),
+            ),
+            ft.TextButton(
+                "Editar",
+                on_click=self.activar_edicion,
+                style=ft.ButtonStyle(color=COLOR_AZUL),
+            ),
+        ]
+
+    def _actualizar_ficha(self):
+        self.dialogo_cliente.content = self._contenido_ficha_cliente()
+        self.dialogo_cliente.actions = self._acciones_ficha_cliente()
+        self._page.update()
+
+    def activar_edicion(self, e):
+        self.modo_edicion = True
+        self._actualizar_ficha()
+
+    def cancelar_edicion(self, e):
+        self.modo_edicion = False
+        self._actualizar_ficha()
+
+    def guardar_cambios_cliente(self, e):
+        campos = self.campos_ficha
+        razon_social = (campos["razon_social"].value or "").strip()
+        tipo_persona = (campos["tipo_persona"].value or "").strip()
+        if not razon_social or not tipo_persona:
+            mostrar_notificacion(
+                self._page,
+                "La razón social y el tipo de persona son obligatorios.",
+                COLOR_ROJO,
+            )
+            return
+
+        try:
+            self.controlador.modificar_cliente(
+                cliente=self.cliente_seleccionado,
+                razon_social=razon_social,
+                tipo_persona=tipo_persona,
+                direccion=campos["direccion"].value,
+                rfc=campos["rfc"].value,
+                telefono=campos["telefono"].value,
+                correo_elect=campos["correo_elect"].value,
+                es_nuevo_cliente=campos["es_nuevo_cliente"].value,
+                activo=campos["activo"].value,
+            )
+        except Exception as error:
+            mostrar_notificacion(
+                self._page,
+                f"No se pudieron guardar los cambios: {error}",
+                COLOR_ROJO,
+            )
+            return
+
+        self.modo_edicion = False
+        self.actualizar_directorio()
+        self._actualizar_ficha()
+        mostrar_notificacion(
+            self._page,
+            "Cambios guardados correctamente.",
+            COLOR_VERDE,
+        )
+
+    def pedir_confirmacion_eliminacion(self, e):
+        cliente = self.cliente_seleccionado
+        self._page.show_dialog(
+            dialogo_confirmacion(
+                page=self._page,
+                titulo="Confirmar eliminación",
+                mensaje=(
+                    f"¿Deseas eliminar el cliente '{cliente.razon_social}'? "
+                    "Esta acción no se puede deshacer."
+                ),
+                on_confirmar=lambda: self._confirmar_eliminacion(cliente),
+                texto_confirmar="Eliminar",
+            )
+        )
 
     def _confirmar_eliminacion(self, cliente):
         try:
@@ -187,6 +533,7 @@ class PantallaClientes(ft.Container):
             )
             return
 
+        self._page.pop_dialog()
         if self.pagina_actual > 1:
             clientes, _ = self.controlador.obtener_clientes(
                 texto=self.busqueda,
@@ -195,13 +542,15 @@ class PantallaClientes(ft.Container):
             )
             if not clientes:
                 self.pagina_actual -= 1
-
         self.actualizar_directorio()
         mostrar_notificacion(
             self._page,
             "Cliente eliminado correctamente.",
             COLOR_VERDE,
         )
+
+    def cerrar_ficha(self, e):
+        self._page.pop_dialog()
 
     def directorio(self):
         offset = (self.pagina_actual - 1) * self.registros_por_pagina
@@ -256,6 +605,7 @@ class PantallaClientes(ft.Container):
             nombre = ft.Container(
                 expand=True,
                 content=ft.Column(
+                    expand=True,
                     spacing=2,
                     alignment=ft.MainAxisAlignment.CENTER,
                     controls=[
@@ -269,20 +619,26 @@ class PantallaClientes(ft.Container):
                         ),
                         ft.Text(
                             f"Registro: {fecha_creacion}",
-                            size=12,
+                            size=11,
                             color=COLOR_GRIS,
+                            max_lines=1,
+                            overflow=ft.TextOverflow.ELLIPSIS,
                         ),
                     ],
                 ),
             )
 
-            info_contacto = ft.Column(
-                spacing=3,
-                alignment=ft.MainAxisAlignment.CENTER,
-                controls=[
-                    self.contacto(ft.Icons.PHONE_OUTLINED, cliente.telefono),
-                    self.contacto(ft.Icons.MAIL_OUTLINE, cliente.correo_elect),
-                ],
+            info_contacto = ft.Container(
+                expand=True,
+                content=ft.Column(
+                    expand=True,
+                    spacing=3,
+                    alignment=ft.MainAxisAlignment.CENTER,
+                    controls=[
+                        self.contacto(ft.Icons.PHONE_OUTLINED, cliente.telefono),
+                        self.contacto(ft.Icons.MAIL_OUTLINE, cliente.correo_elect),
+                    ],
+                ),
             )
 
             estado_cliente = ft.Column(
@@ -302,33 +658,17 @@ class PantallaClientes(ft.Container):
                                 size=13,
                                 color=COLOR_NEGRO,
                                 weight=ft.FontWeight.W_500,
+                                max_lines=1,
+                                overflow=ft.TextOverflow.ELLIPSIS,
                             ),
                         ],
                     ),
                     ft.Text(
                         f"Nuevo cliente: {'Sí' if cliente.es_nuevo_cliente else 'No'}",
-                        size=12,
+                        size=11,
                         color=COLOR_GRIS,
-                    ),
-                ],
-            )
-
-            acciones = ft.Row(
-                spacing=0,
-                alignment=ft.MainAxisAlignment.CENTER,
-                controls=[
-                    boton(
-                        icono=ft.Icons.EDIT_OUTLINED,
-                        tooltip="Editar cliente",
-                        tipo="accion",
-                        on_click=lambda e, c=cliente: self.editar_cliente(c),
-                    ),
-                    boton(
-                        icono=ft.Icons.DELETE_OUTLINE,
-                        tooltip="Eliminar cliente",
-                        tipo="accion",
-                        color=COLOR_ROJO,
-                        on_click=lambda e, c=cliente: self.eliminar_cliente(c),
+                        max_lines=1,
+                        overflow=ft.TextOverflow.ELLIPSIS,
                     ),
                 ],
             )
@@ -337,58 +677,83 @@ class PantallaClientes(ft.Container):
                 ft.DataRow(
                     cells=[
                         ft.DataCell(
-                            ft.Row(
-                                spacing=9,
-                                vertical_alignment=ft.CrossAxisAlignment.CENTER,
-                                controls=[inicial, nombre],
+                            ft.Container(
+                                expand=True,
+                                content=ft.Row(
+                                    expand=True,
+                                    spacing=9,
+                                    vertical_alignment=ft.CrossAxisAlignment.CENTER,
+                                    controls=[inicial, nombre],
+                                ),
                             )
                         ),
                         ft.DataCell(
-                            ft.Text(
-                                cliente.rfc or "-",
-                                size=14,
-                                color=COLOR_NEGRO,
-                                max_lines=1,
-                                overflow=ft.TextOverflow.ELLIPSIS,
+                            ft.Container(
+                                expand=True,
+                                content=ft.Text(
+                                    cliente.rfc or "-",
+                                    size=13,
+                                    color=COLOR_NEGRO,
+                                    max_lines=1,
+                                    overflow=ft.TextOverflow.ELLIPSIS,
+                                ),
                             )
                         ),
                         ft.DataCell(
-                            ft.Text(
-                                texto_tipo_persona,
-                                size=14,
-                                color=COLOR_NEGRO,
-                                max_lines=1,
-                                overflow=ft.TextOverflow.ELLIPSIS,
+                            ft.Container(
+                                expand=True,
+                                content=ft.Text(
+                                    texto_tipo_persona,
+                                    size=13,
+                                    color=COLOR_NEGRO,
+                                    max_lines=1,
+                                    overflow=ft.TextOverflow.ELLIPSIS,
+                                ),
                             )
                         ),
                         ft.DataCell(
-                            ft.Text(
-                                cliente.direccion or "-",
-                                size=14,
-                                color=COLOR_NEGRO,
-                                max_lines=2,
-                                overflow=ft.TextOverflow.ELLIPSIS,
+                            ft.Container(
+                                expand=True,
+                                content=ft.Text(
+                                    cliente.direccion or "-",
+                                    size=13,
+                                    color=COLOR_NEGRO,
+                                    max_lines=2,
+                                    overflow=ft.TextOverflow.ELLIPSIS,
+                                ),
                             )
                         ),
                         ft.DataCell(info_contacto),
-                        ft.DataCell(estado_cliente),
-                        ft.DataCell(acciones),
+                        ft.DataCell(
+                            ft.Container(expand=True, content=estado_cliente)
+                        ),
+                        ft.DataCell(
+                            ft.Container(
+                                alignment=ft.Alignment(0, 0),
+                                content=boton(
+                                    icono=ft.Icons.VISIBILITY_OUTLINED,
+                                    tooltip="Ver ficha del cliente",
+                                    tipo="accion",
+                                    on_click=lambda e, c=cliente: self.ver_cliente(c),
+                                ),
+                            )
+                        ),
                     ],
                 )
             )
 
         tabla_clientes = tabla(
             columnas=[
-                ("Cliente", 230),
-                ("RFC", 120),
-                ("Tipo de persona", 145),
-                ("Dirección", 220),
-                ("Información de contacto", 240),
+                ("Cliente", 210),
+                ("RFC", 160),
+                ("Tipo de persona", 150),
+                ("Dirección", 210),
+                ("Información de contacto", 210),
                 ("Estado", 150),
-                ("Acciones", 125),
+                ("Detalles", 100),
             ],
             filas=filas,
-            column_spacing=10,
+            column_spacing=6,
             horizontal_margin=6,
             heading_row_height=44,
             data_row_min_height=60,

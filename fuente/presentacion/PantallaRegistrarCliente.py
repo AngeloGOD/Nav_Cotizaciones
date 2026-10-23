@@ -6,275 +6,117 @@ from fuente.negocio.controlador.ControladorClientes import ControladorClientes
 
 
 class PantallaRegistrarCliente(ft.Container):
-    def __init__(
-        self,
-        page: ft.Page,
-        servicio_cliente,
-        vista_anterior=None,
-        cliente=None,
-    ):
-        super().__init__(
-            expand=True,
-            bgcolor=COLOR_FONDO,
-        )
+    def __init__(self, page: ft.Page, servicio_cliente, vista_anterior=None):
+        super().__init__(expand=True, bgcolor=COLOR_FONDO)
 
         self._page = page
         self.vista_anterior = vista_anterior
         self.servicio_cliente = servicio_cliente
         self.controlador = ControladorClientes(servicio_cliente)
-        self.cliente = cliente
 
-        self.nombre = campo(
-            "Nombre o razón social *",
-            ft.Icons.BUSINESS_OUTLINED,
-        )
-
-        self.rfc = campo(
-            "RFC",
-            ft.Icons.BADGE_OUTLINED,
-        )
+        # Campos de una sola línea: ancho completo de su columna y altura uniforme.
+        self.nombre = self.ajustar_campo(campo("Ej. ABC Logistics S.A. de C.V.", None))
+        self.rfc = self.ajustar_campo(campo("Ej. ABC010203XYZ", None))
+        self.telefono = self.ajustar_campo(campo("Ej. +52 962 123 4567", None))
+        self.correo = self.ajustar_campo(campo("Ej. cliente@empresa.com", None))
 
         self.tipo_persona = ft.Dropdown(
-            hint_text="Tipo de persona *",
-            leading_icon=ft.Icons.GROUP_OUTLINED,
+            hint_text="Selecciona un tipo de persona",
+            options=[
+                ft.DropdownOption(key="FISICA", text="Persona Física"),
+                ft.DropdownOption(key="MORAL", text="Persona Moral"),
+                ft.DropdownOption(key="EXTRANJERO", text="Extranjero"),
+            ],
+            width=360,
+            menu_width=360,
+            height=44,
+            text_size=14,
+            content_padding=ft.Padding(12, 8, 12, 8),
             border=ft.InputBorder.OUTLINE,
             border_color=COLOR_GRIS_CLARO,
             focused_border_color=COLOR_NARANJA,
             border_radius=9,
-            text_size=14,
-            options=[
-                ft.DropdownOption(
-                    key="FISICA",
-                    text="Persona Física",
-                ),
-                ft.DropdownOption(
-                    key="MORAL",
-                    text="Persona Moral",
-                ),
-                ft.DropdownOption(
-                    key="EXTRANJERO",
-                    text="Extranjero",
-                ),
-            ],
         )
 
-        self.es_nuevo_cliente = ft.Switch(
-            label="Es nuevo cliente",
-            value=False,
-            active_color=COLOR_NARANJA,
-        )
-
-        self.activo = ft.Switch(
-            label="Cliente activo",
-            value=True,
-            active_color=COLOR_NARANJA,
-        )
-
-        self.telefono = campo(
-            "Número telefónico",
-            ft.Icons.PHONE_OUTLINED,
-        )
-
-        self.correo = campo(
-            "Correo electrónico",
-            ft.Icons.MAIL_OUTLINE,
-        )
+        self.es_nuevo_cliente = ft.Switch(value=False, active_color=COLOR_NARANJA)
+        self.activo = ft.Switch(value=True, active_color=COLOR_NARANJA)
 
         self.direccion_fiscal = campo(
-            "Dirección fiscal completa",
-            ft.Icons.LOCATION_ON_OUTLINED,
-            expand=True,
+            "Ej. Calle, número, colonia, ciudad, estado, código postal, país.",
+            None,
             multiline=True,
-            min_lines=4,
-            max_lines=5,
+            min_lines=2,
+            max_lines=3,
         )
+        self.direccion_fiscal.width = float("inf")
+        self.direccion_fiscal.height = 66
+        self.direccion_fiscal.content_padding = ft.Padding(12, 8, 12, 8)
+        self.direccion_fiscal.text_size = 14
 
-        if self.cliente is not None:
-            self.nombre.value = self.cliente.razon_social
-            self.rfc.value = self.cliente.rfc
-            self.direccion_fiscal.value = self.cliente.direccion
-            self.telefono.value = self.cliente.telefono
-            self.correo.value = self.cliente.correo_elect
-            self.tipo_persona.value = (
-                self.cliente.tipo_persona.value
-                if hasattr(self.cliente.tipo_persona, "value")
-                else self.cliente.tipo_persona
-            )
-            self.es_nuevo_cliente.value = self.cliente.es_nuevo_cliente
-            self.activo.value = self.cliente.activo
-
-        self.content = ft.Column(
+        # El encabezado permanece arriba y la zona de campos puede desplazarse.
+        # Los botones están fuera de esa zona para permanecer siempre visibles.
+        self.content = ft.Container(
             expand=True,
-            scroll=ft.ScrollMode.AUTO,
-            spacing=16,
-            controls=[
-                ft.Container(
-                    padding=ft.Padding(24, 20, 24, 24),
-                    content=ft.Column(
-                        expand=True,
-                        spacing=16,
-                        horizontal_alignment=ft.CrossAxisAlignment.STRETCH,
-                        controls=[
-                            self.encabezado(),
-                            self.formulario(),
-                        ],
-                    ),
-                )
-            ],
-        )
-
-    def formulario(self):
-        return card(
-            ft.Column(
-                spacing=24,
-                controls=[
-                    self.seccion(
-                        ft.Icons.BUSINESS_OUTLINED,
-                        "Datos generales",
-                        ft.Column(
-                            spacing=12,
-                            controls=[
-                                ft.Row(
-                                    spacing=14,
-                                    controls=[
-                                        ft.Container(
-                                            expand=True,
-                                            content=self.nombre,
-                                        ),
-                                        ft.Container(
-                                            expand=True,
-                                            content=self.rfc,
-                                        ),
-                                    ],
-                                ),
-                                ft.Row(
-                                    spacing=24,
-                                    vertical_alignment=ft.CrossAxisAlignment.CENTER,
-                                    controls=[
-                                        ft.Container(
-                                            expand=True,
-                                            content=self.tipo_persona,
-                                        ),
-                                        ft.Container(
-                                            content=self.es_nuevo_cliente,
-                                        ),
-                                        ft.Container(
-                                            content=self.activo,
-                                        ),
-                                    ],
-                                ),
-                            ],
-                        ),
-                    ),
-
-                    self.seccion(
-                        ft.Icons.PHONE_OUTLINED,
-                        "Información de contacto",
-                        ft.Row(
-                            spacing=14,
-                            controls=[
-                                ft.Container(
-                                    expand=True,
-                                    content=self.telefono,
-                                ),
-                                ft.Container(
-                                    expand=True,
-                                    content=self.correo,
-                                ),
-                            ],
-                        ),
-                    ),
-
-                    self.seccion(
-                        ft.Icons.LOCATION_ON_OUTLINED,
-                        "Domicilio fiscal",
-                        self.direccion_fiscal,
-                    ),
-
-                    ft.Divider(
-                        height=1,
-                        color=COLOR_GRIS_CLARO,
-                    ),
-
-                    ft.Row(
-                        alignment=ft.MainAxisAlignment.SPACE_BETWEEN,
-                        controls=[
-                            boton(
-                                texto="Cancelar",
-                                icono=ft.Icons.ARROW_BACK,
-                                tipo="secundario",
-                                color=COLOR_GRIS,
-                                height=44,
-                                width=125,
-                                on_click=self.cancelar,
-                            ),
-                            boton(
-                                texto=(
-                                    "Guardar cambios"
-                                    if self.cliente is not None
-                                    else "Guardar cliente"
-                                ),
-                                icono=ft.Icons.SAVE_OUTLINED,
-                                tipo="principal",
-                                height=44,
-                                width=175,
-                                on_click=self.guardar,
-                            ),
-                        ],
-                    ),
-                ],
+            padding=ft.Padding(24, 8, 24, 10),
+            content=ft.Column(
+                expand=True,
+                spacing=10,
+                horizontal_alignment=ft.CrossAxisAlignment.STRETCH,
+                controls=[self.encabezado(), self.formulario()],
             ),
-            padding=24,
-            radius=14,
-            shadow=sombra_suave(),
-            expand=True,
         )
+
+    def ajustar_campo(self, control):
+        control.width = float("inf")
+        control.height = 44
+        control.content_padding = ft.Padding(12, 8, 12, 8)
+        control.text_size = 14
+        return control
 
     def encabezado(self):
-        es_edicion = self.cliente is not None
         return banner_imagen_desvanecida(
             "fondo_PantallaRegistrarClientes.jpg",
-            altura=120,
+            altura=136,
             content=ft.Container(
                 expand=True,
-                padding=ft.Padding(24, 10, 24, 10),
+                padding=ft.Padding(22, 8, 22, 8),
                 content=ft.Row(
-                    expand=True,
-                    vertical_alignment=ft.CrossAxisAlignment.CENTER,
                     spacing=18,
+                    vertical_alignment=ft.CrossAxisAlignment.CENTER,
                     controls=[
-                        ft.Icon(
-                            (
-                                ft.Icons.EDIT_OUTLINED
-                                if es_edicion
-                                else ft.Icons.PERSON_ADD_OUTLINED
+                        ft.Container(
+                            width=68,
+                            height=68,
+                            border_radius=34,
+                            bgcolor="#FFF0E5",
+                            alignment=ft.Alignment(0, 0),
+                            content=ft.Icon(
+                                ft.Icons.GROUPS_OUTLINED,
+                                size=36,
+                                color=COLOR_NARANJA,
                             ),
-                            size=48,
-                            color=COLOR_NARANJA,
                         ),
-
                         ft.Column(
                             expand=True,
-                            spacing=5,
+                            spacing=4,
+                            alignment=ft.MainAxisAlignment.CENTER,
                             controls=[
                                 ft.Text(
-                                    (
-                                        "Editar cliente"
-                                        if es_edicion
-                                        else "Registrar nuevo cliente"
-                                    ),
-                                    size=28,
+                                    "REGISTRO DE CLIENTES",
+                                    size=11,
                                     weight=ft.FontWeight.BOLD,
                                     color=COLOR_BANNER,
                                 ),
                                 ft.Text(
-                                    (
-                                        "Actualiza la información fiscal y de contacto del cliente."
-                                        if es_edicion
-                                        else "Completa la información fiscal y de contacto del cliente."
-                                    ),
-                                    size=14,
-                                    color=COLOR_GRIS,
+                                    "Registrar nuevo cliente",
+                                    size=29,
+                                    weight=ft.FontWeight.BOLD,
+                                    color=COLOR_BANNER,
+                                ),
+                                ft.Text(
+                                    "Completa la información fiscal y de contacto del cliente.",
+                                    size=16,
+                                    color=COLOR_BANNER,
                                 ),
                             ],
                         ),
@@ -283,30 +125,218 @@ class PantallaRegistrarCliente(ft.Container):
             ),
         )
 
+    def formulario(self):
+        datos_generales = ft.Column(
+            spacing=10,
+            controls=[
+                ft.Row(
+                    spacing=18,
+                    controls=[
+                        ft.Container(
+                            expand=1,
+                            content=self.campo_etiquetado(
+                                "Nombre o razón social *", ft.Icons.PERSON_OUTLINED, self.nombre
+                            ),
+                        ),
+                        ft.Container(
+                            expand=1,
+                            content=self.campo_etiquetado(
+                                "RFC *", ft.Icons.BADGE_OUTLINED, self.rfc
+                            ),
+                        ),
+                    ],
+                ),
+                ft.Row(
+                    spacing=18,
+                    vertical_alignment=ft.CrossAxisAlignment.CENTER,
+                    controls=[
+                        ft.Container(
+                            expand=4,
+                            content=self.campo_etiquetado(
+                                "Tipo de persona *", ft.Icons.PERSON_OUTLINE, self.tipo_persona
+                            ),
+                        ),
+                        ft.Container(expand=7, content=self.panel_estados()),
+                    ],
+                ),
+            ],
+        )
+
+        contacto = ft.Row(
+            spacing=18,
+            controls=[
+                ft.Container(
+                    expand=1,
+                    content=self.campo_etiquetado(
+                        "Número telefónico *", ft.Icons.PHONE_OUTLINED, self.telefono
+                    ),
+                ),
+                ft.Container(
+                    expand=1,
+                    content=self.campo_etiquetado(
+                        "Correo electrónico *", ft.Icons.MAIL_OUTLINE, self.correo
+                    ),
+                ),
+            ],
+        )
+
+        domicilio = self.campo_etiquetado(
+            "Dirección fiscal completa *", ft.Icons.LOCATION_ON_OUTLINED, self.direccion_fiscal
+        )
+
+        contenido_desplazable = ft.Column(
+            expand=True,
+            scroll=ft.ScrollMode.AUTO,
+            spacing=12,
+            horizontal_alignment=ft.CrossAxisAlignment.STRETCH,
+            controls=[
+                self.seccion(ft.Icons.ASSIGNMENT_OUTLINED, "Datos generales", datos_generales),
+                ft.Divider(height=1, color=COLOR_GRIS_CLARO),
+                self.seccion(ft.Icons.PHONE_OUTLINED, "Información de contacto", contacto),
+                self.seccion(ft.Icons.LOCATION_ON_OUTLINED, "Domicilio fiscal", domicilio),
+            ],
+        )
+
+        pie_formulario = ft.Column(
+            spacing=8,
+            controls=[
+                ft.Divider(height=1, color=COLOR_GRIS_CLARO),
+                ft.Row(
+                    alignment=ft.MainAxisAlignment.SPACE_BETWEEN,
+                    vertical_alignment=ft.CrossAxisAlignment.CENTER,
+                    controls=[
+                        boton(
+                            texto="Cancelar",
+                            icono=ft.Icons.ARROW_BACK,
+                            tipo="secundario",
+                            color=COLOR_BANNER,
+                            height=42,
+                            width=120,
+                            on_click=self.cancelar,
+                        ),
+                        boton(
+                            texto="Guardar cliente",
+                            icono=ft.Icons.SAVE_OUTLINED,
+                            tipo="principal",
+                            height=44,
+                            width=178,
+                            on_click=self.guardar,
+                        ),
+                    ],
+                ),
+            ],
+        )
+
+        return card(
+            ft.Column(
+                expand=True,
+                spacing=8,
+                horizontal_alignment=ft.CrossAxisAlignment.STRETCH,
+                controls=[contenido_desplazable, pie_formulario],
+            ),
+            padding=ft.Padding(18, 16, 18, 14),
+            radius=14,
+            shadow=sombra_suave(),
+            expand=True,
+        )
+
+    def campo_etiquetado(self, titulo, icono, control):
+        return ft.Column(
+            width=float("inf"),
+            spacing=5,
+            horizontal_alignment=ft.CrossAxisAlignment.STRETCH,
+            controls=[
+                ft.Row(
+                    spacing=8,
+                    vertical_alignment=ft.CrossAxisAlignment.CENTER,
+                    controls=[
+                        ft.Icon(icono, size=18, color=COLOR_BANNER),
+                        ft.Text(
+                            titulo,
+                            size=14,
+                            weight=ft.FontWeight.BOLD,
+                            color=COLOR_BANNER,
+                        ),
+                    ],
+                ),
+                control,
+            ],
+        )
+
+    def panel_estados(self):
+        return ft.Container(
+            bgcolor="#F7FAFD",
+            border_radius=10,
+            padding=ft.Padding(12, 8, 12, 8),
+            content=ft.Row(
+                spacing=12,
+                vertical_alignment=ft.CrossAxisAlignment.CENTER,
+                controls=[
+                    ft.Container(
+                        expand=True,
+                        content=self.opcion_estado(
+                            self.es_nuevo_cliente,
+                            "Es nuevo cliente",
+                            "Marca si es un cliente por primera vez.",
+                        ),
+                    ),
+                    ft.Container(width=1, height=42, bgcolor=COLOR_GRIS_CLARO),
+                    ft.Container(
+                        expand=True,
+                        content=self.opcion_estado(
+                            self.activo,
+                            "Cliente activo",
+                            "El cliente puede ser utilizado en cotizaciones.",
+                        ),
+                    ),
+                ],
+            ),
+        )
+
+    def opcion_estado(self, control, titulo, descripcion):
+        return ft.Row(
+            spacing=8,
+            vertical_alignment=ft.CrossAxisAlignment.CENTER,
+            controls=[
+                control,
+                ft.Column(
+                    expand=True,
+                    spacing=3,
+                    controls=[
+                        ft.Text(
+                            titulo,
+                            size=14,
+                            weight=ft.FontWeight.BOLD,
+                            color=COLOR_BANNER,
+                        ),
+                        ft.Text(
+                            descripcion,
+                            size=12,
+                            color=COLOR_GRIS,
+                            max_lines=2,
+                        ),
+                    ],
+                ),
+            ],
+        )
+
     def seccion(self, icono, titulo, contenido):
         return ft.Column(
-            spacing=12,
+            spacing=9,
+            horizontal_alignment=ft.CrossAxisAlignment.STRETCH,
             controls=[
                 ft.Row(
                     spacing=10,
                     vertical_alignment=ft.CrossAxisAlignment.CENTER,
                     controls=[
-                        ft.Icon(
-                            icono,
-                            size=23,
-                            color=COLOR_NARANJA,
-                        ),
+                        ft.Icon(icono, size=22, color=COLOR_NARANJA),
                         ft.Text(
                             titulo,
-                            size=17,
+                            size=18,
                             weight=ft.FontWeight.BOLD,
                             color=COLOR_BANNER,
                         ),
-                        ft.Container(
-                            expand=True,
-                            height=1,
-                            bgcolor=COLOR_GRIS_CLARO,
-                        ),
+                        ft.Container(expand=True, height=1, bgcolor=COLOR_GRIS_CLARO),
                     ],
                 ),
                 contenido,
@@ -328,40 +358,25 @@ class PantallaRegistrarCliente(ft.Container):
         es_nuevo_cliente = bool(self.es_nuevo_cliente.value)
         activo = bool(self.activo.value)
 
-        if not razon_social or not tipo_persona:
+        if not all([razon_social, rfc, tipo_persona, telefono, correo, direccion]):
             mostrar_notificacion(
                 self._page,
-                "Completa los campos obligatorios.",
+                "Completa todos los campos marcados con *.",
                 COLOR_ROJO,
             )
             return
 
         try:
-            if self.cliente is not None:
-                self.controlador.modificar_cliente(
-                    cliente=self.cliente,
-                    razon_social=razon_social,
-                    tipo_persona=tipo_persona,
-                    direccion=direccion,
-                    rfc=rfc,
-                    telefono=telefono,
-                    correo_elect=correo,
-                    es_nuevo_cliente=es_nuevo_cliente,
-                    activo=activo,
-                )
-                mensaje = "Cambios guardados correctamente."
-            else:
-                self.controlador.registrar_cliente(
-                    razon_social=razon_social,
-                    tipo_persona=tipo_persona,
-                    direccion=direccion,
-                    rfc=rfc,
-                    telefono=telefono,
-                    correo_elect=correo,
-                    es_nuevo_cliente=es_nuevo_cliente,
-                    activo=activo,
-                )
-                mensaje = "Cliente registrado correctamente."
+            self.controlador.registrar_cliente(
+                razon_social=razon_social,
+                tipo_persona=tipo_persona,
+                direccion=direccion,
+                rfc=rfc,
+                telefono=telefono,
+                correo_elect=correo,
+                es_nuevo_cliente=es_nuevo_cliente,
+                activo=activo,
+            )
         except Exception as error:
             mostrar_notificacion(
                 self._page,
@@ -370,7 +385,11 @@ class PantallaRegistrarCliente(ft.Container):
             )
             return
 
-        mostrar_notificacion(self._page, mensaje, COLOR_VERDE)
+        mostrar_notificacion(
+            self._page,
+            "Cliente registrado correctamente.",
+            COLOR_VERDE,
+        )
         if self.vista_anterior:
             self.vista_anterior.build_ui()
             self.vista_anterior.actualizar_directorio()

@@ -265,6 +265,51 @@ def card(
     )
 
 
+def tarjeta_detalle(titulo, icono, contenido):
+    return card(
+        ft.Column(
+            spacing=11,
+            controls=[
+                ft.Row(
+                    spacing=9,
+                    vertical_alignment=ft.CrossAxisAlignment.CENTER,
+                    controls=[
+                        ft.Icon(icono, size=20, color=COLOR_NARANJA),
+                        ft.Text(
+                            titulo,
+                            size=16,
+                            weight=ft.FontWeight.BOLD,
+                            color=COLOR_BANNER,
+                        ),
+                    ],
+                ),
+                contenido,
+            ],
+        ),
+        padding=14,
+        bgcolor=COLOR_BLANCO,
+        border_color="#E4ECF5",
+        radius=12,
+    )
+
+
+def campo_detalle(etiqueta, control, expand=False):
+    return ft.Column(
+        expand=expand,
+        spacing=5,
+        horizontal_alignment=ft.CrossAxisAlignment.STRETCH,
+        controls=[
+            ft.Text(
+                etiqueta,
+                size=13,
+                weight=ft.FontWeight.BOLD,
+                color=COLOR_BANNER,
+            ),
+            control,
+        ],
+    )
+
+
 def barra_busqueda(
     hint="Buscar...",
     on_change=None,

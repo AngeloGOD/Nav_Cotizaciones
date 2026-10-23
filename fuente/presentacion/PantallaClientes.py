@@ -170,29 +170,65 @@ class PantallaClientes(ft.Container):
     def _crear_dialogo_cliente(self):
         return ft.AlertDialog(
             modal=True,
-            bgcolor=COLOR_FONDO,
-            shape=ft.RoundedRectangleBorder(radius=14),
-            title=ft.Row(
-                controls=[
-                    ft.Text(
-                        "Ficha del cliente",
-                        expand=True,
-                        color=COLOR_BANNER,
-                        weight=ft.FontWeight.BOLD,
-                        size=20,
-                    ),
-                    ft.IconButton(
-                        icon=ft.Icons.CLOSE,
-                        tooltip="Cerrar",
-                        icon_color=COLOR_GRIS,
-                        on_click=self.cerrar_ficha,
-                    ),
-                ],
+            bgcolor="#F4F8FC",
+            shape=ft.RoundedRectangleBorder(radius=18),
+            title=self._encabezado_ficha(),
+            title_padding=ft.Padding(22, 18, 22, 10),
+            content=ft.Container(
+                width=650,
+                content=self._contenido_ficha_cliente(),
             ),
-            content=self._contenido_ficha_cliente(),
+            content_padding=ft.Padding(18, 0, 18, 0),
             actions=self._acciones_ficha_cliente(),
-            actions_alignment=ft.MainAxisAlignment.SPACE_BETWEEN,
+            actions_alignment=ft.MainAxisAlignment.END,
+            actions_padding=ft.Padding(18, 12, 18, 18),
             scrollable=True,
+        )
+
+    def _encabezado_ficha(self):
+        es_edicion = self.modo_edicion
+        return ft.Row(
+            spacing=13,
+            vertical_alignment=ft.CrossAxisAlignment.CENTER,
+            controls=[
+                ft.Container(
+                    width=54,
+                    height=54,
+                    border_radius=27,
+                    bgcolor="#FFF0E5",
+                    alignment=ft.Alignment(0, 0),
+                    content=ft.Icon(
+                        ft.Icons.EDIT_OUTLINED if es_edicion else ft.Icons.GROUPS_OUTLINED,
+                        size=28,
+                        color=COLOR_NARANJA,
+                    ),
+                ),
+                ft.Column(
+                    expand=True,
+                    spacing=2,
+                    controls=[
+                        ft.Text(
+                            "Editar cliente" if es_edicion else "Ficha del cliente",
+                            size=22,
+                            weight=ft.FontWeight.BOLD,
+                            color=COLOR_BANNER,
+                        ),
+                        ft.Text(
+                            "Actualiza los datos fiscales y de contacto"
+                            if es_edicion
+                            else "Información fiscal y de contacto",
+                            size=13,
+                            color=COLOR_GRIS,
+                        ),
+                    ],
+                ),
+                ft.IconButton(
+                    icon=ft.Icons.CLOSE,
+                    tooltip="Cerrar",
+                    icon_color=COLOR_BANNER,
+                    on_click=self.cerrar_ficha,
+                ),
+            ],
         )
 
     def _contenido_ficha_cliente(self):
@@ -205,6 +241,28 @@ class PantallaClientes(ft.Container):
             else str(cliente.tipo_persona or "")
         )
 
+        campo_tipo_persona = self._campo_ficha(
+            "Tipo de persona",
+            "tipo_persona",
+            tipo_persona,
+            tipo_persona=True,
+            expand=True,
+        )
+        campo_cliente_nuevo = self._campo_ficha(
+            "Cliente nuevo",
+            "es_nuevo_cliente",
+            cliente.es_nuevo_cliente,
+            switch=True,
+            expand=True,
+        )
+        campo_cliente_activo = self._campo_ficha(
+            "Cliente activo",
+            "activo",
+            cliente.activo,
+            switch=True,
+            expand=True,
+        )
+
         datos_generales = ft.Column(
             spacing=12,
             controls=[
@@ -212,7 +270,7 @@ class PantallaClientes(ft.Container):
                     spacing=12,
                     controls=[
                         self._campo_ficha(
-                            "Razón social",
+                            "Razón fiscal / nombre",
                             "razon_social",
                             cliente.razon_social,
                             expand=True,
@@ -225,11 +283,17 @@ class PantallaClientes(ft.Container):
                         ),
                     ],
                 ),
-                self._campo_ficha(
-                    "Tipo de persona",
-                    "tipo_persona",
-                    tipo_persona,
-                    tipo_persona=True,
+                ft.Row(
+                    spacing=12,
+                    vertical_alignment=ft.CrossAxisAlignment.END,
+                    controls=[
+                        campo_tipo_persona,
+                        *(
+                            [campo_cliente_nuevo, campo_cliente_activo]
+                            if self.modo_edicion
+                            else []
+                        ),
+                    ],
                 ),
             ],
         )
@@ -262,57 +326,39 @@ class PantallaClientes(ft.Container):
 
         estado = ft.Row(
             spacing=24,
-            controls=[
-                self._campo_ficha(
-                    "Cliente nuevo",
-                    "es_nuevo_cliente",
-                    cliente.es_nuevo_cliente,
-                    switch=True,
-                    expand=True,
-                ),
-                self._campo_ficha(
-                    "Estado",
-                    "activo",
-                    cliente.activo,
-                    switch=True,
-                    expand=True,
-                ),
-            ],
+            controls=[campo_cliente_nuevo, campo_cliente_activo],
         )
 
-        return card(
-            ft.Column(
-                spacing=16,
-                controls=[
-                    self._seccion_ficha(
-                        ft.Icons.BUSINESS_OUTLINED,
-                        "Datos generales",
-                        datos_generales,
-                    ),
-                    ft.Divider(height=1, color=COLOR_GRIS_CLARO),
-                    self._seccion_ficha(
-                        ft.Icons.PHONE_OUTLINED,
-                        "Información de contacto",
-                        contacto,
-                    ),
-                    ft.Divider(height=1, color=COLOR_GRIS_CLARO),
-                    self._seccion_ficha(
-                        ft.Icons.LOCATION_ON_OUTLINED,
-                        "Domicilio fiscal",
-                        domicilio,
-                    ),
-                    ft.Divider(height=1, color=COLOR_GRIS_CLARO),
-                    self._seccion_ficha(
-                        ft.Icons.CHECK_CIRCLE_OUTLINE,
-                        "Estado del cliente",
-                        estado,
-                    ),
-                ],
+        tarjetas = [
+            tarjeta_detalle(
+                "Datos generales",
+                ft.Icons.BUSINESS_OUTLINED,
+                datos_generales,
             ),
-            padding=18,
-            radius=12,
-            shadow=sombra_suave(),
-            expand=True,
+            tarjeta_detalle(
+                "Información de contacto",
+                ft.Icons.PHONE_OUTLINED,
+                contacto,
+            ),
+            tarjeta_detalle(
+                "Domicilio fiscal",
+                ft.Icons.LOCATION_ON_OUTLINED,
+                domicilio,
+            ),
+        ]
+        if not self.modo_edicion:
+            tarjetas.append(
+                tarjeta_detalle(
+                    "Estado del cliente",
+                    ft.Icons.VERIFIED_USER_OUTLINED,
+                    estado,
+                )
+            )
+
+        return ft.Column(
+            tight=True,
+            spacing=10,
+            controls=tarjetas,
         )
 
     def _campo_ficha(
@@ -336,6 +382,7 @@ class PantallaClientes(ft.Container):
                     ],
                     height=44,
                     text_size=14,
+                    content_padding=ft.Padding(12, 8, 12, 8),
                     border=ft.InputBorder.OUTLINE,
                     border_color=COLOR_GRIS_CLARO,
                     focused_border_color=COLOR_NARANJA,
@@ -355,6 +402,7 @@ class PantallaClientes(ft.Container):
                     min_lines=2 if multiline else 1,
                     max_lines=3 if multiline else 1,
                     text_size=14,
+                    content_padding=ft.Padding(12, 9, 12, 9),
                     border=ft.InputBorder.OUTLINE,
                     border_color=COLOR_GRIS_CLARO,
                     focused_border_color=COLOR_NARANJA,
@@ -362,10 +410,31 @@ class PantallaClientes(ft.Container):
                 )
                 self.campos_ficha[nombre] = control
         elif switch:
-            control = ft.Text(
-                "Sí" if valor else "No",
-                color=COLOR_NEGRO,
-                size=14,
+            color = COLOR_VERDE if valor else COLOR_ROJO
+            control = ft.Container(
+                bgcolor="#EAF7EF" if valor else "#FDECEC",
+                border_radius=16,
+                padding=ft.Padding(10, 5, 10, 5),
+                content=ft.Row(
+                    tight=True,
+                    spacing=6,
+                    controls=[
+                        ft.Icon(
+                            ft.Icons.CHECK_CIRCLE_OUTLINE
+                            if valor
+                            else ft.Icons.CANCEL_OUTLINED,
+                            size=16,
+                            color=color,
+                        ),
+                        ft.Text(
+                            "Sí" if valor else "No",
+                            color=color,
+                            size=13,
+                            weight=ft.FontWeight.BOLD,
+                            selectable=True,
+                        ),
+                    ],
+                ),
             )
         else:
             texto = valor or "-"
@@ -381,79 +450,126 @@ class PantallaClientes(ft.Container):
                 size=14,
                 max_lines=3 if multiline else 1,
                 overflow=ft.TextOverflow.ELLIPSIS,
+                selectable=True,
             )
 
-        return ft.Column(
-            expand=expand,
-            spacing=5,
-            controls=[
-                ft.Text(
-                    etiqueta,
-                    color=COLOR_BANNER,
-                    size=13,
-                    weight=ft.FontWeight.BOLD,
-                ),
-                control,
-            ],
-        )
+        if switch and self.modo_edicion:
+            control = ft.Container(
+                bgcolor="#F0F7FC",
+                border_radius=10,
+                padding=ft.Padding(10, 2, 10, 2),
+                content=control,
+            )
 
-    def _seccion_ficha(self, icono, titulo, contenido):
-        return ft.Column(
-            spacing=9,
-            controls=[
-                ft.Row(
-                    spacing=8,
-                    controls=[
-                        ft.Icon(icono, size=19, color=COLOR_NARANJA),
-                        ft.Text(
-                            titulo,
-                            size=16,
-                            color=COLOR_BANNER,
-                            weight=ft.FontWeight.BOLD,
-                        ),
-                    ],
-                ),
-                contenido,
-            ],
-        )
+        return campo_detalle(etiqueta, control, expand=expand)
 
     def _acciones_ficha_cliente(self):
         if self.modo_edicion:
             return [
-                ft.TextButton(
-                    "Eliminar",
-                    on_click=self.pedir_confirmacion_eliminacion,
-                    style=ft.ButtonStyle(color=COLOR_ROJO),
-                ),
-                ft.TextButton(
-                    "Cancelar edición",
-                    on_click=self.cancelar_edicion,
-                    style=ft.ButtonStyle(color=COLOR_GRIS),
-                ),
-                ft.FilledButton(
-                    "Guardar cambios",
-                    on_click=self.guardar_cambios_cliente,
-                    style=ft.ButtonStyle(
-                        bgcolor=COLOR_VERDE,
-                        color=COLOR_BLANCO,
-                    ),
+                ft.Row(
+                    expand=True,
+                    alignment=ft.MainAxisAlignment.SPACE_BETWEEN,
+                    controls=[
+                        ft.OutlinedButton(
+                            content=ft.Row(
+                                tight=True,
+                                spacing=6,
+                                controls=[
+                                    ft.Icon(ft.Icons.DELETE_OUTLINE, color=COLOR_ROJO, size=18),
+                                    ft.Text("Eliminar", color=COLOR_ROJO),
+                                ],
+                            ),
+                            on_click=self.pedir_confirmacion_eliminacion,
+                            style=ft.ButtonStyle(
+                                side=ft.BorderSide(1, COLOR_ROJO),
+                                shape=ft.RoundedRectangleBorder(radius=8),
+                            ),
+                        ),
+                        ft.Row(
+                            spacing=9,
+                            controls=[
+                                ft.OutlinedButton(
+                                    content=ft.Row(
+                                        tight=True,
+                                        spacing=6,
+                                        controls=[
+                                            ft.Icon(ft.Icons.CLOSE, color=COLOR_BANNER, size=18),
+                                            ft.Text("Cancelar", color=COLOR_BANNER),
+                                        ],
+                                    ),
+                                    on_click=self.cancelar_edicion,
+                                    style=ft.ButtonStyle(
+                                        side=ft.BorderSide(1, COLOR_GRIS_CLARO),
+                                        shape=ft.RoundedRectangleBorder(radius=8),
+                                    ),
+                                ),
+                                ft.FilledButton(
+                                    content=ft.Row(
+                                        tight=True,
+                                        spacing=6,
+                                        controls=[
+                                            ft.Icon(ft.Icons.SAVE_OUTLINED, color=COLOR_BLANCO, size=18),
+                                            ft.Text("Guardar cambios", color=COLOR_BLANCO),
+                                        ],
+                                    ),
+                                    on_click=self.guardar_cambios_cliente,
+                                    style=ft.ButtonStyle(
+                                        bgcolor=COLOR_VERDE,
+                                        shape=ft.RoundedRectangleBorder(radius=8),
+                                    ),
+                                ),
+                            ],
+                        ),
+                    ],
                 ),
             ]
 
         return [
-            ft.TextButton(
-                "Eliminar",
-                on_click=self.pedir_confirmacion_eliminacion,
-                style=ft.ButtonStyle(color=COLOR_ROJO),
-            ),
-            ft.TextButton(
-                "Editar",
-                on_click=self.activar_edicion,
-                style=ft.ButtonStyle(color=COLOR_AZUL),
+            ft.Row(
+                expand=True,
+                alignment=ft.MainAxisAlignment.SPACE_BETWEEN,
+                controls=[
+                    ft.OutlinedButton(
+                        content=ft.Row(
+                            tight=True,
+                            spacing=6,
+                            controls=[
+                                ft.Icon(ft.Icons.DELETE_OUTLINE, color=COLOR_ROJO, size=18),
+                                ft.Text("Eliminar", color=COLOR_ROJO),
+                            ],
+                        ),
+                        on_click=self.pedir_confirmacion_eliminacion,
+                        style=ft.ButtonStyle(
+                            side=ft.BorderSide(1, COLOR_ROJO),
+                            shape=ft.RoundedRectangleBorder(radius=8),
+                        ),
+                    ),
+                    ft.Row(
+                        spacing=9,
+                        controls=[
+                            ft.FilledButton(
+                                content=ft.Row(
+                                    tight=True,
+                                    spacing=6,
+                                    controls=[
+                                        ft.Icon(ft.Icons.EDIT_OUTLINED, color=COLOR_BLANCO, size=18),
+                                        ft.Text("Editar", color=COLOR_BLANCO),
+                                    ],
+                                ),
+                                on_click=self.activar_edicion,
+                                style=ft.ButtonStyle(
+                                    bgcolor=COLOR_NARANJA,
+                                    shape=ft.RoundedRectangleBorder(radius=8),
+                                ),
+                            ),
+                        ],
+                    ),
+                ],
             ),
         ]
 
     def _actualizar_ficha(self):
+        self.dialogo_cliente.title = self._encabezado_ficha()
         self.dialogo_cliente.content = self._contenido_ficha_cliente()
         self.dialogo_cliente.actions = self._acciones_ficha_cliente()
         self._page.update()

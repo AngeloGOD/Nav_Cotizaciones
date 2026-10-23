@@ -45,6 +45,7 @@ def boton(
     height=None,
     tooltip=None,
     color=None,
+    border_color=None,
 ):
     if tipo == "accion":
         return ft.IconButton(
@@ -75,12 +76,14 @@ def boton(
                         texto,
                         size=14,
                         color=color or COLOR_AZUL,
+                        max_lines=1,
+                        overflow=ft.TextOverflow.ELLIPSIS,
                     ),
                 ],
             ),
             style=ft.ButtonStyle(
                 color=color or COLOR_AZUL,
-                side=ft.BorderSide(1, COLOR_GRIS_CLARO),
+                side=ft.BorderSide(1, border_color or COLOR_GRIS_CLARO),
                 shape=ft.RoundedRectangleBorder(radius=8),
                 padding=ft.Padding(14, 0, 14, 0),
             ),
@@ -104,6 +107,8 @@ def boton(
                     size=14,
                     weight=ft.FontWeight.BOLD,
                     color=COLOR_BLANCO,
+                    max_lines=1,
+                    overflow=ft.TextOverflow.ELLIPSIS,
                 ),
             ],
         ),
@@ -265,6 +270,141 @@ def card(
     )
 
 
+
+def banner_modulo(src, categoria, titulo, descripcion, icono, altura=174):
+    """Encabezado reutilizable para pantallas de módulos, con imagen, icono y descripción."""
+    contenido = ft.Container(
+        expand=True,
+        padding=ft.Padding(24, 16, 24, 16),
+        content=ft.Row(
+            spacing=18,
+            vertical_alignment=ft.CrossAxisAlignment.CENTER,
+            controls=[
+                ft.Container(
+                    width=88,
+                    height=88,
+                    border_radius=44,
+                    bgcolor="#FFF5ED",
+                    alignment=ft.Alignment(0, 0),
+                    content=ft.Icon(icono, size=43, color=COLOR_NARANJA),
+                ),
+                ft.Column(
+                    expand=True,
+                    alignment=ft.MainAxisAlignment.CENTER,
+                    spacing=4,
+                    controls=[
+                        ft.Text(
+                            categoria.upper(),
+                            size=11,
+                            weight=ft.FontWeight.BOLD,
+                            color=COLOR_BANNER,
+                        ),
+                        ft.Text(
+                            titulo,
+                            size=30,
+                            weight=ft.FontWeight.BOLD,
+                            color=COLOR_BANNER,
+                        ),
+                        ft.Text(
+                            descripcion,
+                            size=14,
+                            color="#4F719B",
+                            max_lines=2,
+                            overflow=ft.TextOverflow.ELLIPSIS,
+                        ),
+                    ],
+                ),
+            ],
+        ),
+    )
+    return card(
+        banner_imagen_desvanecida(src, content=contenido, altura=altura),
+        padding=0,
+        border_color="#DCEAF8",
+        radius=16,
+        shadow=sombra_suave(),
+    )
+
+
+def avatar_inicial(texto, color=None, size=44, tooltip=None):
+    """Avatar circular con inicial; reutilizable en directorios y fichas."""
+    inicial = (str(texto or "?").strip()[:1] or "?").upper()
+    return ft.Container(
+        width=size,
+        height=size,
+        border_radius=size / 2,
+        bgcolor=color or COLOR_AZUL,
+        alignment=ft.Alignment(0, 0),
+        tooltip=tooltip,
+        content=ft.Text(
+            inicial,
+            size=max(12, int(size * 0.36)),
+            color=COLOR_BLANCO,
+            weight=ft.FontWeight.BOLD,
+        ),
+    )
+
+
+def badge_estado(texto, estado="activo"):
+    """Etiqueta compacta de estado (activo, inactivo, pendiente o informativo)."""
+    estilos = {
+        "activo": ("#DDF7EF", "#009B82"),
+        "inactivo": ("#FDE8EB", COLOR_ROJO),
+        "pendiente": ("#FFF3D9", "#A66B00"),
+        "info": ("#E8F2FF", COLOR_AZUL),
+    }
+    fondo, acento = estilos.get(str(estado).lower(), estilos["info"])
+    return ft.Container(
+        padding=ft.Padding(10, 5, 10, 5),
+        bgcolor=fondo,
+        border_radius=18,
+        content=ft.Row(
+            tight=True,
+            spacing=6,
+            vertical_alignment=ft.CrossAxisAlignment.CENTER,
+            controls=[
+                ft.Container(width=7, height=7, bgcolor=acento, border_radius=4),
+                ft.Text(
+                    texto,
+                    size=12,
+                    color=acento,
+                    weight=ft.FontWeight.BOLD,
+                    max_lines=1,
+                    overflow=ft.TextOverflow.ELLIPSIS,
+                ),
+            ],
+        ),
+    )
+
+
+def boton_icono_enmarcado(
+    icono,
+    on_click=None,
+    tooltip=None,
+    color=None,
+    border_color=None,
+    size=40,
+):
+    """Botón de icono con borde suave para acciones de tablas y tarjetas."""
+    color = color or COLOR_AZUL
+    return ft.Container(
+        width=size,
+        height=size,
+        alignment=ft.Alignment(0, 0),
+        bgcolor=COLOR_BLANCO,
+        border=ft.Border.all(1, border_color or "#CFE0F5"),
+        border_radius=10,
+        content=ft.IconButton(
+            icon=icono,
+            tooltip=tooltip,
+            icon_color=color,
+            icon_size=19,
+            width=size,
+            height=size,
+            on_click=on_click,
+        ),
+    )
+
 def tarjeta_detalle(titulo, icono, contenido):
     return card(
         ft.Column(
@@ -340,42 +480,52 @@ def tabla(
     data_row_min_height=60,
     data_row_max_height=float("inf"),
     columnas_flexibles=False,
+    heading_row_color=None,
+    heading_text_size=14,
+    heading_text_color=None,
+    vertical_lines=True,
+    horizontal_lines=True,
+    border_color=None,
+    columnas_compactas=False,
 ):
     columnas_tabla = []
 
     for texto, ancho in columnas:
-        encabezado = ft.Container(
-            width=None if columnas_flexibles else ancho,
-            alignment=ft.Alignment(0, 0),
-            content=ft.Text(
+        contenido_encabezado = (
+            texto
+            if not isinstance(texto, str)
+            else ft.Text(
                 texto,
-                size=14,
+                size=heading_text_size,
                 weight=ft.FontWeight.BOLD,
-                color=COLOR_NEGRO,
+                color=heading_text_color or COLOR_NEGRO,
                 text_align=ft.TextAlign.CENTER,
                 max_lines=1,
                 overflow=ft.TextOverflow.ELLIPSIS,
-            ),
+            )
+        )
+        ancho_fijo = (
+            not columnas_flexibles
+            or ancho <= 60
+            or (columnas_compactas and ancho <= 80)
+        )
+        encabezado = ft.Container(
+            width=ancho if ancho_fijo else None,
+            alignment=ft.Alignment(0, 0),
+            content=contenido_encabezado,
         )
 
-        if columnas_flexibles:
-            # Las columnas grandes reciben más espacio.
-            if ancho <= 140:
+        if columnas_flexibles and not ancho_fijo:
+            # El valor de ancho funciona como referencia proporcional. Las
+            # columnas normales crecen hasta ocupar el espacio disponible;
+            # las columnas pequeñas (checkboxes/acciones) conservan su ancho.
+            if columnas_compactas and ancho <= 125:
                 tamano = ftd.DataColumnSize.S
-            elif ancho <= 200:
-                tamano = ftd.DataColumnSize.M
             else:
-                tamano = ftd.DataColumnSize.L
-
-            columna = ftd.DataColumn2(
-                label=encabezado,
-                size=tamano,
-            )
+                tamano = ftd.DataColumnSize.M if ancho <= 145 else ftd.DataColumnSize.L
+            columna = ftd.DataColumn2(label=encabezado, size=tamano)
         else:
-            columna = ftd.DataColumn2(
-                label=encabezado,
-                fixed_width=ancho,
-            )
+            columna = ftd.DataColumn2(label=encabezado, fixed_width=ancho)
 
         columnas_tabla.append(columna)
 
@@ -385,10 +535,10 @@ def tabla(
         horizontal_margin=horizontal_margin,
         heading_row_height=heading_row_height,
         data_row_height=data_row_min_height,
-        heading_row_color=COLOR_FONDO,
-        border=ft.Border.all(1, COLOR_GRIS_CLARO),
-        vertical_lines=ft.BorderSide(1, COLOR_GRIS_CLARO),
-        horizontal_lines=ft.BorderSide(1, COLOR_GRIS_CLARO),
+        heading_row_color=heading_row_color or COLOR_FONDO,
+        border=ft.Border.all(1, border_color or COLOR_GRIS_CLARO),
+        vertical_lines=ft.BorderSide(1, border_color or COLOR_GRIS_CLARO) if vertical_lines else None,
+        horizontal_lines=ft.BorderSide(1, border_color or COLOR_GRIS_CLARO) if horizontal_lines else None,
         clip_behavior=ft.ClipBehavior.HARD_EDGE,
         columns=columnas_tabla,
         rows=filas,

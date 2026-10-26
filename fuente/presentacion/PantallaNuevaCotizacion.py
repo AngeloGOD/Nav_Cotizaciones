@@ -21,7 +21,9 @@ class PantallaNuevaCotizacion(ft.Container):
         self.chk_costo = ft.Checkbox(label="Costo Unitario (MXN)", value=True, on_change=self.toggle_columnas, active_color=ft.Colors.BLUE_600)
         self.chk_ganancia = ft.Checkbox(label="Ganancia (%)", value=True, on_change=self.toggle_columnas, active_color=ft.Colors.BLUE_600)
         self.chk_iva = ft.Checkbox(label="IVA (%)", value=True, on_change=self.toggle_columnas, active_color=ft.Colors.BLUE_600)
-        self.switch_cliente = ft.Switch(label="Vista de la cotización (cliente)", value=False, on_change=self.toggle_vista_cliente, active_color=COLOR_NARANJA)
+        
+        
+        self.switch_cliente = ft.Switch(value=False, on_change=self.toggle_vista_cliente, active_color=COLOR_NARANJA)
 
         self.input_activo_fecha = None 
         self.date_picker = ft.DatePicker(
@@ -86,10 +88,12 @@ class PantallaNuevaCotizacion(ft.Container):
         )
 
     def panel_izquierdo(self):
+        
         boton_cancelar = ft.Container(
-            content=ft.Row([ft.Icon(ft.Icons.CHEVRON_LEFT, size=18, color=COLOR_GRIS), ft.Text("Cancelar", color=COLOR_GRIS, weight=ft.FontWeight.W_600, size=13)], spacing=2),
+            content=ft.Row([ft.Icon(ft.Icons.CHEVRON_LEFT, size=18, color=COLOR_GRIS), ft.Text("Cancelar", color=COLOR_GRIS, weight=ft.FontWeight.W_600, size=13)], spacing=4, alignment=ft.MainAxisAlignment.CENTER),
             padding=ft.Padding(10, 8, 15, 8), border=self.crear_borde_completo(1, ft.Colors.GREY_300), border_radius=6, ink=True,
-            on_click=self.cancelar
+            on_click=self.cancelar,
+            width=130, height=42
         )
         return ft.Column([self.seccion_datos(), self.seccion_servicios(), boton_cancelar], expand=True, spacing=20)
 
@@ -135,7 +139,7 @@ class PantallaNuevaCotizacion(ft.Container):
                     padding=20,
                     content=ft.Column([
                         ft.Row([
-                            self.crear_dropdown("Nombre del Buque *", "Ej. MV Ocean Star", ft.Icons.DIRECTIONS_BOAT_OUTLINED, ["MV Ocean Star", "CMA CGM Marco Polo"]), 
+                            self.crear_input("Nombre del Buque *", "Ej. MV Ocean Star", ft.Icons.DIRECTIONS_BOAT_OUTLINED, ), 
                             self.crear_input_fecha("ETA (Fecha y hora) *", "25/10/2026", ft.Icons.CALENDAR_TODAY_OUTLINED), 
                             self.crear_dropdown("Cliente *", "ABC Logística S.A. de C.V.", ft.Icons.PERSON_OUTLINE, ["ABC Logística S.A. de C.V.", "Maersk Line"])
                         ], spacing=20),
@@ -169,6 +173,22 @@ class PantallaNuevaCotizacion(ft.Container):
                 ft.PopupMenuItem(content=ft.Row([ft.Icon(ft.Icons.VIEW_COLUMN_OUTLINED, color=COLOR_GRIS, size=18), ft.Text("Agregar Campo (Nueva Columna)", color=COLOR_AZUL_OSCURO)]), on_click=self.mostrar_dialogo_columna)
             ]
         )
+        
+        
+        contenedor_tabla_con_scroll = ft.Row(
+            scroll=ft.ScrollMode.ADAPTIVE,
+            controls=[
+                ft.Container(
+                    width=1000, 
+                    content=ft.Column([
+                        self.cabecera_tabla,
+                        ft.Divider(height=20, color=ft.Colors.GREY_200),
+                        self.lista_filas,
+                        ft.Container(height=35) 
+                    ])
+                )
+            ]
+        )
 
         return ft.Container(
             border=self.crear_borde_completo(1, ft.Colors.GREY_200), border_radius=10, bgcolor=COLOR_BLANCO,
@@ -183,9 +203,7 @@ class PantallaNuevaCotizacion(ft.Container):
                 ft.Container(
                     padding=20,
                     content=ft.Column([
-                        self.cabecera_tabla,
-                        ft.Divider(height=20, color=ft.Colors.GREY_200),
-                        self.lista_filas,
+                        contenedor_tabla_con_scroll, 
                         ft.Container(height=10),
                         ft.Container(
                             bgcolor=ft.Colors.BLUE_50, border=self.crear_borde_completo(1, ft.Colors.BLUE_100), border_radius=6, padding=12,
@@ -263,7 +281,6 @@ class PantallaNuevaCotizacion(ft.Container):
             self.input_activo_fecha.value = fecha_formateada
             self.input_activo_fecha.update()
 
-    # --- HELPERS UI ---
     def crear_borde_completo(self, ancho, color):
         return ft.Border(top=ft.BorderSide(ancho, color), right=ft.BorderSide(ancho, color), bottom=ft.BorderSide(ancho, color), left=ft.BorderSide(ancho, color))
 
@@ -275,7 +292,9 @@ class PantallaNuevaCotizacion(ft.Container):
             expand=True,
             content=ft.Column([
                 ft.Text(label, size=11, color=COLOR_AZUL_OSCURO, weight=ft.FontWeight.W_600),
-                ft.TextField(hint_text=hint, prefix_icon=icon, border_color=ft.Colors.GREY_300, border_radius=6, height=38, content_padding=10, text_size=12)
+                ft.Row([
+                    ft.TextField(hint_text=hint, prefix_icon=icon, border_color=ft.Colors.GREY_300, border_radius=6, height=42, content_padding=10, text_size=12, expand=True)
+                ])
             ], spacing=5)
         )
 
@@ -288,12 +307,13 @@ class PantallaNuevaCotizacion(ft.Container):
             e.page.update()
 
         btn_calendario = ft.IconButton(icon=ft.Icons.CALENDAR_MONTH, icon_size=16, icon_color=COLOR_NARANJA, on_click=abrir_picker, width=30, height=30)
-        txt_field = ft.TextField(hint_text=hint, prefix_icon=icon, suffix=btn_calendario, border_color=ft.Colors.GREY_300, border_radius=6, height=38, content_padding=10, text_size=12)
+        txt_field = ft.TextField(hint_text=hint, prefix_icon=icon, suffix=btn_calendario, border_color=ft.Colors.GREY_300, border_radius=6, height=42, content_padding=10, text_size=12, expand=True)
         
         return ft.Container(
             expand=True,
             content=ft.Column([
-                ft.Text(label, size=11, color=COLOR_AZUL_OSCURO, weight=ft.FontWeight.W_600), txt_field
+                ft.Text(label, size=11, color=COLOR_AZUL_OSCURO, weight=ft.FontWeight.W_600),
+                ft.Row([txt_field])
             ], spacing=5)
         )
 
@@ -303,7 +323,9 @@ class PantallaNuevaCotizacion(ft.Container):
             expand=True,
             content=ft.Column([
                 ft.Row([ft.Icon(icon, size=14, color=COLOR_AZUL_OSCURO), ft.Text(label, size=11, color=COLOR_AZUL_OSCURO, weight=ft.FontWeight.W_600)], spacing=5),
-                ft.Dropdown(hint_text=hint, border_color=ft.Colors.GREY_300, border_radius=6, height=38, content_padding=10, text_size=12, options=elementos)
+                ft.Row([
+                    ft.Dropdown(hint_text=hint, border_color=ft.Colors.GREY_300, border_radius=6, height=42, content_padding=10, text_size=12, options=elementos, expand=True)
+                ])
             ], spacing=5)
         )
 

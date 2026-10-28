@@ -1,10 +1,12 @@
-from fuente.negocio.modelo.Cliente import Cliente
-from fuente.negocio.modelo.ENUMs import TipoPersona
+from fuente.negocio.controlador.ControladorRegistrarCliente import (
+    ControladorRegistrarCliente,
+)
 
 
 class ControladorClientes:
     def __init__(self, servicio_cliente):
         self.servicio_cliente = servicio_cliente
+        self.controlador_registro = ControladorRegistrarCliente(servicio_cliente)
 
     def registrar_cliente(
         self,
@@ -17,19 +19,16 @@ class ControladorClientes:
         es_nuevo_cliente=False,
         activo=True,
     ):
-        datos = self._normalizar_datos_cliente(
-            razon_social,
-            tipo_persona,
-            direccion,
-            rfc,
-            telefono,
-            correo_elect,
-            es_nuevo_cliente,
-            activo,
+        return self.controlador_registro.registrar_cliente(
+            razon_social=razon_social,
+            tipo_persona=tipo_persona,
+            direccion=direccion,
+            rfc=rfc,
+            telefono=telefono,
+            correo_elect=correo_elect,
+            es_nuevo_cliente=es_nuevo_cliente,
+            activo=activo,
         )
-        cliente = Cliente(**datos)
-        self.servicio_cliente.registrar_cliente(cliente)
-        return cliente
 
     def obtener_clientes(self, texto="", limit=10, offset=0):
         texto = (texto or "").strip()
@@ -56,7 +55,7 @@ class ControladorClientes:
         es_nuevo_cliente=False,
         activo=True,
     ):
-        datos = self._normalizar_datos_cliente(
+        datos = ControladorRegistrarCliente.normalizar_datos_cliente(
             razon_social,
             tipo_persona,
             direccion,
@@ -74,32 +73,3 @@ class ControladorClientes:
 
     def eliminar_cliente(self, cliente):
         self.servicio_cliente.eliminar_cliente(cliente)
-
-    @staticmethod
-    def _normalizar_datos_cliente(
-        razon_social,
-        tipo_persona,
-        direccion,
-        rfc,
-        telefono,
-        correo_elect,
-        es_nuevo_cliente,
-        activo,
-    ):
-        if isinstance(tipo_persona, str):
-            tipo_persona = TipoPersona(tipo_persona.strip().upper())
-
-        return {
-            "razon_social": razon_social.strip(),
-            "tipo_persona": tipo_persona,
-            "direccion": direccion.strip() if direccion and direccion.strip() else None,
-            "rfc": rfc.strip().upper() if rfc and rfc.strip() else None,
-            "telefono": telefono.strip() if telefono and telefono.strip() else None,
-            "correo_elect": (
-                correo_elect.strip()
-                if correo_elect and correo_elect.strip()
-                else None
-            ),
-            "es_nuevo_cliente": bool(es_nuevo_cliente),
-            "activo": bool(activo),
-        }

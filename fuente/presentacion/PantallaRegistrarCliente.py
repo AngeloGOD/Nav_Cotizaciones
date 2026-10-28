@@ -2,7 +2,10 @@ import flet as ft
 
 from fuente.utilidades.Colores import *
 from fuente.utilidades.Componentes import *
-from fuente.negocio.controlador.ControladorClientes import ControladorClientes
+from fuente.negocio.controlador.ControladorRegistrarCliente import (
+    ControladorRegistrarCliente,
+    ErrorRegistroCliente,
+)
 
 
 class PantallaRegistrarCliente(ft.Container):
@@ -12,7 +15,7 @@ class PantallaRegistrarCliente(ft.Container):
         self._page = page
         self.vista_anterior = vista_anterior
         self.servicio_cliente = servicio_cliente
-        self.controlador = ControladorClientes(servicio_cliente)
+        self.controlador = ControladorRegistrarCliente(servicio_cliente)
 
         # Campos de una sola línea: ancho completo de su columna y altura uniforme.
         self.nombre = self.ajustar_campo(campo("Ej. ABC Logistics S.A. de C.V.", None))
@@ -349,22 +352,14 @@ class PantallaRegistrarCliente(ft.Container):
             self._page.update()
 
     def guardar(self, e):
-        razon_social = (self.nombre.value or "").strip()
-        rfc = (self.rfc.value or "").strip()
-        direccion = (self.direccion_fiscal.value or "").strip()
-        telefono = (self.telefono.value or "").strip()
-        correo = (self.correo.value or "").strip()
-        tipo_persona = (self.tipo_persona.value or "").strip()
+        razon_social = self.nombre.value
+        rfc = self.rfc.value
+        direccion = self.direccion_fiscal.value
+        telefono = self.telefono.value
+        correo = self.correo.value
+        tipo_persona = self.tipo_persona.value
         es_nuevo_cliente = bool(self.es_nuevo_cliente.value)
         activo = bool(self.activo.value)
-
-        if not all([razon_social, rfc, tipo_persona, telefono, correo, direccion]):
-            mostrar_notificacion(
-                self._page,
-                "Completa todos los campos marcados con *.",
-                COLOR_ROJO,
-            )
-            return
 
         try:
             self.controlador.registrar_cliente(
@@ -377,12 +372,11 @@ class PantallaRegistrarCliente(ft.Container):
                 es_nuevo_cliente=es_nuevo_cliente,
                 activo=activo,
             )
-        except Exception as error:
-            mostrar_notificacion(
-                self._page,
-                f"No se pudo guardar el cliente: {error}",
-                COLOR_ROJO,
-            )
+        except ValueError as error:
+            mostrar_notificacion(self._page, str(error), COLOR_ROJO)
+            return
+        except ErrorRegistroCliente as error:
+            mostrar_notificacion(self._page, str(error), COLOR_ROJO)
             return
 
         mostrar_notificacion(

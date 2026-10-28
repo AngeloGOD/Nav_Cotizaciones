@@ -4,6 +4,31 @@ from .Colores import *
 import flet_datatable2 as ftd
 
 
+class Herramientas:
+    @staticmethod
+    def limpiar_controles(controles, valores_iniciales=None):
+        controles = list(controles)
+        if valores_iniciales is not None and len(valores_iniciales) != len(controles):
+            raise ValueError("Debe indicarse un valor inicial por cada control.")
+
+        for indice, control in enumerate(controles):
+            if isinstance(control, ft.TextField):
+                valor = ""
+            elif isinstance(control, ft.Dropdown):
+                valor = None
+            elif isinstance(control, (ft.Checkbox, ft.Switch)):
+                valor = False
+            elif isinstance(control, ft.DatePicker):
+                valor = None
+            else:
+                raise TypeError(
+                    f"No se puede limpiar el control {type(control).__name__}."
+                )
+
+            if valores_iniciales is not None:
+                valor = valores_iniciales[indice]
+            control.value = valor
+
 def sombra_suave():
     return ft.BoxShadow(
         blur_radius=30,
@@ -268,6 +293,172 @@ def card(
         shadow=shadow,
         expand=expand,
     )
+
+
+def seccion_opciones_filtro(
+    titulo,
+    opciones,
+    seleccionados=None,
+    on_change=None,
+):
+    seleccionados = seleccionados or set()
+    checkboxes = {}
+    filas_opciones = []
+    for valor, etiqueta in opciones:
+        checkbox = ft.Checkbox(
+            value=valor in seleccionados,
+            active_color=COLOR_AZUL,
+            check_color=COLOR_BLANCO,
+            border_side=ft.BorderSide(1.5, "#7186A0"),
+            shape=ft.RoundedRectangleBorder(radius=3),
+            scale=1.2,
+            width=30,
+            height=32,
+            on_change=on_change,
+        )
+        checkboxes[valor] = checkbox
+        filas_opciones.append(
+            ft.Row(
+                tight=True,
+                spacing=3,
+                vertical_alignment=ft.CrossAxisAlignment.CENTER,
+                controls=[
+                    checkbox,
+                    ft.Text(etiqueta, size=13, color="#415A77"),
+                ],
+            )
+        )
+
+    return (
+        ft.Container(
+            padding=ft.Padding(14, 8, 14, 6),
+            content=ft.Column(
+                spacing=0,
+                controls=[
+                    ft.Text(
+                        titulo,
+                        size=12,
+                        weight=ft.FontWeight.BOLD,
+                        color=COLOR_BANNER,
+                    ),
+                    ft.Row(
+                        spacing=8,
+                        run_spacing=2,
+                        wrap=True,
+                        controls=filas_opciones,
+                    ),
+                ],
+            ),
+        ),
+        checkboxes,
+    )
+
+
+def panel_filtros(
+    titulo,
+    secciones,
+    resumen,
+    on_limpiar,
+    on_aplicar,
+    on_cerrar,
+    top=247,
+    right=153,
+    width=320,
+    height=452,
+):
+    texto_resumen = ft.Text(
+        resumen,
+        size=11,
+        color=COLOR_GRIS,
+        expand=True,
+        max_lines=1,
+    )
+    pie = ft.Container(
+        padding=ft.Padding(12, 8, 12, 10),
+        border=ft.Border(top=ft.BorderSide(1, "#E2EDF9")),
+        content=ft.Row(
+            spacing=8,
+            alignment=ft.MainAxisAlignment.END,
+            controls=[
+                texto_resumen,
+                ft.OutlinedButton(
+                    "Limpiar",
+                    on_click=on_limpiar,
+                    style=ft.ButtonStyle(
+                        color=COLOR_AZUL,
+                        side=ft.BorderSide(1, "#C9DDF7"),
+                        shape=ft.RoundedRectangleBorder(radius=8),
+                        padding=ft.Padding(10, 0, 10, 0),
+                    ),
+                    height=36,
+                ),
+                ft.FilledButton(
+                    "Aplicar filtros",
+                    on_click=on_aplicar,
+                    style=ft.ButtonStyle(
+                        bgcolor=COLOR_NARANJA,
+                        color=COLOR_BLANCO,
+                        shape=ft.RoundedRectangleBorder(radius=8),
+                        padding=ft.Padding(12, 0, 12, 0),
+                    ),
+                    height=36,
+                ),
+            ],
+        ),
+    )
+    panel = ft.Container(
+        right=right,
+        top=top,
+        width=width,
+        height=height,
+        bgcolor=COLOR_BLANCO,
+        border=ft.Border.all(1, "#DCEAF8"),
+        border_radius=14,
+        shadow=ft.BoxShadow(
+            blur_radius=24,
+            color="#263D5A30",
+            offset=ft.Offset(0, 8),
+        ),
+        content=ft.Column(
+            spacing=0,
+            controls=[
+                ft.Container(
+                    padding=ft.Padding(14, 10, 10, 10),
+                    border=ft.Border(bottom=ft.BorderSide(1, "#E2EDF9")),
+                    content=ft.Row(
+                        spacing=8,
+                        controls=[
+                            ft.Icon(ft.Icons.TUNE, size=18, color=COLOR_AZUL),
+                            ft.Text(
+                                titulo,
+                                expand=True,
+                                size=14,
+                                weight=ft.FontWeight.BOLD,
+                                color=COLOR_BANNER,
+                            ),
+                            ft.IconButton(
+                                icon=ft.Icons.CLOSE,
+                                icon_size=18,
+                                icon_color="#6D89AB",
+                                tooltip="Cerrar filtros",
+                                on_click=on_cerrar,
+                                width=30,
+                                height=30,
+                            ),
+                        ],
+                    ),
+                ),
+                ft.Column(
+                    expand=True,
+                    spacing=0,
+                    scroll=ft.ScrollMode.AUTO,
+                    controls=secciones,
+                ),
+                pie,
+            ],
+        ),
+    )
+    return panel, texto_resumen
 
 
 

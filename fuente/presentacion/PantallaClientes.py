@@ -1,3 +1,5 @@
+from datetime import datetime
+
 import flet as ft
 
 from fuente.utilidades.Colores import *
@@ -21,11 +23,29 @@ class PantallaClientes(ft.Container):
         self.total_clientes = 0
         self.busqueda = ""
         self.clientes_seleccionados = {}
+        self.filtros_seleccionados = {
+            "tipos_persona": set(),
+            "estados": set(),
+            "tipos_cliente": set(),
+            "fecha_desde": None,
+            "fecha_hasta": None,
+        }
+        self._checks_filtros = {}
+        self._campo_fecha_filtro_activo = None
+        self._panel_filtros_abierto = False
+        self._date_picker_filtros = ft.DatePicker(
+            on_change=self._fecha_seleccionada,
+            first_date=datetime(1900, 1, 1),
+            last_date=datetime.now(),
+            help_text="Selecciona una fecha de registro",
+            cancel_text="Cancelar",
+            confirm_text="Seleccionar",
+        )
 
         self.build_ui()
 
     def build_ui(self):
-        self._contenido = ft.Column(
+        self._columna_contenido = ft.Column(
             expand=True,
             spacing=10,
             controls=[
@@ -33,8 +53,13 @@ class PantallaClientes(ft.Container):
                 self.directorio(),
             ],
         )
+        self._contenido = ft.Stack(
+            expand=True,
+            clip_behavior=ft.ClipBehavior.NONE,
+            controls=[self._columna_contenido],
+        )
 
-        self.content = ft.Column(
+        contenido_desplazable = ft.Column(
             expand=True,
             scroll=ft.ScrollMode.AUTO,
             controls=[
@@ -45,13 +70,30 @@ class PantallaClientes(ft.Container):
                 )
             ],
         )
+        self._layout_principal = ft.Stack(
+            expand=True,
+            clip_behavior=ft.ClipBehavior.NONE,
+            controls=[contenido_desplazable],
+        )
+        self.content = self._layout_principal
 
     def cabecera_clientes(self):
         buscador = barra_busqueda(
-            hint="Buscar por razón social, RFC, correo o teléfono...",
+            hint="Buscar por razón social...",
             on_change=self.buscar,
         )
         buscador.height = 48
+
+        self._boton_filtros = boton(
+            texto="Filtros",
+            icono=ft.Icons.TUNE,
+            tipo="secundario",
+            width=160,
+            height=48,
+            border_color="#C9DDF7",
+            on_click=self.abrir_filtros,
+        )
+        self._actualizar_indicador_filtros()
 
         barra_herramientas = card(
             ft.Row(
@@ -59,15 +101,7 @@ class PantallaClientes(ft.Container):
                 vertical_alignment=ft.CrossAxisAlignment.CENTER,
                 controls=[
                     buscador,
-                    boton(
-                        texto="Filtros",
-                        icono=ft.Icons.TUNE,
-                        tipo="secundario",
-                        width=160,
-                        height=48,
-                        border_color="#C9DDF7",
-                        on_click=self.abrir_filtros,
-                    ),
+                    self._boton_filtros,
                     boton(
                         texto="Registrar cliente",
                         icono=ft.Icons.ADD,
@@ -109,9 +143,299 @@ class PantallaClientes(ft.Container):
         self.actualizar_directorio()
 
     def abrir_filtros(self, e):
-        pass
+        if self._panel_filtros_abierto:
+            self.cerrar_filtros()
+            return
+
+        self._checks_filtros = {}
+        self._campo_fecha_desde = ft.TextField(
+            value=self._formatear_fecha_filtro(self.filtros_seleccionados["fecha_desde"]),
+            hint_text="dd/mm/aaaa",
+            height=38,
+            text_size=13,
+            content_padding=ft.Padding(9, 0, 4, 8),
+            border=ft.InputBorder.NONE,
+            border_color="#C9DDF7",
+            focused_border_color=COLOR_AZUL,
+            border_radius=8,
+            keyboard_type=ft.KeyboardType.DATETIME,
+            on_change=self._cambio_fecha_filtro,
+        )
+        self._campo_fecha_hasta = ft.TextField(
+            value=self._formatear_fecha_filtro(self.filtros_seleccionados["fecha_hasta"]),
+            hint_text="dd/mm/aaaa",
+            height=38,
+            text_size=13,
+            content_padding=ft.Padding(9, 0, 4, 8),
+            border=ft.InputBorder.NONE,
+            border_color="#C9DDF7",
+            focused_border_color=COLOR_AZUL,
+            border_radius=8,
+            keyboard_type=ft.KeyboardType.DATETIME,
+            on_change=self._cambio_fecha_filtro,
+        )
+        self._panel_filtros = self._crear_panel_filtros()
+        self._contenido.controls.append(self._panel_filtros)
+        self._panel_filtros_abierto = True
+        self.update()
+
+    def _actualizar_indicador_filtros(self):
+        cantidad = self._contar_filtros(self.filtros_seleccionados)
+        controles = [
+            ft.Icon(ft.Icons.TUNE, size=18, color=COLOR_AZUL),
+            ft.Text("Filtros", size=14, color=COLOR_AZUL, max_lines=1),
+        ]
+        if cantidad:
+            controles.append(
+                ft.Container(
+                    width=20,
+                    height=20,
+                    alignment=ft.Alignment(0, 0),
+                    bgcolor="#E8F2FF",
+                    border_radius=10,
+                    content=ft.Text(
+                        str(cantidad),
+                        size=11,
+                        color=COLOR_AZUL,
+                        weight=ft.FontWeight.BOLD,
+                    ),
+                )
+            )
+        self._boton_filtros.content = ft.Row(
+            tight=True,
+            spacing=7,
+            alignment=ft.MainAxisAlignment.CENTER,
+            controls=controles,
+        )
+
+    def _contar_filtros(self, filtros):
+        return (
+            len(filtros["tipos_persona"])
+            + len(filtros["estados"])
+            + len(filtros["tipos_cliente"])
+            + int(bool(filtros["fecha_desde"]))
+            + int(bool(filtros["fecha_hasta"]))
+        )
+
+    def _formatear_fecha_filtro(self, valor):
+        if isinstance(valor, str):
+            return valor
+        return valor.strftime("%d/%m/%Y") if valor else ""
+
+    def _seccion_filtro(self, titulo, opciones, clave):
+        seleccionados = self.filtros_seleccionados[clave]
+        seccion, checkboxes = seccion_opciones_filtro(
+            titulo,
+            opciones,
+            seleccionados,
+            self._cambio_checkbox_filtro,
+        )
+        self._checks_filtros.update(
+            {(clave, valor): checkbox for valor, checkbox in checkboxes.items()}
+        )
+        return seccion
+
+    def _crear_panel_filtros(self):
+        cantidad_filtros = self._contar_filtros(self.filtros_seleccionados)
+        resumen_filtros = (
+            "1 filtro seleccionado"
+            if cantidad_filtros == 1
+            else f"{cantidad_filtros} filtros seleccionados"
+        )
+        self._panel_filtros, self._texto_resumen_filtros = panel_filtros(
+            titulo="Filtrar clientes",
+            secciones=[
+                self._seccion_filtro(
+                    "Tipo de persona",
+                    [
+                        ("FISICA", "Persona Física"),
+                        ("MORAL", "Persona Moral"),
+                        ("EXTRANJERO", "Extranjero"),
+                    ],
+                    "tipos_persona",
+                ),
+                ft.Divider(height=1, color="#E2EDF9"),
+                self._seccion_filtro(
+                    "Estado del cliente",
+                    [("ACTIVO", "Activo"), ("INACTIVO", "Inactivo")],
+                    "estados",
+                ),
+                ft.Divider(height=1, color="#E2EDF9"),
+                self._seccion_filtro(
+                    "Tipo de cliente",
+                    [("NUEVO", "Nuevo"), ("EXISTENTE", "Existente")],
+                    "tipos_cliente",
+                ),
+                ft.Divider(height=1, color="#E2EDF9"),
+                self._seccion_fechas_filtro(),
+            ],
+            resumen=resumen_filtros,
+            on_limpiar=self.limpiar_filtros,
+            on_aplicar=self.aplicar_filtros,
+            on_cerrar=self.cerrar_filtros,
+        )
+        return self._panel_filtros
+
+    def _seccion_fechas_filtro(self):
+        return ft.Container(
+            padding=ft.Padding(14, 8, 14, 12),
+            content=ft.Column(
+                spacing=6,
+                controls=[
+                    ft.Text(
+                        "Fecha de registro",
+                        size=12,
+                        weight=ft.FontWeight.BOLD,
+                        color=COLOR_BANNER,
+                    ),
+                    ft.Row(
+                        spacing=8,
+                        controls=[
+                            ft.Column(
+                                expand=True,
+                                spacing=3,
+                                controls=[
+                                    ft.Text("Desde", size=11, color=COLOR_GRIS),
+                                    self._envoltura_campo_fecha(
+                                        self._campo_fecha_desde, "fecha_desde"
+                                    ),
+                                ],
+                            ),
+                            ft.Column(
+                                expand=True,
+                                spacing=3,
+                                controls=[
+                                    ft.Text("Hasta", size=11, color=COLOR_GRIS),
+                                    self._envoltura_campo_fecha(
+                                        self._campo_fecha_hasta, "fecha_hasta"
+                                    ),
+                                ],
+                            ),
+                        ],
+                    ),
+                ],
+            ),
+        )
+
+    def _boton_calendario_filtro(self, campo):
+        return ft.IconButton(
+            icon=ft.Icons.CALENDAR_MONTH_OUTLINED,
+            icon_size=16,
+            icon_color=COLOR_AZUL,
+            tooltip="Seleccionar fecha",
+            on_click=lambda e: self.abrir_calendario_filtro(campo),
+            width=34,
+            height=34,
+            padding=0,
+            alignment=ft.Alignment(0, 0),
+        )
+
+    def _envoltura_campo_fecha(self, campo_fecha, campo):
+        return ft.Container(
+            height=42,
+            padding=ft.Padding(4, 1, 4, 1),
+            border=ft.Border.all(1, "#C9DDF7"),
+            border_radius=8,
+            content=ft.Row(
+                spacing=2,
+                vertical_alignment=ft.CrossAxisAlignment.CENTER,
+                controls=[
+                    ft.Container(expand=True, content=campo_fecha),
+                    self._boton_calendario_filtro(campo),
+                ],
+            ),
+        )
+
+    def abrir_calendario_filtro(self, campo):
+        self._campo_fecha_filtro_activo = (
+            self._campo_fecha_desde if campo == "fecha_desde" else self._campo_fecha_hasta
+        )
+        valor = self._campo_fecha_filtro_activo.value
+        if valor:
+            try:
+                fecha = datetime.strptime(valor.strip(), "%d/%m/%Y")
+                self._date_picker_filtros.value = fecha
+            except ValueError:
+                self._date_picker_filtros.value = None
+        else:
+            self._date_picker_filtros.value = None
+        if self._date_picker_filtros not in self._page.overlay:
+            self._page.overlay.append(self._date_picker_filtros)
+        self._date_picker_filtros.open = True
+        self._page.update()
+
+    def _fecha_seleccionada(self, e):
+        if self._date_picker_filtros.value and self._campo_fecha_filtro_activo:
+            self._campo_fecha_filtro_activo.value = (
+                self._date_picker_filtros.value.strftime("%d/%m/%Y")
+            )
+            self._campo_fecha_filtro_activo.update()
+            self._actualizar_resumen_filtros()
+            self._texto_resumen_filtros.update()
+
+    def limpiar_filtros(self, e=None):
+        Herramientas.limpiar_controles(
+            [
+                *self._checks_filtros.values(),
+                self._campo_fecha_desde,
+                self._campo_fecha_hasta,
+                self._date_picker_filtros,
+            ]
+        )
+        self.filtros_seleccionados = {
+            "tipos_persona": set(),
+            "estados": set(),
+            "tipos_cliente": set(),
+            "fecha_desde": None,
+            "fecha_hasta": None,
+        }
+        if self._date_picker_filtros in self._page.overlay:
+            self._date_picker_filtros.update()
+        self._actualizar_indicador_filtros()
+        self._actualizar_resumen_filtros()
+        self._panel_filtros.update()
+
+    def _cambio_checkbox_filtro(self, e):
+        self._actualizar_resumen_filtros()
+        self._texto_resumen_filtros.update()
+
+    def _cambio_fecha_filtro(self, e):
+        self._actualizar_resumen_filtros()
+        self._texto_resumen_filtros.update()
+
+    def _actualizar_resumen_filtros(self):
+        cantidad = sum(bool(checkbox.value) for checkbox in self._checks_filtros.values())
+        cantidad += int(bool(self._campo_fecha_desde.value))
+        cantidad += int(bool(self._campo_fecha_hasta.value))
+        self._texto_resumen_filtros.value = (
+            "1 filtro seleccionado"
+            if cantidad == 1
+            else f"{cantidad} filtros seleccionados"
+        )
+
+    def aplicar_filtros(self, e=None):
+        self.filtros_seleccionados = {
+            "tipos_persona": set(),
+            "estados": set(),
+            "tipos_cliente": set(),
+            "fecha_desde": (self._campo_fecha_desde.value or "").strip() or None,
+            "fecha_hasta": (self._campo_fecha_hasta.value or "").strip() or None,
+        }
+        for (grupo, valor), checkbox in self._checks_filtros.items():
+            if checkbox.value:
+                self.filtros_seleccionados[grupo].add(valor)
+        self._actualizar_indicador_filtros()
+        self.cerrar_filtros()
+
+    def cerrar_filtros(self, e=None):
+        if self._panel_filtros_abierto:
+            self._contenido.controls = [self._columna_contenido]
+            self._panel_filtros_abierto = False
+            self.update()
 
     def ir_a_registro(self, e):
+        if self._panel_filtros_abierto:
+            self.cerrar_filtros()
         self.content = PantallaRegistrarCliente(
             self._page,
             self.servicio_cliente,
@@ -125,7 +449,7 @@ class PantallaClientes(ft.Container):
         self.actualizar_directorio()
 
     def actualizar_directorio(self):
-        self._contenido.controls[1] = self.directorio()
+        self._columna_contenido.controls[1] = self.directorio()
         self.update()
 
     def contacto(self, icono, texto, max_lines=1):
@@ -152,6 +476,49 @@ class PantallaClientes(ft.Container):
                     ),
                 ],
             ),
+        )
+
+    def _insignia_tabla(self, texto, icono, fondo, color):
+        return ft.Container(
+            padding=ft.Padding(7, 4, 7, 4),
+            bgcolor=fondo,
+            border_radius=18,
+            content=ft.Row(
+                tight=True,
+                spacing=5,
+                vertical_alignment=ft.CrossAxisAlignment.CENTER,
+                controls=[
+                    ft.Icon(icono, size=14, color=color),
+                    ft.Text(
+                        texto,
+                        size=12,
+                        color=color,
+                        weight=ft.FontWeight.BOLD,
+                        max_lines=1,
+                        text_align=ft.TextAlign.CENTER,
+                        overflow=ft.TextOverflow.ELLIPSIS,
+                    ),
+                ],
+            ),
+        )
+
+    def _encabezado_columna(self, texto, icono):
+        return ft.Row(
+            tight=True,
+            spacing=6,
+            alignment=ft.MainAxisAlignment.CENTER,
+            vertical_alignment=ft.CrossAxisAlignment.CENTER,
+            controls=[
+                ft.Icon(icono, size=15, color="#6684A8"),
+                ft.Text(
+                    texto,
+                    size=14,
+                    weight=ft.FontWeight.BOLD,
+                    color=COLOR_NEGRO,
+                    max_lines=1,
+                    overflow=ft.TextOverflow.ELLIPSIS,
+                ),
+            ],
         )
 
     def ver_cliente(self, cliente):
@@ -593,7 +960,6 @@ class PantallaClientes(ft.Container):
                 COLOR_ROJO,
             )
             return
-
         self.modo_edicion = False
         self.actualizar_directorio()
         self._actualizar_ficha()
@@ -657,20 +1023,55 @@ class PantallaClientes(ft.Container):
             self.clientes_seleccionados[clave] = cliente
         else:
             self.clientes_seleccionados.pop(clave, None)
-        self.actualizar_directorio()
+        self._actualizar_vista_seleccion({clave})
 
     def seleccionar_pagina(self, clientes, seleccionado):
+        claves = set()
         for cliente in clientes:
             clave = self._clave_cliente(cliente)
+            claves.add(clave)
             if seleccionado:
                 self.clientes_seleccionados[clave] = cliente
             else:
                 self.clientes_seleccionados.pop(clave, None)
-        self.actualizar_directorio()
+        self._actualizar_vista_seleccion(claves)
+
+    def _actualizar_vista_seleccion(self, claves_actualizadas):
+        for clave in claves_actualizadas:
+            checkbox = self._checkboxes_seleccion_clientes.get(clave)
+            fila = self._filas_seleccion_clientes.get(clave)
+            seleccionado = clave in self.clientes_seleccionados
+            if checkbox is not None:
+                checkbox.value = seleccionado
+            if fila is not None:
+                fila.selected = seleccionado
+                fila.update()
+
+        claves_pagina = self._claves_clientes_pagina
+        self._checkbox_seleccionar_pagina.value = bool(claves_pagina) and all(
+            clave in self.clientes_seleccionados for clave in claves_pagina
+        )
+        self._checkbox_seleccionar_pagina.update()
+
+        cantidad = len(self.clientes_seleccionados)
+        self._texto_seleccionados.value = (
+            f"{cantidad} cliente seleccionado"
+            if cantidad == 1
+            else f"{cantidad} clientes seleccionados"
+        )
+        self._barra_seleccion.visible = cantidad > 0
+        self._barra_seleccion.update()
+
+        self._boton_exportar.width = 230 if cantidad else 150
+        self._boton_exportar.content.controls[1].value = (
+            f"Exportar seleccionados ({cantidad})" if cantidad else "Exportar"
+        )
+        self._boton_exportar.update()
 
     def cancelar_seleccion(self, e=None):
+        claves = set(self.clientes_seleccionados)
         self.clientes_seleccionados.clear()
-        self.actualizar_directorio()
+        self._actualizar_vista_seleccion(claves)
 
     def confirmar_eliminar_seleccionados(self, e=None):
         cantidad = len(self.clientes_seleccionados)
@@ -742,16 +1143,24 @@ class PantallaClientes(ft.Container):
         pagina_completa_seleccionada = bool(clientes) and all(
             clave in self.clientes_seleccionados for clave in claves_pagina
         )
+        self._claves_clientes_pagina = claves_pagina
+        self._checkboxes_seleccion_clientes = {}
+        self._filas_seleccion_clientes = {}
         encabezado_seleccion = ft.Container(
             width=52,
             alignment=ft.Alignment(0, 0),
             content=ft.Checkbox(
                 value=pagina_completa_seleccionada,
+                active_color=COLOR_AZUL,
+                check_color=COLOR_BLANCO,
+                border_side=ft.BorderSide(1.5, "#7186A0"),
+                shape=ft.RoundedRectangleBorder(radius=3),
                 on_change=lambda e, cs=list(clientes): self.seleccionar_pagina(
                     cs, bool(e.control.value)
                 ),
             ),
         )
+        self._checkbox_seleccionar_pagina = encabezado_seleccion.content
 
         filas = []
         for indice, cliente in enumerate(clientes):
@@ -824,40 +1233,66 @@ class PantallaClientes(ft.Container):
                 max_lines=2,
                 overflow=ft.TextOverflow.ELLIPSIS,
             )
+            insignias_tipo = {
+                "FISICA": ("#E8F2FF", "#1875D1"),
+                "MORAL": ("#FFF1E5", "#D96900"),
+                "EXTRANJERO": ("#E5EEFF", "#315F9B"),
+            }
+            fondo_tipo, color_tipo = insignias_tipo.get(
+                valor_tipo.upper(), ("#EEF2F7", "#5E718A")
+            )
+            insignia_tipo = self._insignia_tabla(
+                texto_tipo,
+                {
+                    "FISICA": ft.Icons.PERSON_OUTLINED,
+                    "MORAL": ft.Icons.BUSINESS_OUTLINED,
+                    "EXTRANJERO": ft.Icons.PUBLIC_OUTLINED,
+                }.get(valor_tipo.upper(), ft.Icons.BADGE_OUTLINED),
+                fondo_tipo,
+                color_tipo,
+            )
+            insignia_estado = self._insignia_tabla(
+                "Activo" if cliente.activo else "Inactivo",
+                ft.Icons.CHECK_CIRCLE_OUTLINE if cliente.activo else ft.Icons.CLOSE,
+                "#DDF7EF" if cliente.activo else "#FDE8EB",
+                "#009B82" if cliente.activo else COLOR_ROJO,
+            )
+            insignia_novedad = self._insignia_tabla(
+                "Nuevo" if cliente.es_nuevo_cliente else "Existente",
+                ft.Icons.AUTO_AWESOME
+                if cliente.es_nuevo_cliente
+                else ft.Icons.HOW_TO_REG_OUTLINED,
+                "#FFF0E1" if cliente.es_nuevo_cliente else "#EEF2F7",
+                "#D96900" if cliente.es_nuevo_cliente else "#5E718A",
+            )
             estado = ft.Column(
-                spacing=5,
+                spacing=4,
                 alignment=ft.MainAxisAlignment.CENTER,
                 horizontal_alignment=ft.CrossAxisAlignment.CENTER,
                 controls=[
-                    badge_estado(
-                        "Activo" if cliente.activo else "Inactivo",
-                        "activo" if cliente.activo else "inactivo",
-                    ),
-                    ft.Text(
-                        f"Cliente nuevo: {'Sí' if cliente.es_nuevo_cliente else 'No'}",
-                        size=12,
-                        color=COLOR_GRIS,
-                        max_lines=1,
-                        text_align=ft.TextAlign.CENTER,
-                        overflow=ft.TextOverflow.ELLIPSIS,
-                    ),
+                    insignia_estado,
+                    insignia_novedad,
                 ],
             )
 
-            filas.append(
-                ft.DataRow(
-                    selected=seleccionado,
-                    cells=[
+            checkbox_seleccion_cliente = ft.Checkbox(
+                value=seleccionado,
+                active_color=COLOR_AZUL,
+                check_color=COLOR_BLANCO,
+                border_side=ft.BorderSide(1.5, "#7186A0"),
+                shape=ft.RoundedRectangleBorder(radius=3),
+                on_change=lambda e, c=cliente: self.seleccionar_cliente(
+                    c, bool(e.control.value)
+                ),
+            )
+            fila_cliente = ft.DataRow(
+                selected=seleccionado,
+                cells=[
                         ft.DataCell(
                             ft.Container(
                                 expand=True,
                                 alignment=ft.Alignment(0, 0),
-                                content=ft.Checkbox(
-                                    value=seleccionado,
-                                    on_change=lambda e, c=cliente: self.seleccionar_cliente(
-                                        c, bool(e.control.value)
-                                    ),
-                                ),
+                                content=checkbox_seleccion_cliente,
                             )
                         ),
                         ft.DataCell(
@@ -880,18 +1315,11 @@ class PantallaClientes(ft.Container):
                             ft.Container(
                                 expand=True,
                                 alignment=ft.Alignment(0, 0),
-                                content=ft.Text(
-                                    texto_tipo,
-                                    size=13,
-                                    color=COLOR_NEGRO,
-                                    max_lines=1,
-                                    text_align=ft.TextAlign.CENTER,
-                                    overflow=ft.TextOverflow.ELLIPSIS,
-                                ),
+                                content=insignia_tipo,
                             )
                         ),
-                        ft.DataCell(ft.Container(expand=True, content=contacto)),
                         ft.DataCell(ft.Container(expand=True, content=direccion)),
+                        ft.DataCell(ft.Container(expand=True, content=contacto)),
                         ft.DataCell(
                             ft.Container(
                                 expand=True,
@@ -901,6 +1329,7 @@ class PantallaClientes(ft.Container):
                         ),
                         ft.DataCell(
                             ft.Container(
+                                expand=True,
                                 alignment=ft.Alignment(0, 0),
                                 content=boton_icono_enmarcado(
                                     ft.Icons.VISIBILITY_OUTLINED,
@@ -913,18 +1342,50 @@ class PantallaClientes(ft.Container):
                             )
                         ),
                     ],
-                )
             )
+            filas.append(fila_cliente)
+            self._checkboxes_seleccion_clientes[clave] = checkbox_seleccion_cliente
+            self._filas_seleccion_clientes[clave] = fila_cliente
+
+        encabezado_tipo_persona = ft.Row(
+            tight=True,
+            spacing=4,
+            alignment=ft.MainAxisAlignment.CENTER,
+            vertical_alignment=ft.CrossAxisAlignment.CENTER,
+            controls=[
+                ft.Icon(ft.Icons.BUSINESS_OUTLINED, size=14, color="#6684A8"),
+                ft.Text(
+                    "Tipo de\npersona",
+                    size=14,
+                    weight=ft.FontWeight.BOLD,
+                    color=COLOR_NEGRO,
+                    max_lines=2,
+                ),
+            ],
+        )
 
         tabla_clientes = tabla(
             columnas=[
                 (encabezado_seleccion, 52),
-                ("Cliente", 285),
-                ("RFC", 135),
-                ("Tipo de persona", 120),
-                ("Contacto", 202),
-                ("Dirección", 172),
-                ("Estado", 125),
+                (self._encabezado_columna("Cliente", ft.Icons.PERSON_OUTLINED), 285),
+                (self._encabezado_columna("RFC", ft.Icons.BADGE_OUTLINED), 135),
+                (
+                    encabezado_tipo_persona,
+                    120,
+                ),
+                (
+                    self._encabezado_columna(
+                        "Dirección", ft.Icons.LOCATION_ON_OUTLINED
+                    ),
+                    172,
+                ),
+                (
+                    self._encabezado_columna(
+                        "Contacto", ft.Icons.CONTACT_PHONE_OUTLINED
+                    ),
+                    202,
+                ),
+                (self._encabezado_columna("Estado", ft.Icons.CHECK_CIRCLE_OUTLINE), 125),
                 ("Acciones", 76),
             ],
             filas=filas,
@@ -943,6 +1404,58 @@ class PantallaClientes(ft.Container):
             columnas_compactas=True,
         )
 
+        self._texto_seleccionados = ft.Text(
+            (
+                f"{len(self.clientes_seleccionados)} cliente seleccionado"
+                if len(self.clientes_seleccionados) == 1
+                else f"{len(self.clientes_seleccionados)} clientes seleccionados"
+            ),
+            size=12,
+            color=COLOR_NEGRO,
+            weight=ft.FontWeight.BOLD,
+            max_lines=1,
+        )
+        self._barra_seleccion = ft.Row(
+            visible=bool(self.clientes_seleccionados),
+            spacing=7,
+            vertical_alignment=ft.CrossAxisAlignment.CENTER,
+            controls=[
+                ft.Icon(
+                    ft.Icons.CHECK_CIRCLE_OUTLINED,
+                    size=18,
+                    color=COLOR_AZUL,
+                ),
+                self._texto_seleccionados,
+                boton(
+                    texto="Eliminar",
+                    icono=ft.Icons.DELETE_OUTLINE,
+                    tipo="secundario",
+                    color=COLOR_ROJO,
+                    border_color="#FFC8CF",
+                    height=36,
+                    on_click=self.confirmar_eliminar_seleccionados,
+                ),
+                ft.TextButton(
+                    "Cancelar",
+                    on_click=self.cancelar_seleccion,
+                    style=ft.ButtonStyle(color=COLOR_BANNER),
+                ),
+            ],
+        )
+        self._boton_exportar = boton(
+            texto=(
+                f"Exportar seleccionados ({len(self.clientes_seleccionados)})"
+                if self.clientes_seleccionados
+                else "Exportar"
+            ),
+            icono=ft.Icons.DOWNLOAD_OUTLINED,
+            tipo="secundario",
+            width=230 if self.clientes_seleccionados else 150,
+            height=44,
+            border_color="#C9DDF7",
+            on_click=self.exportar_clientes,
+        )
+
         cabecera_directorio = ft.Row(
             spacing=12,
             vertical_alignment=ft.CrossAxisAlignment.CENTER,
@@ -954,7 +1467,7 @@ class PantallaClientes(ft.Container):
                     bgcolor=COLOR_NARANJA,
                     border_radius=13,
                     content=ft.Icon(
-                        ft.Icons.GROUPS_OUTLINED,
+                        ft.Icons.CONTACTS_OUTLINED,
                         color=COLOR_BLANCO,
                         size=27,
                     ),
@@ -976,61 +1489,8 @@ class PantallaClientes(ft.Container):
                         ),
                     ],
                 ),
-                *(
-                    [
-                        ft.Row(
-                            spacing=7,
-                            vertical_alignment=ft.CrossAxisAlignment.CENTER,
-                            controls=[
-                                ft.Icon(
-                                    ft.Icons.CHECK_CIRCLE_OUTLINED,
-                                    size=18,
-                                    color=COLOR_AZUL,
-                                ),
-                                ft.Text(
-                                    (
-                                        f"{len(self.clientes_seleccionados)} cliente seleccionado"
-                                        if len(self.clientes_seleccionados) == 1
-                                        else f"{len(self.clientes_seleccionados)} clientes seleccionados"
-                                    ),
-                                    size=12,
-                                    color=COLOR_NEGRO,
-                                    weight=ft.FontWeight.BOLD,
-                                    max_lines=1,
-                                ),
-                                boton(
-                                    texto="Eliminar",
-                                    icono=ft.Icons.DELETE_OUTLINE,
-                                    tipo="secundario",
-                                    color=COLOR_ROJO,
-                                    border_color="#FFC8CF",
-                                    height=36,
-                                    on_click=self.confirmar_eliminar_seleccionados,
-                                ),
-                                ft.TextButton(
-                                    "Cancelar",
-                                    on_click=self.cancelar_seleccion,
-                                    style=ft.ButtonStyle(color=COLOR_BANNER),
-                                ),
-                            ],
-                        )
-                    ]
-                    if self.clientes_seleccionados
-                    else []
-                ),
-                boton(
-                    texto=(
-                        f"Exportar seleccionados ({len(self.clientes_seleccionados)})"
-                        if self.clientes_seleccionados
-                        else "Exportar"
-                    ),
-                    icono=ft.Icons.DOWNLOAD_OUTLINED,
-                    tipo="secundario",
-                    width=230 if self.clientes_seleccionados else 150,
-                    height=44,
-                    border_color="#C9DDF7",
-                    on_click=self.exportar_clientes,
-                ),
+                self._barra_seleccion,
+                self._boton_exportar,
             ],
         )
 

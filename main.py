@@ -20,6 +20,15 @@ from fuente.negocio.servicio.ServicioBuque import ServicioBuque
 from fuente.negocio.servicio.ServicioProducto import ServicioProducto
 
 
+IMAGENES_ESTATICAS = (
+    "fondo_puerto.jpg",
+    "fondo_PantallaClientes.jpg",
+    "fondo_PantallaRegistrarClientes.jpg",
+    "fondo_menulateral.jpg",
+    "oplcompleto.png",
+)
+
+
 def main(page: ft.Page, servicio_cliente, servicio_buque):
     page.bgcolor = COLOR_FONDO
     page.padding = 0
@@ -27,20 +36,39 @@ def main(page: ft.Page, servicio_cliente, servicio_buque):
     page.theme_mode = ft.ThemeMode.LIGHT
 
     page.add(
-        ft.Row(
-            controls=[
-                ft.Container(
-                    expand=True,
-                    bgcolor=COLOR_FONDO,
-                    content=PantallaPrincipal(
-                        page,
-                        servicio_cliente,
-                        servicio_buque,
-                    ),
-                )
-            ],
+        ft.Stack(
             expand=True,
-            spacing=0,
+            controls=[
+                ft.Row(
+                    height=1,
+                    spacing=0,
+                    opacity=0,
+                    controls=[
+                        ft.Image(
+                            src=imagen,
+                            width=1,
+                            height=1,
+                            fit=ft.BoxFit.CONTAIN,
+                        )
+                        for imagen in IMAGENES_ESTATICAS
+                    ],
+                ),
+                ft.Row(
+                    controls=[
+                        ft.Container(
+                            expand=True,
+                            bgcolor=COLOR_FONDO,
+                            content=PantallaPrincipal(
+                                page,
+                                servicio_cliente,
+                                servicio_buque,
+                            ),
+                        )
+                    ],
+                    expand=True,
+                    spacing=0,
+                ),
+            ],
         )
     )
 

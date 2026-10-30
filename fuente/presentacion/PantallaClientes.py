@@ -81,10 +81,10 @@ class PantallaClientes(ft.Container):
     def cabecera_clientes(self):
         buscador = barra_busqueda(
             hint="Buscar por razón social...",
-            on_change=self.buscar,
+            on_change=self._con_cierre_de_menus(self.buscar),
         )
         buscador.height = 48
-        buscador.on_focus = self.cerrar_menu_exportacion
+        buscador.on_focus = self.cerrar_menus
 
         self._boton_filtros = boton(
             texto="Filtros",
@@ -110,7 +110,7 @@ class PantallaClientes(ft.Container):
                         tipo="principal",
                         width=210,
                         height=48,
-                        on_click=self.ir_a_registro,
+                        on_click=self._con_cierre_de_menus(self.ir_a_registro),
                     ),
                 ],
             ),
@@ -119,7 +119,6 @@ class PantallaClientes(ft.Container):
             border_color="#E0ECF9",
             shadow=sombra_suave(),
         )
-        barra_herramientas.on_click = self.cerrar_menu_exportacion
 
         banner = banner_modulo(
             src="fondo_PantallaClientes.jpg",
@@ -132,7 +131,7 @@ class PantallaClientes(ft.Container):
             icono=ft.Icons.GROUPS_OUTLINED,
             altura=174,
         )
-        banner.on_click = self.cerrar_menu_exportacion
+        banner.on_click = self.cerrar_menus
 
         return ft.Column(
             spacing=12,
@@ -149,6 +148,7 @@ class PantallaClientes(ft.Container):
         self.actualizar_directorio()
 
     def abrir_filtros(self, e):
+        self.cerrar_menu_exportacion()
         if self._panel_filtros_abierto:
             self.cerrar_filtros()
             return
@@ -1161,8 +1161,10 @@ class PantallaClientes(ft.Container):
                 check_color=COLOR_BLANCO,
                 border_side=ft.BorderSide(1.5, "#7186A0"),
                 shape=ft.RoundedRectangleBorder(radius=3),
-                on_change=lambda e, cs=list(clientes): self.seleccionar_pagina(
-                    cs, bool(e.control.value)
+                on_change=self._con_cierre_de_menus(
+                    lambda e, cs=list(clientes): self.seleccionar_pagina(
+                        cs, bool(e.control.value)
+                    )
                 ),
             ),
         )
@@ -1287,8 +1289,10 @@ class PantallaClientes(ft.Container):
                 check_color=COLOR_BLANCO,
                 border_side=ft.BorderSide(1.5, "#7186A0"),
                 shape=ft.RoundedRectangleBorder(radius=3),
-                on_change=lambda e, c=cliente: self.seleccionar_cliente(
-                    c, bool(e.control.value)
+                on_change=self._con_cierre_de_menus(
+                    lambda e, c=cliente: self.seleccionar_cliente(
+                        c, bool(e.control.value)
+                    )
                 ),
             )
             fila_cliente = ft.DataRow(
@@ -1340,7 +1344,9 @@ class PantallaClientes(ft.Container):
                                 content=boton_icono_enmarcado(
                                     ft.Icons.VISIBILITY_OUTLINED,
                                     tooltip="Ver ficha del cliente",
-                                    on_click=lambda e, c=cliente: self.ver_cliente(c),
+                                    on_click=self._con_cierre_de_menus(
+                                        lambda e, c=cliente: self.ver_cliente(c)
+                                    ),
                                     color=COLOR_AZUL,
                                     border_color="#C9DDF7",
                                     size=38,
@@ -1439,11 +1445,13 @@ class PantallaClientes(ft.Container):
                     color=COLOR_ROJO,
                     border_color="#FFC8CF",
                     height=36,
-                    on_click=self.confirmar_eliminar_seleccionados,
+                    on_click=self._con_cierre_de_menus(
+                        self.confirmar_eliminar_seleccionados
+                    ),
                 ),
                 ft.TextButton(
                     "Cancelar",
-                    on_click=self.cancelar_seleccion,
+                    on_click=self._con_cierre_de_menus(self.cancelar_seleccion),
                     style=ft.ButtonStyle(color=COLOR_BANNER),
                 ),
             ],
@@ -1477,15 +1485,6 @@ class PantallaClientes(ft.Container):
             width=280,
         )
         self._menu_exportacion.visible = False
-        self._barrera_menu_exportacion = ft.Container(
-            top=52,
-            left=0,
-            right=0,
-            bottom=0,
-            bgcolor="#00000000",
-            visible=False,
-            on_click=self.cerrar_menu_exportacion,
-        )
 
         cabecera_directorio = ft.Row(
             spacing=12,
@@ -1497,7 +1496,7 @@ class PantallaClientes(ft.Container):
                     alignment=ft.Alignment(0, 0),
                     bgcolor=COLOR_NARANJA,
                     border_radius=13,
-                    on_click=self.cerrar_menu_exportacion,
+                    on_click=self.cerrar_menus,
                     content=ft.Icon(
                         ft.Icons.CONTACTS_OUTLINED,
                         color=COLOR_BLANCO,
@@ -1506,7 +1505,7 @@ class PantallaClientes(ft.Container):
                 ),
                 ft.Container(
                     expand=True,
-                    on_click=self.cerrar_menu_exportacion,
+                    on_click=self.cerrar_menus,
                     content=ft.Column(
                         expand=True,
                         spacing=3,
@@ -1525,10 +1524,7 @@ class PantallaClientes(ft.Container):
                         ],
                     ),
                 ),
-                ft.Container(
-                    on_click=self.cerrar_menu_exportacion,
-                    content=self._barra_seleccion,
-                ),
+                self._barra_seleccion,
                 self._boton_exportar,
             ],
         )
@@ -1542,6 +1538,7 @@ class PantallaClientes(ft.Container):
                 border_radius=12,
                 bgcolor=COLOR_BLANCO,
                 clip_behavior=ft.ClipBehavior.HARD_EDGE,
+                on_click=self.cerrar_menus,
                 content=tabla_clientes,
             ),
             ft.Row(
@@ -1557,7 +1554,9 @@ class PantallaClientes(ft.Container):
                         total_registros=self.total_clientes,
                         registros_por_pagina=self.registros_por_pagina,
                         pagina_actual=self.pagina_actual,
-                        on_change=self.cambiar_pagina,
+                        on_change=self._con_cierre_de_menus(
+                            self.cambiar_pagina
+                        ),
                     ),
                 ],
             ),
@@ -1573,7 +1572,6 @@ class PantallaClientes(ft.Container):
                     horizontal_alignment=ft.CrossAxisAlignment.STRETCH,
                     controls=controles,
                 ),
-                self._barrera_menu_exportacion,
                 self._menu_exportacion,
             ],
         )
@@ -1587,8 +1585,13 @@ class PantallaClientes(ft.Container):
         )
 
     def alternar_menu_exportacion(self, e=None):
+        self.cerrar_filtros()
         self._menu_exportacion_abierto = not self._menu_exportacion_abierto
         self._actualizar_menu_exportacion()
+
+    def cerrar_menus(self, e=None):
+        self.cerrar_menu_exportacion()
+        self.cerrar_filtros()
 
     def cerrar_menu_exportacion(self, e=None):
         if not self._menu_exportacion_abierto:
@@ -1600,9 +1603,16 @@ class PantallaClientes(ft.Container):
         if self._menu_exportacion_abierto:
             self._texto_resumen_exportacion.value = self._descripcion_exportacion()
         self._menu_exportacion.visible = self._menu_exportacion_abierto
-        self._barrera_menu_exportacion.visible = self._menu_exportacion_abierto
         self._menu_exportacion.update()
-        self._barrera_menu_exportacion.update()
+
+    def _con_cierre_de_menus(self, accion):
+        def ejecutar(*args, **kwargs):
+            try:
+                return accion(*args, **kwargs)
+            finally:
+                self.cerrar_menus()
+
+        return ejecutar
 
     def _descripcion_exportacion(self):
         if self.clientes_seleccionados:

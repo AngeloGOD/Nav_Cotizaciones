@@ -37,6 +37,105 @@ def sombra_suave():
     )
 
 
+def menu_exportacion(
+    descripcion,
+    on_pdf,
+    on_excel,
+    descripcion_pdf="Genera un archivo PDF para guardar o compartir.",
+    descripcion_excel="Descarga una hoja de cálculo con los datos.",
+    top=52,
+    right=0,
+    width=280,
+):
+    texto_descripcion = (
+        descripcion
+        if isinstance(descripcion, ft.Text)
+        else ft.Text(descripcion, size=11, color=COLOR_GRIS)
+    )
+
+    def opcion(icono, color, fondo, texto, detalle, on_click):
+        return ft.Container(
+            padding=ft.Padding(10, 8, 10, 8),
+            border_radius=9,
+            ink=True,
+            on_click=on_click,
+            content=ft.Row(
+                spacing=10,
+                vertical_alignment=ft.CrossAxisAlignment.CENTER,
+                controls=[
+                    ft.Container(
+                        width=32,
+                        height=32,
+                        border_radius=7,
+                        bgcolor=fondo,
+                        alignment=ft.Alignment(0, 0),
+                        content=ft.Icon(icono, color=color, size=19),
+                    ),
+                    ft.Column(
+                        expand=True,
+                        spacing=2,
+                        controls=[
+                            ft.Text(
+                                texto,
+                                size=12,
+                                weight=ft.FontWeight.BOLD,
+                                color=COLOR_BANNER,
+                            ),
+                            ft.Text(
+                                detalle,
+                                size=10,
+                                color=COLOR_GRIS,
+                                max_lines=2,
+                            ),
+                        ],
+                    ),
+                ],
+            ),
+        )
+
+    return ft.Container(
+        top=top,
+        right=right,
+        width=width,
+        bgcolor=COLOR_BLANCO,
+        border=ft.Border.all(1, "#DCEAF8"),
+        border_radius=12,
+        shadow=ft.BoxShadow(
+            blur_radius=22,
+            color="#263D5A30",
+            offset=ft.Offset(0, 7),
+        ),
+        padding=ft.Padding(7, 7, 7, 7),
+        on_click=lambda e: None,
+        content=ft.Column(
+            tight=True,
+            spacing=1,
+            controls=[
+                ft.Container(
+                    padding=ft.Padding(9, 4, 9, 6),
+                    content=texto_descripcion,
+                ),
+                opcion(
+                    ft.Icons.PICTURE_AS_PDF,
+                    "#E53935",
+                    "#FDECEC",
+                    "Exportar a PDF",
+                    descripcion_pdf,
+                    on_pdf,
+                ),
+                opcion(
+                    ft.Icons.GRID_ON,
+                    "#168A59",
+                    "#E5F4EB",
+                    "Exportar a Excel",
+                    descripcion_excel,
+                    on_excel,
+                ),
+            ],
+        ),
+    )
+
+
 def campo(
     hint,
     icono,

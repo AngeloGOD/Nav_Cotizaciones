@@ -33,6 +33,7 @@ class PantallaClientes(ft.Container):
         self._checks_filtros = {}
         self._campo_fecha_filtro_activo = None
         self._panel_filtros_abierto = False
+        self._menu_exportacion_abierto = False
         self._date_picker_filtros = ft.DatePicker(
             on_change=self._fecha_seleccionada,
             first_date=datetime(1900, 1, 1),
@@ -83,6 +84,7 @@ class PantallaClientes(ft.Container):
             on_change=self.buscar,
         )
         buscador.height = 48
+        buscador.on_focus = self.cerrar_menu_exportacion
 
         self._boton_filtros = boton(
             texto="Filtros",
@@ -117,21 +119,25 @@ class PantallaClientes(ft.Container):
             border_color="#E0ECF9",
             shadow=sombra_suave(),
         )
+        barra_herramientas.on_click = self.cerrar_menu_exportacion
+
+        banner = banner_modulo(
+            src="fondo_PantallaClientes.jpg",
+            categoria="Gestión de clientes",
+            titulo="Clientes",
+            descripcion=(
+                "Administra la información fiscal y de contacto de agencias navieras, "
+                "armadores y clientes."
+            ),
+            icono=ft.Icons.GROUPS_OUTLINED,
+            altura=174,
+        )
+        banner.on_click = self.cerrar_menu_exportacion
 
         return ft.Column(
             spacing=12,
             controls=[
-                banner_modulo(
-                    src="fondo_PantallaClientes.jpg",
-                    categoria="Gestión de clientes",
-                    titulo="Clientes",
-                    descripcion=(
-                        "Administra la información fiscal y de contacto de agencias navieras, "
-                        "armadores y clientes."
-                    ),
-                    icono=ft.Icons.GROUPS_OUTLINED,
-                    altura=174,
-                ),
+                banner,
                 barra_herramientas,
             ],
         )
@@ -1453,7 +1459,32 @@ class PantallaClientes(ft.Container):
             width=230 if self.clientes_seleccionados else 150,
             height=44,
             border_color="#C9DDF7",
-            on_click=self.exportar_clientes,
+            on_click=self.alternar_menu_exportacion,
+        )
+        self._texto_resumen_exportacion = ft.Text(
+            self._descripcion_exportacion(),
+            size=11,
+            color=COLOR_GRIS,
+        )
+        self._menu_exportacion = menu_exportacion(
+            descripcion=self._texto_resumen_exportacion,
+            on_pdf=self.cerrar_menu_exportacion,
+            on_excel=self.cerrar_menu_exportacion,
+            descripcion_pdf="Genera un archivo PDF en el directorio de clientes.",
+            descripcion_excel="Descarga un archivo Excel con los datos de clientes.",
+            top=52,
+            right=0,
+            width=280,
+        )
+        self._menu_exportacion.visible = False
+        self._barrera_menu_exportacion = ft.Container(
+            top=52,
+            left=0,
+            right=0,
+            bottom=0,
+            bgcolor="#00000000",
+            visible=False,
+            on_click=self.cerrar_menu_exportacion,
         )
 
         cabecera_directorio = ft.Row(
@@ -1466,30 +1497,38 @@ class PantallaClientes(ft.Container):
                     alignment=ft.Alignment(0, 0),
                     bgcolor=COLOR_NARANJA,
                     border_radius=13,
+                    on_click=self.cerrar_menu_exportacion,
                     content=ft.Icon(
                         ft.Icons.CONTACTS_OUTLINED,
                         color=COLOR_BLANCO,
                         size=27,
                     ),
                 ),
-                ft.Column(
+                ft.Container(
                     expand=True,
-                    spacing=3,
-                    controls=[
-                        ft.Text(
-                            "Directorio de clientes",
-                            size=20,
-                            weight=ft.FontWeight.BOLD,
-                            color=COLOR_NEGRO,
-                        ),
-                        ft.Text(
-                            f"{self.total_clientes} clientes registrados",
-                            size=13,
-                            color=COLOR_GRIS,
-                        ),
-                    ],
+                    on_click=self.cerrar_menu_exportacion,
+                    content=ft.Column(
+                        expand=True,
+                        spacing=3,
+                        controls=[
+                            ft.Text(
+                                "Directorio de clientes",
+                                size=20,
+                                weight=ft.FontWeight.BOLD,
+                                color=COLOR_NEGRO,
+                            ),
+                            ft.Text(
+                                f"{self.total_clientes} clientes registrados",
+                                size=13,
+                                color=COLOR_GRIS,
+                            ),
+                        ],
+                    ),
                 ),
-                self._barra_seleccion,
+                ft.Container(
+                    on_click=self.cerrar_menu_exportacion,
+                    content=self._barra_seleccion,
+                ),
                 self._boton_exportar,
             ],
         )
@@ -1524,13 +1563,22 @@ class PantallaClientes(ft.Container):
             ),
         ]
 
+        self._contenido_directorio = ft.Stack(
+            expand=True,
+            clip_behavior=ft.ClipBehavior.NONE,
+            controls=[
+                ft.Column(
+                    expand=True,
+                    spacing=10,
+                    horizontal_alignment=ft.CrossAxisAlignment.STRETCH,
+                    controls=controles,
+                ),
+                self._barrera_menu_exportacion,
+                self._menu_exportacion,
+            ],
+        )
         return card(
-            ft.Column(
-                expand=True,
-                spacing=10,
-                horizontal_alignment=ft.CrossAxisAlignment.STRETCH,
-                controls=controles,
-            ),
+            self._contenido_directorio,
             padding=14,
             radius=16,
             border_color="#E0ECF9",
@@ -1538,5 +1586,35 @@ class PantallaClientes(ft.Container):
             expand=True,
         )
 
-    def exportar_clientes(self, e):
-        pass
+    def alternar_menu_exportacion(self, e=None):
+        self._menu_exportacion_abierto = not self._menu_exportacion_abierto
+        self._actualizar_menu_exportacion()
+
+    def cerrar_menu_exportacion(self, e=None):
+        if not self._menu_exportacion_abierto:
+            return
+        self._menu_exportacion_abierto = False
+        self._actualizar_menu_exportacion()
+
+    def _actualizar_menu_exportacion(self):
+        if self._menu_exportacion_abierto:
+            self._texto_resumen_exportacion.value = self._descripcion_exportacion()
+        self._menu_exportacion.visible = self._menu_exportacion_abierto
+        self._barrera_menu_exportacion.visible = self._menu_exportacion_abierto
+        self._menu_exportacion.update()
+        self._barrera_menu_exportacion.update()
+
+    def _descripcion_exportacion(self):
+        if self.clientes_seleccionados:
+            return "Elige un formato para exportar los clientes seleccionados."
+
+        filtros_activos = any(
+            self.filtros_seleccionados.get(grupo)
+            for grupo in ("tipos_persona", "estados", "tipos_cliente")
+        ) or any(
+            self.filtros_seleccionados.get(campo)
+            for campo in ("fecha_desde", "fecha_hasta")
+        )
+        if self.busqueda.strip() or filtros_activos:
+            return "Elige un formato para exportar los clientes filtrados."
+        return "Elige un formato para exportar los clientes encontrados."

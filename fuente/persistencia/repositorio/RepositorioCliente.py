@@ -11,10 +11,36 @@ class RepositorioCliente(Repositorio):
     def insertar(self, cliente: Cliente):
         self.sesion.add(cliente)
     
-    def consultar_pagina(self, desplazamiento, limite):
+    def consultar_pagina(self, desplazamiento, limite, filtros: dict = {}):
+        stmt = select(Cliente)
+
+        if filtros:
+            tipos = filtros.get("tipo_persona", [])
+            if tipos and 0 < len(tipos) < 3:
+                stmt = stmt.where(Cliente.tipo_persona.in_(tipos))
+
+            estados = filtros.get("estado_activo", [])
+            if estados and 0 < len(estados) < 2:
+                stmt = stmt.where(Cliente.activo.in_(estados))
+
+            es_nuevo = filtros.get("es_nuevo", [])
+            if es_nuevo and 0 < len(es_nuevo) < 2:
+                stmt = stmt.where(Cliente.es_nuevo_cliente.in_(es_nuevo))
+
+            fecha_desde = filtros.get("fecha_desde")
+            if fecha_desde:
+                stmt = stmt.where(Cliente.creado_en >= fecha_desde)
+
+            fecha_hasta = filtros.get("fecha_hasta")
+            if fecha_hasta:
+                stmt = stmt.where(Cliente.creado_en <= fecha_hasta)
+
+            nombre = filtros.get("nombre", "")
+            if nombre and len(nombre) > 0:
+                stmt = stmt.where(Cliente.razon_social.ilike(f"%{nombre}%"))
+
         stmt = (
-            select(Cliente)
-            .order_by(Cliente.id)
+            stmt.order_by(Cliente.id)
             .limit(limite)
             .offset(desplazamiento)
         )

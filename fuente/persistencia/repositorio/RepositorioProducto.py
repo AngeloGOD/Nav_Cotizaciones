@@ -11,7 +11,7 @@ class RepositorioProducto(Repositorio):
     def insertar(self, producto: Producto):
         self.sesion.add(producto)
     
-    def consultar_pagina(self, desplazamiento, limite):
+    def consultar_pagina(self, desplazamiento, limite, filtros: dict = {}):
         stmt = (
             select(Producto)
             .order_by(Producto.id_producto)

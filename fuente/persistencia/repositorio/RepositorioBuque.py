@@ -12,7 +12,7 @@ class RepositorioBuque(Repositorio):
     def insertar(self, buque: Buque):
         self.sesion.add(buque)
     
-    def consultar_pagina(self, desplazamiento, limite):
+    def consultar_pagina(self, desplazamiento, limite, filtros: dict = {}):
         stmt = (
             select(Buque)
             .options(selectinload(Buque.cliente))

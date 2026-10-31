@@ -11,7 +11,7 @@ class Repositorio(abc.ABC):
     def insertar(self, objeto: Base): pass
     
     @abc.abstractmethod
-    def consultar_pagina(self, desplazamiento, limite): pass
+    def consultar_pagina(self, desplazamiento, limite, filtros: dict = {}): pass
 
     @abc.abstractmethod
     def modificar(self, objeto: Base): pass

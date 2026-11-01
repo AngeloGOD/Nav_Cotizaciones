@@ -298,6 +298,7 @@ def banner_imagen_desvanecida(
     src,
     content=None,
     altura=150,
+    shadow=None,
 ):
     imagen = ft.Container(
         expand=True,
@@ -346,6 +347,7 @@ def banner_imagen_desvanecida(
         height=altura,
         bgcolor=COLOR_BLANCO,
         border_radius=12,
+        shadow=shadow,
         clip_behavior=ft.ClipBehavior.HARD_EDGE,
         content=ft.Stack(
             expand=True,
@@ -399,6 +401,7 @@ def seccion_opciones_filtro(
     opciones,
     seleccionados=None,
     on_change=None,
+    icono=None,
 ):
     seleccionados = seleccionados or set()
     checkboxes = {}
@@ -434,11 +437,29 @@ def seccion_opciones_filtro(
             content=ft.Column(
                 spacing=0,
                 controls=[
-                    ft.Text(
-                        titulo,
-                        size=12,
-                        weight=ft.FontWeight.BOLD,
-                        color=COLOR_BANNER,
+                    ft.Row(
+                        spacing=7,
+                        vertical_alignment=ft.CrossAxisAlignment.CENTER,
+                        controls=(
+                            [
+                                ft.Icon(icono, size=16, color=COLOR_BANNER),
+                                ft.Text(
+                                    titulo,
+                                    size=12,
+                                    weight=ft.FontWeight.BOLD,
+                                    color=COLOR_BANNER,
+                                ),
+                            ]
+                            if icono
+                            else [
+                                ft.Text(
+                                    titulo,
+                                    size=12,
+                                    weight=ft.FontWeight.BOLD,
+                                    color=COLOR_BANNER,
+                                )
+                            ]
+                        ),
                     ),
                     ft.Row(
                         spacing=8,
@@ -561,22 +582,41 @@ def panel_filtros(
 
 
 
-def banner_modulo(src, categoria, titulo, descripcion, icono, altura=174):
+def banner_modulo(
+    src,
+    categoria,
+    titulo,
+    descripcion,
+    icono,
+    altura=136,
+    padding=ft.Padding(22, 8, 22, 8),
+    tamano_icono=68,
+    tamano_grafico=36,
+    fondo_icono="#FFF0E5",
+    tamano_titulo=29,
+    tamano_descripcion=16,
+    color_descripcion=COLOR_BANNER,
+    overflow_descripcion=None,
+):
     """Encabezado reutilizable para pantallas de módulos, con imagen, icono y descripción."""
     contenido = ft.Container(
         expand=True,
-        padding=ft.Padding(24, 16, 24, 16),
+        padding=padding,
         content=ft.Row(
             spacing=18,
             vertical_alignment=ft.CrossAxisAlignment.CENTER,
             controls=[
                 ft.Container(
-                    width=88,
-                    height=88,
-                    border_radius=44,
-                    bgcolor="#FFF5ED",
+                    width=tamano_icono,
+                    height=tamano_icono,
+                    border_radius=tamano_icono / 2,
+                    bgcolor=fondo_icono,
                     alignment=ft.Alignment(0, 0),
-                    content=ft.Icon(icono, size=43, color=COLOR_NARANJA),
+                    content=ft.Icon(
+                        icono,
+                        size=tamano_grafico,
+                        color=COLOR_NARANJA,
+                    ),
                 ),
                 ft.Column(
                     expand=True,
@@ -591,16 +631,16 @@ def banner_modulo(src, categoria, titulo, descripcion, icono, altura=174):
                         ),
                         ft.Text(
                             titulo,
-                            size=30,
+                            size=tamano_titulo,
                             weight=ft.FontWeight.BOLD,
                             color=COLOR_BANNER,
                         ),
                         ft.Text(
                             descripcion,
-                            size=14,
-                            color="#4F719B",
+                            size=tamano_descripcion,
+                            color=color_descripcion,
                             max_lines=2,
-                            overflow=ft.TextOverflow.ELLIPSIS,
+                            overflow=overflow_descripcion,
                         ),
                     ],
                 ),
@@ -1216,4 +1256,5 @@ def fila_producto(producto, on_info=None):
         ),
         padding=10,
         radius=10,
+        shadow=sombra_suave(),
     )

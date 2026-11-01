@@ -2,7 +2,7 @@ import flet as ft
 
 from fuente.utilidades.Colores import *
 from fuente.utilidades.Componentes import *
-from fuente.negocio.controlador.ControladorBuque import ControladorBuque
+from fuente.negocio.controlador.ControladorRegistrarBuques import ControladorRegistrarBuques
 
 
 class PantallaRegistrarBuque(ft.Container):
@@ -18,7 +18,7 @@ class PantallaRegistrarBuque(ft.Container):
         self._page = page
         self.vista_anterior = vista_anterior
         self.servicio_buque = servicio_buque
-        self.controlador = ControladorBuque(servicio_buque)
+        self.controlador = ControladorRegistrarBuques(servicio_buque)
         self.buque_a_editar = buque_a_editar
         self.modo_edicion = buque_a_editar is not None
 
@@ -431,58 +431,18 @@ class PantallaRegistrarBuque(ft.Container):
             self.vista_anterior.update()
 
     def guardar(self, e):
-        nombre = (self.nombre.value or "").strip()
-        numero_imo = (self.numero_imo.value or "").strip()
-        cliente_id = (self.cliente_id.value or "").strip()
-        categoria_buque = (self.categoria_buque.value or "").strip()
-        subtipo_descripcion = (self.subtipo_descripcion.value or "").strip()
-        bandera_pais = (self.bandera_pais.value or "").strip()
-        trb_arqueo_bruto = (self.trb_arqueo_bruto.value or "").strip()
-        eslora_metros = (self.eslora_metros.value or "").strip()
-        calado_metros = (self.calado_metros.value or "").strip()
-        es_autopropulsado = bool(self.es_autopropulsado.value)
-        propulsores_proa_popa = bool(self.propulsores_proa_popa.value)
-        activo = bool(self.activo.value)
-
-        if not nombre or not categoria_buque or not trb_arqueo_bruto or not eslora_metros:
-            self._page.show_dialog(
-                ft.SnackBar(content=ft.Text("Completa todos los campos obligatorios."))
-            )
-            self._page.update()
-            return
-
-
         try:
-            datos_buque = {
-                "nombre": nombre,
-                "categoria_buque": categoria_buque,
-                "trb_arqueo_bruto": trb_arqueo_bruto,
-                "eslora_metros": eslora_metros,
-                "cliente_id": cliente_id,
-                "numero_imo": numero_imo,
-                "subtipo_descripcion": subtipo_descripcion,
-                "calado_metros": calado_metros,
-                "propulsores_proa_popa": propulsores_proa_popa,
-                "es_autopropulsado": es_autopropulsado,
-                "bandera_pais": bandera_pais,
-                "activo": activo,
-            }
-
-            if self.modo_edicion:
-                self.controlador.modificar_buque(
-                    buque=self.buque_a_editar,
-                    **datos_buque,
-                )
-                mensaje = "Buque modificado correctamente."
-            else:
-                self.controlador.registrar_buque(**datos_buque)
-                mensaje = "Buque registrado correctamente."
+            datos_buque = self.controlador.obtener_datos(self)
+            exito, mensaje = self.controlador.guardar_buque(
+                datos=datos_buque,
+                buque_a_editar=self.buque_a_editar,
+            )
 
             self._page.show_dialog(
                 ft.SnackBar(content=ft.Text(mensaje))
             )
 
-            if self.vista_anterior:
+            if exito and self.vista_anterior:
                 self.vista_anterior.build_ui()
                 self.vista_anterior.actualizar_directorio()
 
@@ -498,4 +458,3 @@ class PantallaRegistrarBuque(ft.Container):
                 )
             )
             self._page.update()
-

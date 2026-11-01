@@ -22,6 +22,17 @@ class PantallaBuques(ft.Container):
         self.total_buques = 0
         self.busqueda = ""
         self.buques_seleccionados = {}
+        self.filtros_seleccionados = {
+            "categorias": set(),
+            "autopropulsion": set(),
+            "propulsores": set(),
+            "estados": set(),
+            "trb_min": "", "trb_max": "",
+            "eslora_min": "", "eslora_max": "",
+            "calado_min": "", "calado_max": "",
+        }
+        self._checks_filtros = {}
+        self._panel_filtros_abierto = False
 
         self.buque_seleccionado = None
         self.dialogo_confirmacion = None
@@ -38,22 +49,26 @@ class PantallaBuques(ft.Container):
             ],
         )
 
-        self.content = ft.Column(
+        contenido_desplazable = ft.Column(
             expand=True,
             scroll=ft.ScrollMode.AUTO,
             controls=[
                 ft.Container(
                     expand=True,
-                    padding=ft.Padding(
-                        left=14,
-                        right=14,
-                        top=8,
-                        bottom=18,
-                    ),
+                    padding=ft.Padding(left=14, right=14, top=8, bottom=18),
                     content=self._contenido,
                 )
             ],
         )
+
+        # Igual que PantallaClientes: el panel se dibuja encima del contenido
+        # mediante Stack, sin empujar ni desplazar la tabla.
+        self._layout_principal = ft.Stack(
+            expand=True,
+            clip_behavior=ft.ClipBehavior.NONE,
+            controls=[contenido_desplazable],
+        )
+        self.content = self._layout_principal
 
     def cabecera_buques(self):
         buscador = barra_busqueda(
@@ -68,15 +83,7 @@ class PantallaBuques(ft.Container):
                 vertical_alignment=ft.CrossAxisAlignment.CENTER,
                 controls=[
                     buscador,
-                    boton(
-                        texto="Filtros",
-                        icono=ft.Icons.TUNE,
-                        tipo="secundario",
-                        width=160,
-                        height=48,
-                        border_color="#C9DDF7",
-                        on_click=self.abrir_filtros,
-                    ),
+                    self._crear_boton_filtros(),
                     boton(
                         texto="Registrar buque",
                         icono=ft.Icons.ADD,
@@ -119,8 +126,200 @@ class PantallaBuques(ft.Container):
         self.buques_seleccionados.clear()
         self.actualizar_directorio()
 
-    def abrir_filtros(self, e):
-        pass
+    # ---------------------------------------------------------
+    # PANEL DE FILTROS (CONECTADO A LA CONSULTA)
+    # ---------------------------------------------------------
+
+    def _crear_boton_filtros(self):
+        self._boton_filtros = boton(
+            texto="Filtros",
+            icono=ft.Icons.TUNE,
+            tipo="secundario",
+            width=160,
+            height=48,
+            border_color="#C9DDF7",
+            on_click=self.abrir_filtros,
+        )
+        self._actualizar_indicador_filtros()
+        return self._boton_filtros
+
+    def abrir_filtros(self, e=None):
+        if self._panel_filtros_abierto:
+            self.cerrar_filtros()
+            return
+
+        self._checks_filtros = {}
+        self._campos_rango_filtros = {}
+        self._panel_filtros = self._crear_panel_filtros()
+        # Se agrega como capa del Stack, no como elemento de la columna.
+        self._layout_principal.controls.append(self._panel_filtros)
+        self._panel_filtros_abierto = True
+        self.update()
+
+    def _actualizar_indicador_filtros(self):
+        if not hasattr(self, "_boton_filtros"):
+            return
+        cantidad = self._contar_filtros()
+        controles = [
+            ft.Icon(ft.Icons.TUNE, size=18, color=COLOR_AZUL),
+            ft.Text("Filtros", size=14, color=COLOR_AZUL),
+        ]
+        if cantidad:
+            controles.append(ft.Container(
+                width=20, height=20, alignment=ft.Alignment(0, 0),
+                bgcolor="#E8F2FF", border_radius=10,
+                content=ft.Text(str(cantidad), size=11, color=COLOR_AZUL,
+                               weight=ft.FontWeight.BOLD),
+            ))
+        self._boton_filtros.content = ft.Row(
+            tight=True, spacing=7, alignment=ft.MainAxisAlignment.CENTER,
+            controls=controles,
+        )
+
+    def _contar_filtros(self):
+        f = self.filtros_seleccionados
+        return (sum(len(f[k]) for k in ("categorias", "autopropulsion", "propulsores", "estados"))
+                + sum(bool(f[k]) for k in ("trb_min", "trb_max", "eslora_min", "eslora_max", "calado_min", "calado_max")))
+
+    def _seccion_checks_filtro(self, titulo, clave, opciones, columnas=2):
+        seleccionados = self.filtros_seleccionados[clave]
+        checks = {}
+        controles = []
+        for valor, etiqueta in opciones:
+            cb = ft.Checkbox(
+                label=etiqueta, value=valor in seleccionados,
+                active_color=COLOR_AZUL, label_style=ft.TextStyle(size=12, color=COLOR_NEGRO),
+                on_change=self._cambio_filtro_visual,
+            )
+            checks[valor] = cb
+            self._checks_filtros[(clave, valor)] = cb
+            controles.append(ft.Container(expand=True, content=cb))
+        filas = []
+        for i in range(0, len(controles), columnas):
+            filas.append(ft.Row(spacing=4, controls=controles[i:i + columnas]))
+        return ft.Container(
+            padding=ft.Padding(14, 8, 14, 8),
+            content=ft.Column(spacing=5, controls=[
+                ft.Text(titulo, size=12, weight=ft.FontWeight.BOLD, color=COLOR_BANNER),
+                *filas,
+            ]),
+        )
+
+    def _campo_rango_filtro(self, etiqueta, clave, hint):
+        campo = ft.TextField(
+            value=self.filtros_seleccionados.get(clave, ""),
+            hint_text=hint, height=38, text_size=12,
+            keyboard_type=ft.KeyboardType.NUMBER,
+            content_padding=ft.Padding(9, 5, 9, 5),
+            border=ft.InputBorder.OUTLINE, border_color="#C9DDF7",
+            focused_border_color=COLOR_AZUL, border_radius=8,
+            on_change=self._cambio_filtro_visual,
+        )
+        self._campos_rango_filtros[clave] = campo
+        return ft.Column(expand=True, spacing=3, controls=[
+            ft.Text(etiqueta, size=11, color=COLOR_GRIS), campo
+        ])
+
+    def _seccion_rango_filtro(self, titulo, prefijo, unidad):
+        return ft.Container(
+            padding=ft.Padding(14, 8, 14, 8),
+            content=ft.Column(spacing=6, controls=[
+                ft.Text(titulo, size=12, weight=ft.FontWeight.BOLD, color=COLOR_BANNER),
+                ft.Row(spacing=8, controls=[
+                    self._campo_rango_filtro("Mínimo", f"{prefijo}_min", f"0 {unidad}"),
+                    self._campo_rango_filtro("Máximo", f"{prefijo}_max", f"Sin límite ({unidad})"),
+                ]),
+            ]),
+        )
+
+    def _crear_panel_filtros(self):
+        cantidad = self._contar_filtros()
+        resumen = (
+            "1 filtro seleccionado"
+            if cantidad == 1
+            else f"{cantidad} filtros seleccionados"
+        )
+
+        self._panel_filtros, self._texto_resumen_filtros_control = panel_filtros(
+            titulo="Filtrar buques",
+            secciones=[
+                self._seccion_checks_filtro("Categoría del buque", "categorias", [
+                    ("COMERCIAL", "Comercial"), ("TURISTICO", "Turístico"),
+                    ("PESQUERO", "Pesquero"), ("PETROLERO", "Petrolero"),
+                    ("RO_RO", "Ro-Ro"), ("RECREO_MENOR", "Recreo / Menor"),
+                ]),
+                ft.Divider(height=1, color="#E2EDF9"),
+                self._seccion_rango_filtro("Arqueo bruto (TRB)", "trb", "TRB"),
+                ft.Divider(height=1, color="#E2EDF9"),
+                self._seccion_rango_filtro("Eslora (metros)", "eslora", "m"),
+                ft.Divider(height=1, color="#E2EDF9"),
+                self._seccion_rango_filtro("Calado (metros)", "calado", "m"),
+                ft.Divider(height=1, color="#E2EDF9"),
+                self._seccion_checks_filtro("Autopropulsión", "autopropulsion", [
+                    ("SI", "Autopropulsado"), ("NO", "Sin autopropulsión"),
+                ]),
+                ft.Divider(height=1, color="#E2EDF9"),
+                self._seccion_checks_filtro("Propulsores", "propulsores", [
+                    ("SI", "Con proa/popa"), ("NO", "Sin proa/popa"),
+                ]),
+                ft.Divider(height=1, color="#E2EDF9"),
+                self._seccion_checks_filtro("Estado del buque", "estados", [
+                    ("ACTIVO", "Activo"), ("INACTIVO", "Inactivo"),
+                ]),
+            ],
+            resumen=resumen,
+            on_limpiar=self.limpiar_filtros,
+            on_aplicar=self.aplicar_filtros,
+            on_cerrar=self.cerrar_filtros,
+        )
+        return self._panel_filtros
+
+    def _texto_resumen_filtros(self):
+        n = self._contar_filtros()
+        return "Sin filtros seleccionados" if n == 0 else ("1 filtro seleccionado" if n == 1 else f"{n} filtros seleccionados")
+
+    def _cambio_filtro_visual(self, e=None):
+        if hasattr(self, "_texto_resumen_filtros_control"):
+            self._texto_resumen_filtros_control.value = self._texto_resumen_filtros()
+            self._texto_resumen_filtros_control.update()
+
+    def limpiar_filtros(self, e=None):
+        for checkbox in self._checks_filtros.values():
+            checkbox.value = False
+        for campo in self._campos_rango_filtros.values():
+            campo.value = ""
+        self.filtros_seleccionados = {
+            "categorias": set(), "autopropulsion": set(), "propulsores": set(),
+            "estados": set(),
+            "trb_min": "", "trb_max": "", "eslora_min": "", "eslora_max": "",
+            "calado_min": "", "calado_max": "",
+        }
+        self._actualizar_indicador_filtros()
+        self._cambio_filtro_visual()
+        self.pagina_actual = 1
+        self.buques_seleccionados.clear()
+        self.actualizar_directorio()
+
+    def aplicar_filtros(self, e=None):
+        # Guarda los filtros elegidos; el repositorio los aplica en PostgreSQL.
+        for clave in ("categorias", "autopropulsion", "propulsores", "estados"):
+            self.filtros_seleccionados[clave] = {
+                valor for (grupo, valor), cb in self._checks_filtros.items()
+                if grupo == clave and cb.value
+            }
+        for clave, campo in self._campos_rango_filtros.items():
+            self.filtros_seleccionados[clave] = (campo.value or "").strip()
+        self.pagina_actual = 1
+        self.buques_seleccionados.clear()
+        self._actualizar_indicador_filtros()
+        self.cerrar_filtros()
+        self.actualizar_directorio()
+
+    def cerrar_filtros(self, e=None):
+        if self._panel_filtros_abierto:
+            self._layout_principal.controls = self._layout_principal.controls[:1]
+            self._panel_filtros_abierto = False
+            self.update()
 
     def ir_a_registro(self, e):
         self.content = PantallaRegistrarBuque(
@@ -136,6 +335,7 @@ class PantallaBuques(ft.Container):
         self.actualizar_directorio()
 
     def actualizar_directorio(self):
+        # La tabla vive en la columna base; el panel flotante es una capa aparte.
         self._contenido.controls[1] = self.directorio()
         self.update()
 
@@ -649,6 +849,7 @@ class PantallaBuques(ft.Container):
                 texto=self.busqueda,
                 limit=self.registros_por_pagina,
                 offset=(self.pagina_actual - 1) * self.registros_por_pagina,
+                filtros=self.filtros_seleccionados,
             )
             if not registros:
                 self.pagina_actual -= 1
@@ -729,6 +930,7 @@ class PantallaBuques(ft.Container):
                         limit=self.registros_por_pagina,
                         offset=(self.pagina_actual - 1)
                         * self.registros_por_pagina,
+                        filtros=self.filtros_seleccionados,
                     )[0]
                 ) == 0
             ):
@@ -1141,6 +1343,7 @@ class PantallaBuques(ft.Container):
             texto=self.busqueda,
             limit=self.registros_por_pagina,
             offset=offset,
+            filtros=self.filtros_seleccionados,
         )
 
         tabla_buques = self.crear_tabla_buques(buques)

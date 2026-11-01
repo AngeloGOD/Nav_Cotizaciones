@@ -31,3 +31,6 @@ class RepositorioProducto(Repositorio):
 
     def buscar_por_nombre(self, nombre: str):
         pass
+
+    def contar_registros(self):
+        pass

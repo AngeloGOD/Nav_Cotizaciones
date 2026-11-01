@@ -2,7 +2,7 @@ from sqlalchemy.orm.session import Session
 from sqlalchemy.orm import selectinload
 from fuente.negocio.modelo.Buque import Buque
 from fuente.persistencia.repositorio.Repositorio import Repositorio
-from sqlalchemy import select, update, delete
+from sqlalchemy import select, update, delete, func
 
 class RepositorioBuque(Repositorio):
 
@@ -64,3 +64,7 @@ class RepositorioBuque(Repositorio):
             .limit(10)
         )
         return self.sesion.scalars(stmt).all()
+
+    def contar_registros(self):
+        stmt = select(func.count()).select_from(Buque)
+        return self.sesion.scalar(stmt)

@@ -1,7 +1,7 @@
 from sqlalchemy.orm.session import Session
 from fuente.negocio.modelo.Cliente import Cliente
 from fuente.persistencia.repositorio.Repositorio import Repositorio
-from sqlalchemy import select, update, delete
+from sqlalchemy import select, update, delete, func
 
 class RepositorioCliente(Repositorio):
 
@@ -79,3 +79,7 @@ class RepositorioCliente(Repositorio):
             .limit(10)
         )
         return self.sesion.scalars(stmt).all()
+
+    def contar_registros(self):
+        stmt = select(func.count()).select_from(Cliente)
+        return self.sesion.scalar(stmt)

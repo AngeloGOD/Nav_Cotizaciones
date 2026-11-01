@@ -24,3 +24,6 @@ class Repositorio(abc.ABC):
 
     @abc.abstractmethod
     def buscar_por_nombre(self, nombre: str): pass
+
+    @abc.abstractmethod
+    def contar_registros(self): pass

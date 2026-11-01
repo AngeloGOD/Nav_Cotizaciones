@@ -39,3 +39,9 @@ class ServicioBuque():
         with self.uow:
             resultado = self.uow.buque.buscar_por_nombre(nombre)
         return resultado
+
+    def obtener_cantidad_registros(self):
+        resultado = 0
+        with self.uow:
+            resultado = self.uow.buque.contar_registros()
+        return resultado

@@ -60,7 +60,7 @@ class PantallaRegistrarCliente(ft.Container):
         # Los botones están fuera de esa zona para permanecer siempre visibles.
         self.content = ft.Container(
             expand=True,
-            padding=ft.Padding(24, 8, 24, 10),
+            padding=ft.Padding(14, 8, 14, 10),
             content=ft.Column(
                 expand=True,
                 spacing=10,
@@ -80,6 +80,7 @@ class PantallaRegistrarCliente(ft.Container):
         return banner_imagen_desvanecida(
             "fondo_PantallaRegistrarClientes.jpg",
             altura=136,
+            shadow=sombra_suave(),
             content=ft.Container(
                 expand=True,
                 padding=ft.Padding(22, 8, 22, 8),

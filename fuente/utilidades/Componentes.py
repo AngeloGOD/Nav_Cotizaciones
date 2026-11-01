@@ -657,18 +657,18 @@ def banner_modulo(
 
 
 def avatar_inicial(texto, color=None, size=44, tooltip=None):
-    """Avatar circular con inicial; reutilizable en directorios y fichas."""
+    """Avatar compacto con inicial y esquinas redondeadas."""
     inicial = (str(texto or "?").strip()[:1] or "?").upper()
     return ft.Container(
         width=size,
         height=size,
-        border_radius=size / 2,
+        border_radius=round(size * 0.25),
         bgcolor=color or COLOR_AZUL,
         alignment=ft.Alignment(0, 0),
         tooltip=tooltip,
         content=ft.Text(
             inicial,
-            size=max(12, int(size * 0.36)),
+            size=max(12, int(size * 0.4)),
             color=COLOR_BLANCO,
             weight=ft.FontWeight.BOLD,
         ),

@@ -48,7 +48,7 @@ class PantallaClientes(ft.Container):
     def build_ui(self):
         self._columna_contenido = ft.Column(
             expand=True,
-            spacing=10,
+            spacing=12,
             controls=[
                 self.cabecera_clientes(),
                 self.directorio(),
@@ -66,7 +66,7 @@ class PantallaClientes(ft.Container):
             controls=[
                 ft.Container(
                     expand=True,
-                    padding=ft.Padding(14, 8, 14, 18),
+                    padding=ft.Padding(14, 8, 14, 16),
                     content=self._contenido,
                 )
             ],
@@ -80,10 +80,10 @@ class PantallaClientes(ft.Container):
 
     def cabecera_clientes(self):
         buscador = barra_busqueda(
-            hint="Buscar por razón social...",
+            hint="Buscar por razón social o RFC...",
             on_change=self._con_cierre_de_menus(self.buscar),
         )
-        buscador.height = 48
+        buscador.height = 44
         buscador.on_focus = self.cerrar_menus
 
         self._boton_filtros = boton(
@@ -91,11 +91,20 @@ class PantallaClientes(ft.Container):
             icono=ft.Icons.TUNE,
             tipo="secundario",
             width=160,
-            height=48,
+            height=44,
             border_color="#C9DDF7",
             on_click=self.abrir_filtros,
         )
         self._actualizar_indicador_filtros()
+        boton_registrar_cliente = boton(
+            texto="Registrar cliente",
+            icono=ft.Icons.ADD,
+            tipo="principal",
+            width=210,
+            height=44,
+            on_click=self._con_cierre_de_menus(self.ir_a_registro),
+        )
+        boton_registrar_cliente.content.controls[1].weight = ft.FontWeight.W_500
 
         barra_herramientas = card(
             ft.Row(
@@ -104,18 +113,11 @@ class PantallaClientes(ft.Container):
                 controls=[
                     buscador,
                     self._boton_filtros,
-                    boton(
-                        texto="Registrar cliente",
-                        icono=ft.Icons.ADD,
-                        tipo="principal",
-                        width=210,
-                        height=48,
-                        on_click=self._con_cierre_de_menus(self.ir_a_registro),
-                    ),
+                    boton_registrar_cliente,
                 ],
             ),
-            padding=12,
-            radius=14,
+            padding=10,
+            radius=10,
             border_color="#E0ECF9",
             shadow=sombra_suave(),
         )
@@ -129,12 +131,11 @@ class PantallaClientes(ft.Container):
                 "armadores y clientes."
             ),
             icono=ft.Icons.GROUPS_OUTLINED,
-            altura=174,
         )
         banner.on_click = self.cerrar_menus
 
         return ft.Column(
-            spacing=12,
+            spacing=10,
             controls=[
                 banner,
                 barra_herramientas,
@@ -486,7 +487,7 @@ class PantallaClientes(ft.Container):
 
     def _insignia_tabla(self, texto, icono, fondo, color):
         return ft.Container(
-            padding=ft.Padding(7, 4, 7, 4),
+            padding=ft.Padding(7, 3, 7, 3),
             bgcolor=fondo,
             border_radius=18,
             content=ft.Row(
@@ -803,12 +804,22 @@ class PantallaClientes(ft.Container):
                 selectable=True,
             )
 
-        if switch and self.modo_edicion:
-            control = ft.Container(
-                bgcolor="#F0F7FC",
-                border_radius=10,
-                padding=ft.Padding(10, 2, 10, 2),
-                content=control,
+        if switch:
+            return ft.Container(
+                expand=expand,
+                padding=ft.Padding(9, 3, 9, 3),
+                bgcolor="#F0F7FC" if self.modo_edicion else COLOR_BLANCO,
+                border=ft.Border.all(1, "#E1EAF3"),
+                border_radius=9,
+                content=ft.Row(
+                    tight=True,
+                    spacing=8,
+                    vertical_alignment=ft.CrossAxisAlignment.CENTER,
+                    controls=[
+                        ft.Text(etiqueta, size=12, color=COLOR_NEGRO, expand=True),
+                        control,
+                    ],
+                ),
             )
 
         return campo_detalle(etiqueta, control, expand=expand)
@@ -1144,7 +1155,18 @@ class PantallaClientes(ft.Container):
             "MORAL": "Persona Moral",
             "EXTRANJERO": "Extranjero",
         }
-        colores_avatar = [COLOR_AZUL, COLOR_NARANJA, "#08AFAE", "#7040D7"]
+        colores_avatar = (
+            COLOR_BANNER,
+            COLOR_AZUL,
+            COLOR_NARANJA,
+            COLOR_AZUL_MARINO_MEDIO,
+            COLOR_NARANJA_OSCURO,
+            COLOR_AZUL_MARINO_OSCURO,
+            COLOR_AZUL_ACERO,
+            COLOR_AZUL_INTENSO,
+            COLOR_NARANJA_SUAVE,
+            COLOR_AZUL_PETROLEO,
+        )
         claves_pagina = [self._clave_cliente(c) for c in clientes]
         pagina_completa_seleccionada = bool(clientes) and all(
             clave in self.clientes_seleccionados for clave in claves_pagina
@@ -1171,7 +1193,7 @@ class PantallaClientes(ft.Container):
         self._checkbox_seleccionar_pagina = encabezado_seleccion.content
 
         filas = []
-        for indice, cliente in enumerate(clientes):
+        for cliente in clientes:
             valor_tipo = (
                 cliente.tipo_persona.value
                 if hasattr(cliente.tipo_persona, "value")
@@ -1186,14 +1208,15 @@ class PantallaClientes(ft.Container):
             )
             clave = self._clave_cliente(cliente)
             seleccionado = clave in self.clientes_seleccionados
+            inicial_cliente = (nombre_cliente.strip()[:1] or "?").upper()
 
             avatar = avatar_inicial(
                 nombre_cliente,
-                color=colores_avatar[indice % len(colores_avatar)],
-                size=44,
+                color=colores_avatar[ord(inicial_cliente) % len(colores_avatar)],
+                size=35,
             )
             celda_cliente = ft.Row(
-                spacing=10,
+                spacing=9,
                 vertical_alignment=ft.CrossAxisAlignment.CENTER,
                 controls=[
                     avatar,
@@ -1242,12 +1265,12 @@ class PantallaClientes(ft.Container):
                 overflow=ft.TextOverflow.ELLIPSIS,
             )
             insignias_tipo = {
-                "FISICA": ("#E8F2FF", "#1875D1"),
-                "MORAL": ("#FFF1E5", "#D96900"),
-                "EXTRANJERO": ("#E5EEFF", "#315F9B"),
+                "FISICA": ("#E8F2FF", COLOR_AZUL),
+                "MORAL": ("#FFF0E1", COLOR_NARANJA),
+                "EXTRANJERO": ("#EAF0F7", COLOR_BANNER),
             }
             fondo_tipo, color_tipo = insignias_tipo.get(
-                valor_tipo.upper(), ("#EEF2F7", "#5E718A")
+                valor_tipo.upper(), ("#EAF0F7", COLOR_BANNER)
             )
             insignia_tipo = self._insignia_tabla(
                 texto_tipo,
@@ -1262,16 +1285,16 @@ class PantallaClientes(ft.Container):
             insignia_estado = self._insignia_tabla(
                 "Activo" if cliente.activo else "Inactivo",
                 ft.Icons.CHECK_CIRCLE_OUTLINE if cliente.activo else ft.Icons.CLOSE,
-                "#DDF7EF" if cliente.activo else "#FDE8EB",
-                "#009B82" if cliente.activo else COLOR_ROJO,
+                "#E5F4EB" if cliente.activo else "#FDECEC",
+                COLOR_VERDE if cliente.activo else COLOR_ROJO,
             )
             insignia_novedad = self._insignia_tabla(
                 "Nuevo" if cliente.es_nuevo_cliente else "Existente",
                 ft.Icons.AUTO_AWESOME
                 if cliente.es_nuevo_cliente
                 else ft.Icons.HOW_TO_REG_OUTLINED,
-                "#FFF0E1" if cliente.es_nuevo_cliente else "#EEF2F7",
-                "#D96900" if cliente.es_nuevo_cliente else "#5E718A",
+                "#FFF0E1" if cliente.es_nuevo_cliente else "#E8F2FF",
+                COLOR_NARANJA if cliente.es_nuevo_cliente else COLOR_BANNER,
             )
             estado = ft.Column(
                 spacing=4,
@@ -1404,7 +1427,7 @@ class PantallaClientes(ft.Container):
             column_spacing=6,
             horizontal_margin=6,
             heading_row_height=46,
-            data_row_min_height=80,
+            data_row_min_height=68,
             data_row_max_height=float("inf"),
             columnas_flexibles=True,
             heading_row_color="#EEF5FD",
@@ -1491,16 +1514,16 @@ class PantallaClientes(ft.Container):
             vertical_alignment=ft.CrossAxisAlignment.CENTER,
             controls=[
                 ft.Container(
-                    width=52,
-                    height=52,
+                    width=48,
+                    height=48,
                     alignment=ft.Alignment(0, 0),
                     bgcolor=COLOR_NARANJA,
-                    border_radius=13,
+                    border_radius=12,
                     on_click=self.cerrar_menus,
                     content=ft.Icon(
                         ft.Icons.CONTACTS_OUTLINED,
                         color=COLOR_BLANCO,
-                        size=27,
+                        size=25,
                     ),
                 ),
                 ft.Container(
@@ -1512,13 +1535,13 @@ class PantallaClientes(ft.Container):
                         controls=[
                             ft.Text(
                                 "Directorio de clientes",
-                                size=20,
+                                size=18,
                                 weight=ft.FontWeight.BOLD,
                                 color=COLOR_NEGRO,
                             ),
                             ft.Text(
                                 f"{self.total_clientes} clientes registrados",
-                                size=13,
+                                size=12,
                                 color=COLOR_GRIS,
                             ),
                         ],
@@ -1538,7 +1561,6 @@ class PantallaClientes(ft.Container):
                 border_radius=12,
                 bgcolor=COLOR_BLANCO,
                 clip_behavior=ft.ClipBehavior.HARD_EDGE,
-                on_click=self.cerrar_menus,
                 content=tabla_clientes,
             ),
             ft.Row(
@@ -1568,7 +1590,7 @@ class PantallaClientes(ft.Container):
             controls=[
                 ft.Column(
                     expand=True,
-                    spacing=10,
+                    spacing=12,
                     horizontal_alignment=ft.CrossAxisAlignment.STRETCH,
                     controls=controles,
                 ),
@@ -1577,8 +1599,8 @@ class PantallaClientes(ft.Container):
         )
         return card(
             self._contenido_directorio,
-            padding=14,
-            radius=16,
+            padding=ft.Padding(12, 11, 12, 11),
+            radius=12,
             border_color="#E0ECF9",
             shadow=sombra_suave(),
             expand=True,

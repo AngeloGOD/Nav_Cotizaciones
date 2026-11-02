@@ -2,20 +2,26 @@ import flet as ft
 
 from fuente.utilidades.Colores import *
 from fuente.utilidades.Componentes import *
+from fuente.negocio.controlador.ControladorClientes import (
+    ControladorClientes,
+)
 from fuente.negocio.controlador.ControladorRegistrarCliente import (
-    ControladorRegistrarCliente,
     ErrorRegistroCliente,
 )
 
 
 class PantallaRegistrarCliente(ft.Container):
-    def __init__(self, page: ft.Page, servicio_cliente, vista_anterior=None):
+    def __init__(
+        self,
+        page: ft.Page,
+        controlador: ControladorClientes,
+        vista_anterior=None,
+    ):
         super().__init__(expand=True, bgcolor=COLOR_FONDO)
 
         self._page = page
         self.vista_anterior = vista_anterior
-        self.servicio_cliente = servicio_cliente
-        self.controlador = ControladorRegistrarCliente(servicio_cliente)
+        self.controlador = controlador
 
         # Campos de una sola línea: ancho completo de su columna y altura uniforme.
         self.nombre = self.ajustar_campo(campo("Ej. ABC Logistics S.A. de C.V.", None))

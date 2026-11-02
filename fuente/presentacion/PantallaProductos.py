@@ -41,6 +41,7 @@ class PantallaProductos(ft.Container):
         self.vista = "catalogo"
         self._panel_filtros_abierto = False
         self._menu_exportacion_abierto = False
+        self._clic_en_boton_menu = False
         self._controles_filtros = {}
         self._checks_filtros = {}
 
@@ -322,6 +323,7 @@ class PantallaProductos(ft.Container):
         self._actualizar_resultados()
 
     def cambiar_vista(self, vista):
+        self.cerrar_menus()
         self.vista = vista
         self._botones_vista = self._crear_botones_vista()
         self._campo_busqueda.on_focus = self.cerrar_menus
@@ -406,6 +408,12 @@ class PantallaProductos(ft.Container):
                 shape=ft.RoundedRectangleBorder(radius=9),
             ),
         )
+        boton_filtros = ft.GestureDetector(
+            on_tap_down=self._marcar_clic_en_boton_menu,
+            on_tap_up=self._limpiar_clic_en_boton_menu,
+            on_tap_cancel=self._limpiar_clic_en_boton_menu,
+            content=self._boton_filtros,
+        )
         self._texto_boton_exportar = ft.Text(
             "Exportar",
             size=14,
@@ -434,6 +442,12 @@ class PantallaProductos(ft.Container):
                 shape=ft.RoundedRectangleBorder(radius=9),
             ),
         )
+        boton_exportar = ft.GestureDetector(
+            on_tap_down=self._marcar_clic_en_boton_menu,
+            on_tap_up=self._limpiar_clic_en_boton_menu,
+            on_tap_cancel=self._limpiar_clic_en_boton_menu,
+            content=self._boton_exportar,
+        )
         self._texto_resumen_exportacion = ft.Text(
             self._descripcion_exportacion(),
             size=11,
@@ -445,7 +459,7 @@ class PantallaProductos(ft.Container):
             on_excel=lambda e: self._informar_exportacion("Excel"),
             descripcion_pdf="Genera un archivo PDF del catálogo de productos.",
             descripcion_excel="Descarga una hoja de cálculo de los productos.",
-            top=220,
+            top=210,
             right=14,
             width=280,
         )
@@ -457,7 +471,7 @@ class PantallaProductos(ft.Container):
                 vertical_alignment=ft.CrossAxisAlignment.CENTER,
                 controls=[
                     self._campo_busqueda,
-                    self._boton_filtros,
+                    boton_filtros,
                     ft.Button(
                         ft.Text(
                             "Agregar producto",
@@ -476,7 +490,7 @@ class PantallaProductos(ft.Container):
                             shape=ft.RoundedRectangleBorder(radius=9),
                         ),
                     ),
-                    self._boton_exportar,
+                    boton_exportar,
                 ],
             ),
             padding=10,
@@ -485,6 +499,7 @@ class PantallaProductos(ft.Container):
         )
 
     def _abrir_filtros(self, e=None):
+        self._clic_en_boton_menu = False
         self.cerrar_menu_exportacion()
         if self._panel_filtros_abierto:
             self.cerrar_filtros()
@@ -543,7 +558,7 @@ class PantallaProductos(ft.Container):
             on_limpiar=self.limpiar_filtros,
             on_aplicar=self.aplicar_filtros,
             on_cerrar=self.cerrar_filtros,
-            top=220,
+            top=210,
             right=310,
             width=340,
             height=405,
@@ -625,7 +640,7 @@ class PantallaProductos(ft.Container):
         if not self._panel_filtros_abierto:
             return
         self._contenido.controls = [
-            self._columna_contenido,
+            self._contenido.controls[0],
             self._menu_exportacion,
         ]
         self._panel_filtros_abierto = False
@@ -633,6 +648,7 @@ class PantallaProductos(ft.Container):
             self.update()
 
     def alternar_menu_exportacion(self, e=None):
+        self._clic_en_boton_menu = False
         self.cerrar_filtros()
         self._menu_exportacion_abierto = not self._menu_exportacion_abierto
         self._actualizar_menu_exportacion()
@@ -653,6 +669,16 @@ class PantallaProductos(ft.Container):
         self._menu_exportacion.visible = self._menu_exportacion_abierto
         if self.page is not None:
             self._menu_exportacion.update()
+
+    def _clic_fuera_de_menus(self, e=None):
+        if not self._clic_en_boton_menu:
+            self.cerrar_menus()
+
+    def _marcar_clic_en_boton_menu(self, e=None):
+        self._clic_en_boton_menu = True
+
+    def _limpiar_clic_en_boton_menu(self, e=None):
+        self._clic_en_boton_menu = False
 
     def _hay_filtros_exportacion(self):
         return bool(self.busqueda.strip() or self._cantidad_filtros())
@@ -705,13 +731,17 @@ class PantallaProductos(ft.Container):
                     ft.Icons.GRID_VIEW,
                     "Vista de catálogo",
                     self.vista == "catalogo",
-                    lambda e: self.cambiar_vista("catalogo"),
+                    self._con_cierre_de_menus(
+                        lambda e: self.cambiar_vista("catalogo")
+                    ),
                 ),
                 boton_vista(
                     ft.Icons.VIEW_LIST_OUTLINED,
                     "Vista de lista",
                     self.vista == "lista",
-                    lambda e: self.cambiar_vista("lista"),
+                    self._con_cierre_de_menus(
+                        lambda e: self.cambiar_vista("lista")
+                    ),
                 ),
             ],
         )
@@ -1008,7 +1038,11 @@ class PantallaProductos(ft.Container):
             expand=True,
             clip_behavior=ft.ClipBehavior.NONE,
             controls=[
-                self._columna_contenido,
+                ft.GestureDetector(
+                    expand=True,
+                    on_tap_down=self._clic_fuera_de_menus,
+                    content=self._columna_contenido,
+                ),
                 self._menu_exportacion,
             ],
         )

@@ -16,7 +16,6 @@ class PantallaClientes(ft.Container):
         )
 
         self._page = page
-        self.servicio_cliente = servicio_cliente
         self.controlador = ControladorClientes(servicio_cliente)
         self.pagina_actual = 1
         self.registros_por_pagina = 10
@@ -34,6 +33,7 @@ class PantallaClientes(ft.Container):
         self._campo_fecha_filtro_activo = None
         self._panel_filtros_abierto = False
         self._menu_exportacion_abierto = False
+        self._clic_en_boton_menu = False
         self._date_picker_filtros = ft.DatePicker(
             on_change=self._fecha_seleccionada,
             first_date=datetime(1900, 1, 1),
@@ -57,7 +57,13 @@ class PantallaClientes(ft.Container):
         self._contenido = ft.Stack(
             expand=True,
             clip_behavior=ft.ClipBehavior.NONE,
-            controls=[self._columna_contenido],
+            controls=[
+                ft.GestureDetector(
+                    expand=True,
+                    on_tap_down=self._clic_fondo_filtros,
+                    content=self._columna_contenido,
+                )
+            ],
         )
 
         contenido_desplazable = ft.Column(
@@ -80,7 +86,7 @@ class PantallaClientes(ft.Container):
 
     def cabecera_clientes(self):
         buscador = barra_busqueda(
-            hint="Buscar por razón social o RFC...",
+            hint="Buscar por nombre o razón social...",
             on_change=self._con_cierre_de_menus(self.buscar),
         )
         buscador.height = 44
@@ -94,6 +100,12 @@ class PantallaClientes(ft.Container):
             height=44,
             border_color="#C9DDF7",
             on_click=self.abrir_filtros,
+        )
+        boton_filtros = ft.GestureDetector(
+            on_tap_down=self._marcar_clic_en_boton_menu,
+            on_tap_up=self._limpiar_clic_en_boton_menu,
+            on_tap_cancel=self._limpiar_clic_en_boton_menu,
+            content=self._boton_filtros,
         )
         self._actualizar_indicador_filtros()
         boton_registrar_cliente = boton(
@@ -112,7 +124,7 @@ class PantallaClientes(ft.Container):
                 vertical_alignment=ft.CrossAxisAlignment.CENTER,
                 controls=[
                     buscador,
-                    self._boton_filtros,
+                    boton_filtros,
                     boton_registrar_cliente,
                 ],
             ),
@@ -132,14 +144,15 @@ class PantallaClientes(ft.Container):
             ),
             icono=ft.Icons.GROUPS_OUTLINED,
         )
-        banner.on_click = self.cerrar_menus
-
-        return ft.Column(
-            spacing=10,
-            controls=[
-                banner,
-                barra_herramientas,
-            ],
+        return ft.GestureDetector(
+            on_tap_down=self._clic_fondo_exportacion,
+            content=ft.Column(
+                spacing=10,
+                controls=[
+                    banner,
+                    barra_herramientas,
+                ],
+            ),
         )
 
     def buscar(self, e):
@@ -149,6 +162,7 @@ class PantallaClientes(ft.Container):
         self.actualizar_directorio()
 
     def abrir_filtros(self, e):
+        self._clic_en_boton_menu = False
         self.cerrar_menu_exportacion()
         if self._panel_filtros_abierto:
             self.cerrar_filtros()
@@ -182,7 +196,10 @@ class PantallaClientes(ft.Container):
             on_change=self._cambio_fecha_filtro,
         )
         self._panel_filtros = self._crear_panel_filtros()
-        self._contenido.controls.append(self._panel_filtros)
+        self._contenido.controls = [
+            self._contenido.controls[0],
+            self._panel_filtros,
+        ]
         self._panel_filtros_abierto = True
         self.update()
 
@@ -229,13 +246,14 @@ class PantallaClientes(ft.Container):
             return valor
         return valor.strftime("%d/%m/%Y") if valor else ""
 
-    def _seccion_filtro(self, titulo, opciones, clave):
+    def _seccion_filtro(self, titulo, opciones, clave, icono):
         seleccionados = self.filtros_seleccionados[clave]
         seccion, checkboxes = seccion_opciones_filtro(
             titulo,
             opciones,
             seleccionados,
             self._cambio_checkbox_filtro,
+            icono=icono,
         )
         self._checks_filtros.update(
             {(clave, valor): checkbox for valor, checkbox in checkboxes.items()}
@@ -260,18 +278,21 @@ class PantallaClientes(ft.Container):
                         ("EXTRANJERO", "Extranjero"),
                     ],
                     "tipos_persona",
+                    ft.Icons.BUSINESS_OUTLINED,
                 ),
                 ft.Divider(height=1, color="#E2EDF9"),
                 self._seccion_filtro(
                     "Estado del cliente",
                     [("ACTIVO", "Activo"), ("INACTIVO", "Inactivo")],
                     "estados",
+                    ft.Icons.CHECK_CIRCLE_OUTLINED,
                 ),
                 ft.Divider(height=1, color="#E2EDF9"),
                 self._seccion_filtro(
                     "Tipo de cliente",
                     [("NUEVO", "Nuevo"), ("EXISTENTE", "Existente")],
                     "tipos_cliente",
+                    ft.Icons.PERSON_OUTLINED,
                 ),
                 ft.Divider(height=1, color="#E2EDF9"),
                 self._seccion_fechas_filtro(),
@@ -280,6 +301,10 @@ class PantallaClientes(ft.Container):
             on_limpiar=self.limpiar_filtros,
             on_aplicar=self.aplicar_filtros,
             on_cerrar=self.cerrar_filtros,
+            top=210,
+            right=153,
+            width=360,
+            height=452,
         )
         return self._panel_filtros
 
@@ -289,11 +314,22 @@ class PantallaClientes(ft.Container):
             content=ft.Column(
                 spacing=6,
                 controls=[
-                    ft.Text(
-                        "Fecha de registro",
-                        size=12,
-                        weight=ft.FontWeight.BOLD,
-                        color=COLOR_BANNER,
+                    ft.Row(
+                        spacing=7,
+                        vertical_alignment=ft.CrossAxisAlignment.CENTER,
+                        controls=[
+                            ft.Icon(
+                                ft.Icons.CALENDAR_MONTH_OUTLINED,
+                                size=16,
+                                color=COLOR_BANNER,
+                            ),
+                            ft.Text(
+                                "Fecha de registro",
+                                size=12,
+                                weight=ft.FontWeight.BOLD,
+                                color=COLOR_BANNER,
+                            ),
+                        ],
                     ),
                     ft.Row(
                         spacing=8,
@@ -401,6 +437,9 @@ class PantallaClientes(ft.Container):
         self._actualizar_indicador_filtros()
         self._actualizar_resumen_filtros()
         self._panel_filtros.update()
+        self.pagina_actual = 1
+        self.clientes_seleccionados.clear()
+        self.actualizar_directorio()
 
     def _cambio_checkbox_filtro(self, e):
         self._actualizar_resumen_filtros()
@@ -421,7 +460,7 @@ class PantallaClientes(ft.Container):
         )
 
     def aplicar_filtros(self, e=None):
-        self.filtros_seleccionados = {
+        filtros = {
             "tipos_persona": set(),
             "estados": set(),
             "tipos_cliente": set(),
@@ -430,13 +469,23 @@ class PantallaClientes(ft.Container):
         }
         for (grupo, valor), checkbox in self._checks_filtros.items():
             if checkbox.value:
-                self.filtros_seleccionados[grupo].add(valor)
+                filtros[grupo].add(valor)
+        try:
+            self.controlador.normalizar_filtros(filtros, self.busqueda)
+        except ValueError as error:
+            mostrar_notificacion(self._page, str(error), COLOR_ROJO)
+            return
+
+        self.filtros_seleccionados = filtros
+        self.pagina_actual = 1
+        self.clientes_seleccionados.clear()
         self._actualizar_indicador_filtros()
         self.cerrar_filtros()
+        self.actualizar_directorio()
 
     def cerrar_filtros(self, e=None):
         if self._panel_filtros_abierto:
-            self._contenido.controls = [self._columna_contenido]
+            self._contenido.controls = [self._contenido.controls[0]]
             self._panel_filtros_abierto = False
             self.update()
 
@@ -445,7 +494,7 @@ class PantallaClientes(ft.Container):
             self.cerrar_filtros()
         self.content = PantallaRegistrarCliente(
             self._page,
-            self.servicio_cliente,
+            self.controlador,
             vista_anterior=self,
         )
         self.update()
@@ -1018,6 +1067,7 @@ class PantallaClientes(ft.Container):
                 texto=self.busqueda,
                 limit=self.registros_por_pagina,
                 offset=(self.pagina_actual - 1) * self.registros_por_pagina,
+                filtros=self.filtros_seleccionados,
             )
             if not clientes:
                 self.pagina_actual -= 1
@@ -1148,6 +1198,7 @@ class PantallaClientes(ft.Container):
             texto=self.busqueda,
             limit=self.registros_por_pagina,
             offset=offset,
+            filtros=self.filtros_seleccionados,
         )
 
         etiquetas_persona = {
@@ -1519,7 +1570,6 @@ class PantallaClientes(ft.Container):
                     alignment=ft.Alignment(0, 0),
                     bgcolor=COLOR_NARANJA,
                     border_radius=12,
-                    on_click=self.cerrar_menus,
                     content=ft.Icon(
                         ft.Icons.CONTACTS_OUTLINED,
                         color=COLOR_BLANCO,
@@ -1528,7 +1578,6 @@ class PantallaClientes(ft.Container):
                 ),
                 ft.Container(
                     expand=True,
-                    on_click=self.cerrar_menus,
                     content=ft.Column(
                         expand=True,
                         spacing=3,
@@ -1548,7 +1597,12 @@ class PantallaClientes(ft.Container):
                     ),
                 ),
                 self._barra_seleccion,
-                self._boton_exportar,
+                ft.GestureDetector(
+                    on_tap_down=self._marcar_clic_en_boton_menu,
+                    on_tap_up=self._limpiar_clic_en_boton_menu,
+                    on_tap_cancel=self._limpiar_clic_en_boton_menu,
+                    content=self._boton_exportar,
+                ),
             ],
         )
 
@@ -1588,11 +1642,15 @@ class PantallaClientes(ft.Container):
             expand=True,
             clip_behavior=ft.ClipBehavior.NONE,
             controls=[
-                ft.Column(
+                ft.GestureDetector(
                     expand=True,
-                    spacing=12,
-                    horizontal_alignment=ft.CrossAxisAlignment.STRETCH,
-                    controls=controles,
+                    on_tap_down=self._clic_fondo_exportacion,
+                    content=ft.Column(
+                        expand=True,
+                        spacing=12,
+                        horizontal_alignment=ft.CrossAxisAlignment.STRETCH,
+                        controls=controles,
+                    ),
                 ),
                 self._menu_exportacion,
             ],
@@ -1607,6 +1665,7 @@ class PantallaClientes(ft.Container):
         )
 
     def alternar_menu_exportacion(self, e=None):
+        self._clic_en_boton_menu = False
         self.cerrar_filtros()
         self._menu_exportacion_abierto = not self._menu_exportacion_abierto
         self._actualizar_menu_exportacion()
@@ -1626,6 +1685,21 @@ class PantallaClientes(ft.Container):
             self._texto_resumen_exportacion.value = self._descripcion_exportacion()
         self._menu_exportacion.visible = self._menu_exportacion_abierto
         self._menu_exportacion.update()
+
+    def _clic_fondo_filtros(self, e=None):
+        if self._clic_en_boton_menu:
+            return
+        self.cerrar_menus()
+
+    def _clic_fondo_exportacion(self, e=None):
+        if not self._clic_en_boton_menu:
+            self.cerrar_menus()
+
+    def _marcar_clic_en_boton_menu(self, e=None):
+        self._clic_en_boton_menu = True
+
+    def _limpiar_clic_en_boton_menu(self, e=None):
+        self._clic_en_boton_menu = False
 
     def _con_cierre_de_menus(self, accion):
         def ejecutar(*args, **kwargs):

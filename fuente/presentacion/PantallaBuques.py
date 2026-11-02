@@ -5,10 +5,12 @@ from fuente.utilidades.Colores import *
 from fuente.utilidades.Componentes import *
 from fuente.negocio.controlador.ControladorBuque import ControladorBuque
 from fuente.presentacion.PantallaRegistrarBuque import PantallaRegistrarBuque
+from fuente.presentacion.SelectorCliente import SelectorCliente
+from fuente.infraestructura.servicios_externos.ServicioPaises import ServicioPaises
 
 
 class PantallaBuques(ft.Container):
-    def __init__(self, page: ft.Page, servicio_buque):
+    def __init__(self, page: ft.Page, servicio_buque, servicio_cliente):
         super().__init__(
             expand=True,
             bgcolor=COLOR_FONDO,
@@ -16,6 +18,7 @@ class PantallaBuques(ft.Container):
 
         self._page = page
         self.servicio_buque = servicio_buque
+        self.servicio_cliente = servicio_cliente
         self.controlador = ControladorBuque(servicio_buque)
         self.pagina_actual = 1
         self.registros_por_pagina = 10
@@ -24,6 +27,7 @@ class PantallaBuques(ft.Container):
         self.buques_seleccionados = {}
         self.filtros_seleccionados = {
             "categorias": set(),
+            "banderas": set(),
             "autopropulsion": set(),
             "propulsores": set(),
             "estados": set(),
@@ -178,8 +182,10 @@ class PantallaBuques(ft.Container):
 
     def _contar_filtros(self):
         f = self.filtros_seleccionados
-        return (sum(len(f[k]) for k in ("categorias", "autopropulsion", "propulsores", "estados"))
-                + sum(bool(f[k]) for k in ("trb_min", "trb_max", "eslora_min", "eslora_max", "calado_min", "calado_max")))
+        return (
+            sum(len(f[k]) for k in ("categorias", "banderas", "autopropulsion", "propulsores", "estados"))
+            + sum(bool(f[k]) for k in ("trb_min", "trb_max", "eslora_min", "eslora_max", "calado_min", "calado_max"))
+        )
 
     def _seccion_checks_filtro(self, titulo, clave, opciones, columnas=2):
         seleccionados = self.filtros_seleccionados[clave]
@@ -232,6 +238,77 @@ class PantallaBuques(ft.Container):
             ]),
         )
 
+    def _seccion_filtro_banderas(self):
+        try:
+            paises = ServicioPaises.obtener_paises()
+        except RuntimeError:
+            paises = []
+
+        seleccionados = self.filtros_seleccionados.get("banderas", set())
+        self._busqueda_banderas_filtro = ft.TextField(
+            hint_text="Buscar país...",
+            prefix_icon=ft.Icons.SEARCH,
+            height=38,
+            text_size=12,
+            content_padding=ft.Padding(9, 5, 9, 5),
+            border=ft.InputBorder.OUTLINE,
+            border_color="#C9DDF7",
+            focused_border_color=COLOR_AZUL,
+            border_radius=8,
+            on_change=self._filtrar_opciones_banderas,
+        )
+        self._checks_banderas_filtro = {}
+        self._opciones_banderas_filtro = []
+        for pais in paises:
+            nombre = pais["nombre"]
+            cb = ft.Checkbox(
+                label=f'{pais["emoji"]}  {nombre}',
+                value=nombre in seleccionados,
+                active_color=COLOR_AZUL,
+                label_style=ft.TextStyle(size=12, color=COLOR_NEGRO),
+                on_change=self._cambio_filtro_visual,
+            )
+            self._checks_banderas_filtro[nombre] = cb
+            self._opciones_banderas_filtro.append(
+                ft.Container(content=cb, visible=True)
+            )
+
+        # Mantiene visibles valores guardados previamente que no estén en la API.
+        for nombre in seleccionados:
+            if nombre not in self._checks_banderas_filtro:
+                cb = ft.Checkbox(
+                    label=f"🌐  {nombre} (valor anterior)",
+                    value=True,
+                    active_color=COLOR_AZUL,
+                    label_style=ft.TextStyle(size=12, color=COLOR_NEGRO),
+                    on_change=self._cambio_filtro_visual,
+                )
+                self._checks_banderas_filtro[nombre] = cb
+                self._opciones_banderas_filtro.append(ft.Container(content=cb, visible=True))
+
+        self._lista_banderas_filtro = ft.Column(
+            spacing=2,
+            scroll=ft.ScrollMode.AUTO,
+            height=150,
+            controls=self._opciones_banderas_filtro,
+        )
+        return ft.Container(
+            padding=ft.Padding(14, 8, 14, 8),
+            content=ft.Column(spacing=6, controls=[
+                ft.Text("Bandera / país", size=12, weight=ft.FontWeight.BOLD, color=COLOR_BANNER),
+                self._busqueda_banderas_filtro,
+                self._lista_banderas_filtro,
+            ]),
+        )
+
+    def _filtrar_opciones_banderas(self, e=None):
+        termino = (self._busqueda_banderas_filtro.value or "").strip().casefold()
+        for nombre, contenedor in zip(
+            self._checks_banderas_filtro.keys(), self._opciones_banderas_filtro
+        ):
+            contenedor.visible = termino in nombre.casefold()
+        self._lista_banderas_filtro.update()
+
     def _crear_panel_filtros(self):
         cantidad = self._contar_filtros()
         resumen = (
@@ -266,6 +343,8 @@ class PantallaBuques(ft.Container):
                 self._seccion_checks_filtro("Estado del buque", "estados", [
                     ("ACTIVO", "Activo"), ("INACTIVO", "Inactivo"),
                 ]),
+                ft.Divider(height=1, color="#E2EDF9"),
+                self._seccion_filtro_banderas(),
             ],
             resumen=resumen,
             on_limpiar=self.limpiar_filtros,
@@ -286,11 +365,13 @@ class PantallaBuques(ft.Container):
     def limpiar_filtros(self, e=None):
         for checkbox in self._checks_filtros.values():
             checkbox.value = False
+        for checkbox in getattr(self, "_checks_banderas_filtro", {}).values():
+            checkbox.value = False
         for campo in self._campos_rango_filtros.values():
             campo.value = ""
         self.filtros_seleccionados = {
-            "categorias": set(), "autopropulsion": set(), "propulsores": set(),
-            "estados": set(),
+            "categorias": set(), "banderas": set(),
+            "autopropulsion": set(), "propulsores": set(), "estados": set(),
             "trb_min": "", "trb_max": "", "eslora_min": "", "eslora_max": "",
             "calado_min": "", "calado_max": "",
         }
@@ -307,6 +388,10 @@ class PantallaBuques(ft.Container):
                 valor for (grupo, valor), cb in self._checks_filtros.items()
                 if grupo == clave and cb.value
             }
+        self.filtros_seleccionados["banderas"] = {
+            nombre for nombre, cb in getattr(self, "_checks_banderas_filtro", {}).items()
+            if cb.value
+        }
         for clave, campo in self._campos_rango_filtros.items():
             self.filtros_seleccionados[clave] = (campo.value or "").strip()
         self.pagina_actual = 1
@@ -325,6 +410,7 @@ class PantallaBuques(ft.Container):
         self.content = PantallaRegistrarBuque(
             self._page,
             self.servicio_buque,
+            self.servicio_cliente,
             vista_anterior=self,
         )
         self.update()
@@ -547,7 +633,13 @@ class PantallaBuques(ft.Container):
         switch=False,
     ):
         if self.modo_edicion_buque:
-            if tipo_categoria:
+            if nombre == "cliente_id":
+                control = SelectorCliente(self.servicio_cliente)
+                cliente_obj = getattr(self.buque_en_detalle, "cliente", None)
+                control.establecer_cliente(cliente_obj)
+                self.campos_ficha_buque[nombre] = control
+                return campo_detalle(etiqueta, control, expand=expand)
+            elif tipo_categoria:
                 valor_actual = str(valor or "").upper()
                 control = ft.Dropdown(
                     value=valor_actual or None,
@@ -559,6 +651,34 @@ class PantallaBuques(ft.Container):
                         ft.DropdownOption(key="RO_RO", text="Ro-Ro"),
                         ft.DropdownOption(key="RECREO_MENOR", text="Recreo / Menor"),
                     ],
+                    height=44,
+                    text_size=14,
+                    content_padding=ft.Padding(12, 8, 12, 8),
+                    border=ft.InputBorder.OUTLINE,
+                    border_color=COLOR_GRIS_CLARO,
+                    focused_border_color=COLOR_NARANJA,
+                    border_radius=9,
+                )
+                self.campos_ficha_buque[nombre] = control
+            elif nombre == "bandera_pais":
+                try:
+                    paises = ServicioPaises.obtener_paises()
+                except RuntimeError:
+                    paises = []
+                opciones = [
+                    ft.DropdownOption(key=p["nombre"], text=f'{p["emoji"]}  {p["nombre"]}')
+                    for p in paises
+                ]
+                valor_actual = "" if valor is None else str(valor)
+                if valor_actual and valor_actual not in {p["nombre"] for p in paises}:
+                    opciones.append(ft.DropdownOption(
+                        key=valor_actual, text=f"🌐  {valor_actual} (valor anterior)"
+                    ))
+                control = ft.Dropdown(
+                    value=valor_actual or None,
+                    options=opciones,
+                    hint_text="Selecciona país",
+                    leading_icon=ft.Icons.FLAG_OUTLINED,
                     height=44,
                     text_size=14,
                     content_padding=ft.Padding(12, 8, 12, 8),
@@ -789,12 +909,7 @@ class PantallaBuques(ft.Container):
             )
             return
 
-        cliente_id = (campos["cliente_id"].value or "").strip()
-        try:
-            cliente_id = int(cliente_id) if cliente_id else None
-        except ValueError:
-            self._mostrar_notificacion("El ID del cliente debe ser un número entero.", COLOR_ROJO)
-            return
+        cliente_id = campos["cliente_id"].cliente_id_seleccionado
 
         try:
             self.controlador.modificar_buque(

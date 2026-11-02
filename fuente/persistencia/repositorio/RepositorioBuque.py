@@ -28,20 +28,16 @@ class RepositorioBuque(Repositorio):
     def _construir_condiciones(self, texto="", filtros=None):
         filtros = filtros or {}
         condiciones = []
-
-        # La búsqueda se realiza en PostgreSQL antes de limitar/desplazar resultados.
         texto = (texto or "").strip()
         if texto:
             patron = f"%{texto}%"
-            condiciones.append(
-                or_(
-                    Buque.nombre.ilike(patron),
-                    Buque.numero_imo.ilike(patron),
-                    Buque.bandera_pais.ilike(patron),
-                    Buque.subtipo_descripcion.ilike(patron),
-                    cast(Buque.categoria_buque, String).ilike(patron),
-                )
-            )
+            condiciones.append(or_(
+                Buque.nombre.ilike(patron),
+                Buque.numero_imo.ilike(patron),
+                Buque.bandera_pais.ilike(patron),
+                Buque.subtipo_descripcion.ilike(patron),
+                cast(Buque.categoria_buque, String).ilike(patron),
+            ))
 
         categorias = filtros.get("categorias") or []
         if categorias:
@@ -51,26 +47,27 @@ class RepositorioBuque(Repositorio):
                     categorias_enum.append(categoria)
                 else:
                     try:
-                        categorias_enum.append(
-                            CategoriaBuque(str(categoria).strip().upper())
-                        )
+                        categorias_enum.append(CategoriaBuque(str(categoria).strip().upper()))
                     except (ValueError, TypeError):
                         continue
             if categorias_enum:
                 condiciones.append(Buque.categoria_buque.in_(categorias_enum))
 
-        # Si se marcan las dos opciones, no se restringe ese atributo.
+        banderas = {
+            str(p).strip().casefold()
+            for p in (filtros.get("banderas") or [])
+            if p is not None and str(p).strip()
+        }
+        if banderas:
+            condiciones.append(func.lower(Buque.bandera_pais).in_([p.lower() for p in banderas]))
+
         autopropulsion = {str(v).upper() for v in (filtros.get("autopropulsion") or [])}
         if len(autopropulsion) == 1:
-            condiciones.append(
-                Buque.es_autopropulsado.is_(next(iter(autopropulsion)) == "SI")
-            )
+            condiciones.append(Buque.es_autopropulsado.is_(next(iter(autopropulsion)) == "SI"))
 
         propulsores = {str(v).upper() for v in (filtros.get("propulsores") or [])}
         if len(propulsores) == 1:
-            condiciones.append(
-                Buque.propulsores_proa_popa.is_(next(iter(propulsores)) == "SI")
-            )
+            condiciones.append(Buque.propulsores_proa_popa.is_(next(iter(propulsores)) == "SI"))
 
         estados = {str(v).upper() for v in (filtros.get("estados") or [])}
         if len(estados) == 1:
@@ -87,7 +84,6 @@ class RepositorioBuque(Repositorio):
                 condiciones.append(columna >= minimo)
             if maximo is not None:
                 condiciones.append(columna <= maximo)
-
         return condiciones
 
     def consultar_pagina(self, desplazamiento, limite, filtros=None, texto=""):
@@ -106,27 +102,18 @@ class RepositorioBuque(Repositorio):
         return self.sesion.scalar(stmt) or 0
 
     def contar_registros(self):
-        stmt = select(func.count()).select_from(Buque)
-        return self.sesion.scalar(stmt) or 0
+        return self.sesion.scalar(select(func.count()).select_from(Buque)) or 0
 
     def modificar(self, buque: Buque):
-        stmt = (
-            update(Buque)
-            .where(Buque.id == buque.id)
-            .values(
-                cliente_id=buque.cliente_id,
-                nombre=buque.nombre,
-                numero_imo=buque.numero_imo,
-                categoria_buque=buque.categoria_buque,
-                subtipo_descripcion=buque.subtipo_descripcion,
-                trb_arqueo_bruto=buque.trb_arqueo_bruto,
-                eslora_metros=buque.eslora_metros,
-                calado_metros=buque.calado_metros,
-                propulsores_proa_popa=buque.propulsores_proa_popa,
-                es_autopropulsado=buque.es_autopropulsado,
-                bandera_pais=buque.bandera_pais,
-                activo=buque.activo,
-            )
+        stmt = update(Buque).where(Buque.id == buque.id).values(
+            cliente_id=buque.cliente_id, nombre=buque.nombre,
+            numero_imo=buque.numero_imo, categoria_buque=buque.categoria_buque,
+            subtipo_descripcion=buque.subtipo_descripcion,
+            trb_arqueo_bruto=buque.trb_arqueo_bruto, eslora_metros=buque.eslora_metros,
+            calado_metros=buque.calado_metros,
+            propulsores_proa_popa=buque.propulsores_proa_popa,
+            es_autopropulsado=buque.es_autopropulsado,
+            bandera_pais=buque.bandera_pais, activo=buque.activo,
         )
         self.sesion.execute(stmt)
 
@@ -134,19 +121,11 @@ class RepositorioBuque(Repositorio):
         self.sesion.execute(delete(Buque).where(Buque.id == buque.id))
 
     def buscar_por_id(self, id: int):
-        stmt = (
-            select(Buque)
-            .options(selectinload(Buque.cliente))
-            .where(Buque.id == id)
-        )
+        stmt = select(Buque).options(selectinload(Buque.cliente)).where(Buque.id == id)
         return self.sesion.scalars(stmt).first()
 
     def buscar_por_nombre(self, nombre: str):
-        stmt = (
-            select(Buque)
-            .options(selectinload(Buque.cliente))
-            .where(Buque.nombre.ilike(f"%{nombre}%"))
-            .order_by(Buque.id)
-            .limit(10)
-        )
+        stmt = (select(Buque).options(selectinload(Buque.cliente))
+                .where(Buque.nombre.ilike(f"%{nombre}%"))
+                .order_by(Buque.id).limit(10))
         return self.sesion.scalars(stmt).all()

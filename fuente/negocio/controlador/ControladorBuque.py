@@ -1,4 +1,3 @@
-
 from decimal import Decimal
 
 from fuente.negocio.modelo.Buque import Buque
@@ -20,32 +19,15 @@ class ControladorBuque:
             return None
         return Decimal(str(valor).strip())
 
-    def registrar_buque(
-        self,
-        nombre,
-        categoria_buque,
-        trb_arqueo_bruto,
-        eslora_metros,
-        cliente_id=None,
-        numero_imo=None,
-        subtipo_descripcion=None,
-        calado_metros=None,
-        propulsores_proa_popa=False,
-        es_autopropulsado=True,
-        bandera_pais=None,
-        activo=True,
-    ):
+    def registrar_buque(self, nombre, categoria_buque, trb_arqueo_bruto,
+                        eslora_metros, cliente_id=None, numero_imo=None,
+                        subtipo_descripcion=None, calado_metros=None,
+                        propulsores_proa_popa=False, es_autopropulsado=True,
+                        bandera_pais=None, activo=True):
         if isinstance(categoria_buque, str):
-            categoria_buque = CategoriaBuque(
-                categoria_buque.strip().upper()
-            )
+            categoria_buque = CategoriaBuque(categoria_buque.strip().upper())
 
-        cliente_id_val = (
-            int(str(cliente_id).strip())
-            if self._texto_o_none(cliente_id)
-            else None
-        )
-
+        cliente_id_val = int(str(cliente_id).strip()) if self._texto_o_none(cliente_id) else None
         buque = Buque(
             cliente_id=cliente_id_val,
             nombre=str(nombre).strip(),
@@ -60,55 +42,28 @@ class ControladorBuque:
             bandera_pais=self._texto_o_none(bandera_pais),
             activo=bool(activo),
         )
-
         self.servicio_buque.registrar_buque(buque)
         return buque
 
     def obtener_buques(self, texto="", limit=10, offset=0, filtros=None):
         pagina = (offset // limit) + 1 if limit else 1
-
         return self.servicio_buque.consultar_pagina(
-            no_pagina=pagina,
-            limite=limit,
-            filtros=filtros or {},
-            texto=texto or "",
+            no_pagina=pagina, limite=limit, filtros=filtros or {}, texto=texto or ""
         )
 
     def obtener_pagina(self, pagina, limite=10, filtros=None, texto=""):
         return self.servicio_buque.consultar_pagina(
-            no_pagina=pagina,
-            limite=limite,
-            filtros=filtros or {},
-            texto=texto or "",
+            no_pagina=pagina, limite=limite, filtros=filtros or {}, texto=texto or ""
         )
 
-    def modificar_buque(
-        self,
-        buque,
-        nombre,
-        categoria_buque,
-        trb_arqueo_bruto,
-        eslora_metros,
-        cliente_id=None,
-        numero_imo=None,
-        subtipo_descripcion=None,
-        calado_metros=None,
-        propulsores_proa_popa=False,
-        es_autopropulsado=True,
-        bandera_pais=None,
-        activo=True,
-    ):
+    def modificar_buque(self, buque, nombre, categoria_buque, trb_arqueo_bruto,
+                        eslora_metros, cliente_id=None, numero_imo=None,
+                        subtipo_descripcion=None, calado_metros=None,
+                        propulsores_proa_popa=False, es_autopropulsado=True,
+                        bandera_pais=None, activo=True):
         if isinstance(categoria_buque, str):
-            categoria_buque = CategoriaBuque(
-                categoria_buque.strip().upper()
-            )
-
-        buque.cliente_id = (
-            int(str(cliente_id).strip())
-            if self._texto_o_none(cliente_id)
-            else None
-        )
-
+            categoria_buque = CategoriaBuque(categoria_buque.strip().upper())
+        buque.cliente_id = int(str(cliente_id).strip()) if self._texto_o_none(cliente_id) else None
         buque.nombre = str(nombre).strip()
         buque.numero_imo = self._texto_o_none(numero_imo)
         buque.categoria_buque = categoria_buque
@@ -120,6 +75,5 @@ class ControladorBuque:
         buque.es_autopropulsado = bool(es_autopropulsado)
         buque.bandera_pais = self._texto_o_none(bandera_pais)
         buque.activo = bool(activo)
-
         self.servicio_buque.modificar_buque(buque)
         return buque

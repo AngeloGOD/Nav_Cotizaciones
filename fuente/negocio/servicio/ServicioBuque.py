@@ -16,19 +16,12 @@ class ServicioBuque:
         filtros = filtros or {}
         with self.uow:
             registros = self.uow.buque.consultar_pagina(
-                desplazamiento,
-                limite,
-                filtros=filtros,
-                texto=texto or "",
+                desplazamiento, limite, filtros=filtros, texto=texto or ""
             )
-            total = self.uow.buque.contar(
-                filtros=filtros,
-                texto=texto or "",
-            )
+            total = self.uow.buque.contar(filtros=filtros, texto=texto or "")
         return registros, total
 
     def obtener_pagina(self, no_pagina, limite=10):
-        # Compatibilidad con pantallas o procesos anteriores que esperan solo una lista.
         registros, _ = self.consultar_pagina(no_pagina, limite)
         return registros
 

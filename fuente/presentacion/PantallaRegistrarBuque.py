@@ -24,9 +24,16 @@ class PantallaRegistrarBuque(ft.Container):
         self.controlador = ControladorRegistrarBuques(servicio_buque)
         self.buque_a_editar = buque_a_editar
         self.modo_edicion = buque_a_editar is not None
-
-        self.nombre = self._crear_campo_texto("Nombre del buque *", ft.Icons.DIRECTIONS_BOAT_OUTLINED)
-        self.numero_imo = self._crear_campo_texto("Número IMO", ft.Icons.NUMBERS_OUTLINED)
+        self.nombre = self._crear_campo_etiquetado(
+            etiqueta="Nombre del buque *",
+            ejemplo="Ej. Ocean Star",
+            icono=ft.Icons.DIRECTIONS_BOAT_OUTLINED,
+        )
+        self.numero_imo = self._crear_campo_etiquetado(
+            etiqueta="Número IMO",
+            ejemplo="Ej.  IMO 9876543",
+            icono=ft.Icons.NUMBERS_OUTLINED,
+        )
         self.cliente_busqueda = SelectorCliente(self.servicio_cliente)
         self.paises = []
         try:
@@ -53,8 +60,9 @@ class PantallaRegistrarBuque(ft.Container):
         # Campo de bandera modificado con expand y height
         self.bandera_pais = ft.TextField(
             expand=True,
-            height=52,
-            hint_text="Selecciona bandera / país",
+            height=58,
+            label="Bandera / país",
+            hint_text="Ej. México",
             prefix_icon=ft.Icons.FLAG_OUTLINED,
             suffix_icon=ft.Icons.ARROW_DROP_DOWN,
             read_only=True,
@@ -63,7 +71,7 @@ class PantallaRegistrarBuque(ft.Container):
             focused_border_color=COLOR_NARANJA,
             border_radius=9,
             text_size=14,
-            content_padding=14,
+            content_padding=ft.Padding(14, 12, 14, 12),
             on_click=self._abrir_selector_pais,
         )
         self._lista_paises_registro = ft.Column(
@@ -73,7 +81,11 @@ class PantallaRegistrarBuque(ft.Container):
             controls=[],
         )
         self._dialogo_selector_pais = None
-        self.subtipo_descripcion = self._crear_campo_texto("Subtipo o descripción", ft.Icons.DESCRIPTION_OUTLINED)
+        self.subtipo_descripcion = self._crear_campo_etiquetado(
+            etiqueta="Subtipo o descripción",
+            ejemplo="Ej. Portacontenedores, carga general...",
+            icono=ft.Icons.DESCRIPTION_OUTLINED,
+        )
 
         self.categoria_buque = ft.Dropdown(
             hint_text="Categoría del buque *",
@@ -94,9 +106,26 @@ class PantallaRegistrarBuque(ft.Container):
         )
 
         # Campos numéricos para especificaciones técnicas
-        self.trb_arqueo_bruto = self._crear_campo_numerico("Arqueo Bruto / TRB *")
-        self.eslora_metros = self._crear_campo_numerico("Eslora (m) *")
-        self.calado_metros = self._crear_campo_numerico("Calado (m)")
+        self.trb_arqueo_bruto = self._crear_campo_etiquetado(
+            etiqueta="Arqueo Bruto / TRB *",
+            ejemplo="Ej. 12500.50",
+            icono=ft.Icons.SCALE_OUTLINED,
+            numerico=True,
+        )
+
+        self.eslora_metros = self._crear_campo_etiquetado(
+            etiqueta="Eslora (m) *",
+            ejemplo="Ej. 150.30",
+            icono=ft.Icons.STRAIGHTEN_OUTLINED,
+            numerico=True,
+        )
+
+        self.calado_metros = self._crear_campo_etiquetado(
+            etiqueta="Calado (m)",
+            ejemplo="Ej. 8.75",
+            icono=ft.Icons.WATER_OUTLINED,
+            numerico=True,
+        )
 
         # Controles booleanos de propulsión y estado
         self.es_autopropulsado = ft.Switch(
@@ -233,6 +262,28 @@ class PantallaRegistrarBuque(ft.Container):
             border_radius=9,
             text_size=14,
             content_padding=14,
+        )
+    
+    def _crear_campo_etiquetado(self, etiqueta, ejemplo, icono=None, numerico=False):
+        return ft.TextField(
+            label=etiqueta,
+            hint_text=ejemplo,
+            prefix_icon=icono,
+            border=ft.InputBorder.OUTLINE,
+            border_color=COLOR_GRIS_CLARO,
+            focused_border_color=COLOR_NARANJA,
+            border_radius=9,
+            text_size=14,
+            content_padding=ft.Padding(14, 12, 14, 12),
+            height=58,
+            input_filter=(
+                ft.InputFilter(
+                    allow=True,
+                    regex_string=r"^[0-9.]*$",
+                    replacement_string="",
+                )
+                if numerico else None
+            ),
         )
 
     def _crear_campo_numerico(self, hint):

@@ -511,17 +511,17 @@ class PantallaBuques(ft.Container):
             ],
         )
 
+
+
     def _contenido_ficha_buque(self):
         buque = self.buque_en_detalle
         self.campos_ficha_buque = {}
 
         categoria = getattr(buque, "categoria_buque", "")
-        categoria = categoria.value if hasattr(categoria, "value") else str(categoria or "")
-
-        cliente_obj = getattr(buque, "cliente", None)
-        cliente_texto = (
-            getattr(cliente_obj, "razon_social", None)
-            or (f"ID {buque.cliente_id}" if getattr(buque, "cliente_id", None) is not None else "Sin cliente asignado")
+        categoria = (
+            categoria.value
+            if hasattr(categoria, "value")
+            else str(categoria or "")
         )
 
         identificacion = ft.Column(
@@ -530,15 +530,35 @@ class PantallaBuques(ft.Container):
                 ft.Row(
                     spacing=12,
                     controls=[
-                        self._campo_ficha_buque("Nombre del buque", "nombre", buque.nombre, expand=True),
-                        self._campo_ficha_buque("Número IMO", "numero_imo", buque.numero_imo, expand=True),
+                        self._campo_ficha_buque(
+                            "Nombre del buque",
+                            "nombre",
+                            buque.nombre,
+                            expand=True,
+                        ),
+                        self._campo_ficha_buque(
+                            "Número IMO",
+                            "numero_imo",
+                            buque.numero_imo,
+                            expand=True,
+                        ),
                     ],
                 ),
                 ft.Row(
                     spacing=12,
                     controls=[
-                        self._campo_ficha_buque("Cliente asignado", "cliente_id", buque.cliente_id, expand=True),
-                        self._campo_ficha_buque("Bandera / país", "bandera_pais", buque.bandera_pais, expand=True),
+                        self._campo_ficha_buque(
+                            "Cliente asignado",
+                            "cliente_id",
+                            buque.cliente_id,
+                            expand=True,
+                        ),
+                        self._campo_ficha_buque(
+                            "Bandera / país",
+                            "bandera_pais",
+                            buque.bandera_pais,
+                            expand=True,
+                        ),
                     ],
                 ),
             ],
@@ -551,12 +571,17 @@ class PantallaBuques(ft.Container):
                     spacing=10,
                     controls=[
                         self._campo_ficha_buque(
-                            "Categoría del buque", "categoria_buque", categoria,
-                            tipo_categoria=True, expand=True,
+                            "Categoría del buque",
+                            "categoria_buque",
+                            categoria,
+                            tipo_categoria=True,
+                            expand=True,
                         ),
                         self._campo_ficha_buque(
-                            "Subtipo / descripción", "subtipo_descripcion",
-                            buque.subtipo_descripcion, expand=True,
+                            "Subtipo / descripción",
+                            "subtipo_descripcion",
+                            buque.subtipo_descripcion,
+                            expand=True,
                         ),
                     ],
                 ),
@@ -599,29 +624,80 @@ class PantallaBuques(ft.Container):
                     spacing=8,
                     controls=[
                         self._campo_ficha_buque(
-                            "Autopropulsado", "es_autopropulsado", buque.es_autopropulsado,
-                            switch=True, expand=True,
+                            "Autopropulsado",
+                            "es_autopropulsado",
+                            buque.es_autopropulsado,
+                            switch=True,
+                            expand=True,
                         ),
                         self._campo_ficha_buque(
-                            "Propulsores proa/popa", "propulsores_proa_popa",
-                            buque.propulsores_proa_popa, switch=True, expand=True,
+                            "Propulsores proa/popa",
+                            "propulsores_proa_popa",
+                            buque.propulsores_proa_popa,
+                            switch=True,
+                            expand=True,
                         ),
                     ],
                 ),
                 self._campo_ficha_buque(
-                    "Buque activo", "activo", buque.activo, switch=True, expand=True,
+                    "Buque activo",
+                    "activo",
+                    buque.activo,
+                    switch=True,
+                    expand=True,
                 ),
             ],
         )
 
         tarjetas = [
-            tarjeta_detalle("Identificación y cliente", ft.Icons.FOLDER_OUTLINED, identificacion),
-            tarjeta_detalle("Clasificación", ft.Icons.CATEGORY_OUTLINED, clasificacion),
-            tarjeta_detalle("Características técnicas", ft.Icons.STRAIGHTEN, caracteristicas),
-            tarjeta_detalle("Propulsión y estado", ft.Icons.SETTINGS_OUTLINED, propulsion),
+            tarjeta_detalle(
+                "Identificación y cliente",
+                ft.Icons.FOLDER_OUTLINED,
+                identificacion,
+            ),
+            tarjeta_detalle(
+                "Clasificación",
+                ft.Icons.CATEGORY_OUTLINED,
+                clasificacion,
+            ),
+            tarjeta_detalle(
+                "Características técnicas",
+                ft.Icons.STRAIGHTEN,
+                caracteristicas,
+            ),
+            tarjeta_detalle(
+                "Propulsión y estado",
+                ft.Icons.SETTINGS_OUTLINED,
+                propulsion,
+            ),
         ]
 
-        return ft.Column(tight=True, spacing=7, controls=tarjetas)
+        contenido = ft.Column(
+            tight=True,
+            spacing=7,
+            controls=tarjetas,
+        )
+
+        if self.modo_edicion_buque:
+            selector_cliente = self.campos_ficha_buque.get("cliente_id")
+
+            if selector_cliente:
+                return ft.Stack(
+                    clip_behavior=ft.ClipBehavior.NONE,
+                    controls=[
+                        contenido,
+
+                        # Desplegable alineado con el campo Cliente asignado.
+                        ft.Container(
+                            top=205,
+                            left=14,
+                            width=330,
+                            content=selector_cliente.contenido_resultados,
+                        ),
+                    ],
+                )
+
+        return contenido
 
     def _campo_ficha_buque(
         self,

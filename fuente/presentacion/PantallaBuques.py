@@ -44,12 +44,20 @@ class PantallaBuques(ft.Container):
         self.build_ui()
 
     def build_ui(self):
-        self._contenido = ft.Column(
+        self._columna_contenido = ft.Column(
             expand=True,
             spacing=12,
             controls=[
                 self.cabecera_buques(),
                 self.directorio(),
+            ],
+        )
+
+        self._contenido = ft.Stack(
+            expand=True,
+            clip_behavior=ft.ClipBehavior.NONE,
+            controls=[
+                self._columna_contenido,
             ],
         )
 
@@ -59,19 +67,20 @@ class PantallaBuques(ft.Container):
             controls=[
                 ft.Container(
                     expand=True,
-                    padding=ft.Padding(left=14, right=14, top=8, bottom=18),
+                    padding=ft.Padding(14, 8, 14, 16),
                     content=self._contenido,
                 )
             ],
         )
 
-        # Igual que PantallaClientes: el panel se dibuja encima del contenido
-        # mediante Stack, sin empujar ni desplazar la tabla.
         self._layout_principal = ft.Stack(
             expand=True,
             clip_behavior=ft.ClipBehavior.NONE,
-            controls=[contenido_desplazable],
+            controls=[
+                contenido_desplazable,
+            ],
         )
+
         self.content = self._layout_principal
 
     def cabecera_buques(self):
@@ -79,7 +88,28 @@ class PantallaBuques(ft.Container):
             hint="Buscar por nombre, IMO, categoría, subtipo o bandera...",
             on_change=self.buscar,
         )
-        buscador.height = 48
+        buscador.height = 44
+
+        self._boton_filtros = boton(
+            texto="Filtros",
+            icono=ft.Icons.TUNE,
+            tipo="secundario",
+            width=160,
+            height=44,
+            border_color="#C9DDF7",
+            on_click=self.abrir_filtros,
+        )
+
+        boton_filtros = self._boton_filtros
+
+        boton_registrar_buque = boton(
+            texto="Registrar buque",
+            icono=ft.Icons.ADD,
+            tipo="principal",
+            width=210,
+            height=44,
+            on_click=self.ir_a_registro,
+        )
 
         barra_herramientas = card(
             ft.Row(
@@ -87,42 +117,35 @@ class PantallaBuques(ft.Container):
                 vertical_alignment=ft.CrossAxisAlignment.CENTER,
                 controls=[
                     buscador,
-                    self._crear_boton_filtros(),
-                    boton(
-                        texto="Registrar buque",
-                        icono=ft.Icons.ADD,
-                        tipo="principal",
-                        width=210,
-                        height=48,
-                        on_click=self.ir_a_registro,
-                    ),
+                    boton_filtros,
+                    boton_registrar_buque,
                 ],
             ),
-            padding=12,
-            radius=14,
+            padding=10,
+            radius=10,
             border_color="#E0ECF9",
             shadow=sombra_suave(),
         )
 
+        banner = banner_modulo(
+            src="fondo_PantallaClientes.jpg",
+            categoria="Gestión de buques",
+            titulo="Buques",
+            descripcion=(
+                "Administra el directorio de buques, sus dimensiones, "
+                "categorías y características técnicas."
+            ),
+            icono=ft.Icons.DIRECTIONS_BOAT_OUTLINED,
+        )
+
         return ft.Column(
-            spacing=12,
+            spacing=10,
+            horizontal_alignment=ft.CrossAxisAlignment.STRETCH,
             controls=[
-                banner_modulo(
-                    src="fondo_PantallaClientes.jpg",
-                    categoria="Gestión de buques",
-                    titulo="Buques",
-                    descripcion=(
-                        "Administra el directorio de buques, sus dimensiones, "
-                        "categorías y características técnicas."
-                    ),
-                    icono=ft.Icons.DIRECTIONS_BOAT_OUTLINED,
-                    altura=174,
-                ),
+                banner,
                 barra_herramientas,
             ],
         )
-
-
 
     def buscar(self, e):
         self.busqueda = e.control.value or ""
@@ -421,8 +444,7 @@ class PantallaBuques(ft.Container):
         self.actualizar_directorio()
 
     def actualizar_directorio(self):
-        # La tabla vive en la columna base; el panel flotante es una capa aparte.
-        self._contenido.controls[1] = self.directorio()
+        self._columna_contenido.controls[1] = self.directorio()
         self.update()
 
 
@@ -1224,6 +1246,7 @@ class PantallaBuques(ft.Container):
             COLOR_VERDE,
         )
 
+
     def crear_tabla_buques(self, buques):
         etiquetas_categoria = {
             "COMERCIAL": "Comercial",
@@ -1238,11 +1261,16 @@ class PantallaBuques(ft.Container):
         pagina_completa_seleccionada = bool(buques) and all(
             clave in self.buques_seleccionados for clave in claves_pagina
         )
+
         encabezado_seleccion = ft.Container(
             width=52,
             alignment=ft.Alignment(0, 0),
             content=ft.Checkbox(
                 value=pagina_completa_seleccionada,
+                active_color=COLOR_AZUL,
+                check_color=COLOR_BLANCO,
+                border_side=ft.BorderSide(1.5, "#7186A0"),
+                shape=ft.RoundedRectangleBorder(radius=3),
                 on_change=lambda e, bs=list(buques): self.seleccionar_pagina_buques(
                     bs, bool(e.control.value)
                 ),
@@ -1254,6 +1282,7 @@ class PantallaBuques(ft.Container):
         for buque in buques:
             clave = self._clave_buque(buque)
             seleccionado = clave in self.buques_seleccionados
+
             inicial = ft.Container(
                 content=ft.Text(
                     buque.nombre[:1].upper() if buque.nombre else "?",
@@ -1269,6 +1298,7 @@ class PantallaBuques(ft.Container):
             )
 
             cliente_obj = getattr(buque, "cliente", None)
+
             if cliente_obj and getattr(cliente_obj, "razon_social", None):
                 texto_cliente = f"Cliente: {cliente_obj.razon_social}"
             elif buque.cliente_id is not None:
@@ -1283,8 +1313,9 @@ class PantallaBuques(ft.Container):
                     inicial,
                     ft.Container(
                         expand=True,
+                        padding=ft.Padding(8, 0, 0, 0),
                         content=ft.Column(
-                            spacing=2,
+                            spacing=3,
                             alignment=ft.MainAxisAlignment.CENTER,
                             controls=[
                                 ft.Text(
@@ -1309,7 +1340,7 @@ class PantallaBuques(ft.Container):
             )
 
             identificadores = ft.Column(
-                spacing=2,
+                spacing=3,
                 alignment=ft.MainAxisAlignment.CENTER,
                 controls=[
                     ft.Text(
@@ -1322,7 +1353,8 @@ class PantallaBuques(ft.Container):
             )
 
             bandera = ft.Row(
-                spacing=5,
+                spacing=6,
+                vertical_alignment=ft.CrossAxisAlignment.CENTER,
                 controls=[
                     ft.Icon(
                         ft.Icons.FLAG_OUTLINED,
@@ -1347,13 +1379,14 @@ class PantallaBuques(ft.Container):
                 if hasattr(buque.categoria_buque, "value")
                 else str(buque.categoria_buque or "")
             )
+
             texto_cat = etiquetas_categoria.get(
                 valor_cat.upper(),
                 valor_cat or "N/A",
             )
 
             categoria_y_subtipo = ft.Column(
-                spacing=2,
+                spacing=3,
                 alignment=ft.MainAxisAlignment.CENTER,
                 controls=[
                     ft.Text(
@@ -1381,11 +1414,12 @@ class PantallaBuques(ft.Container):
             )
 
             especificaciones = ft.Column(
-                spacing=3,
+                spacing=5,
                 alignment=ft.MainAxisAlignment.CENTER,
                 controls=[
                     ft.Row(
                         spacing=5,
+                        vertical_alignment=ft.CrossAxisAlignment.CENTER,
                         controls=[
                             ft.Icon(
                                 ft.Icons.STRAIGHTEN_OUTLINED,
@@ -1407,6 +1441,7 @@ class PantallaBuques(ft.Container):
                     ),
                     ft.Row(
                         spacing=5,
+                        vertical_alignment=ft.CrossAxisAlignment.CENTER,
                         controls=[
                             ft.Icon(
                                 ft.Icons.SCALE_OUTLINED,
@@ -1429,11 +1464,12 @@ class PantallaBuques(ft.Container):
             )
 
             propulsion_y_estado = ft.Column(
-                spacing=2,
+                spacing=3,
                 alignment=ft.MainAxisAlignment.CENTER,
                 controls=[
                     ft.Row(
                         spacing=5,
+                        vertical_alignment=ft.CrossAxisAlignment.CENTER,
                         controls=[
                             ft.Icon(
                                 ft.Icons.CIRCLE,
@@ -1472,6 +1508,17 @@ class PantallaBuques(ft.Container):
                 ],
             )
 
+            checkbox_seleccion = ft.Checkbox(
+                value=seleccionado,
+                active_color=COLOR_AZUL,
+                check_color=COLOR_BLANCO,
+                border_side=ft.BorderSide(1.5, "#7186A0"),
+                shape=ft.RoundedRectangleBorder(radius=3),
+                on_change=lambda e, b=buque: self.seleccionar_buque(
+                    b, bool(e.control.value)
+                ),
+            )
+
             filas.append(
                 ft.DataRow(
                     selected=seleccionado,
@@ -1480,43 +1527,75 @@ class PantallaBuques(ft.Container):
                             ft.Container(
                                 expand=True,
                                 alignment=ft.Alignment(0, 0),
-                                content=ft.Checkbox(
-                                    value=seleccionado,
-                                    on_change=lambda e, b=buque: self.seleccionar_buque(
-                                        b, bool(e.control.value)
-                                    ),
-                                ),
+                                content=checkbox_seleccion,
                             )
                         ),
-                        ft.DataCell(nombre),
-                        ft.DataCell(identificadores),
-                        ft.DataCell(bandera),
-                        ft.DataCell(categoria_y_subtipo),
-                        ft.DataCell(especificaciones),
-                        ft.DataCell(propulsion_y_estado),
-                        ft.DataCell(acciones),
+                        ft.DataCell(
+                            ft.Container(
+                                expand=True,
+                                padding=ft.Padding(8, 0, 0, 0),
+                                content=nombre,
+                            )
+                        ),
+                        ft.DataCell(
+                            ft.Container(
+                                expand=True,
+                                content=identificadores,
+                            )
+                        ),
+                        ft.DataCell(
+                            ft.Container(
+                                expand=True,
+                                content=bandera,
+                            )
+                        ),
+                        ft.DataCell(
+                            ft.Container(
+                                expand=True,
+                                content=categoria_y_subtipo,
+                            )
+                        ),
+                        ft.DataCell(
+                            ft.Container(
+                                expand=True,
+                                content=especificaciones,
+                            )
+                        ),
+                        ft.DataCell(
+                            ft.Container(
+                                expand=True,
+                                content=propulsion_y_estado,
+                            )
+                        ),
+                        ft.DataCell(
+                            ft.Container(
+                                expand=True,
+                                alignment=ft.Alignment(0, 0),
+                                content=acciones,
+                            )
+                        ),
                     ],
                 )
             )
 
         columnas = [
             (encabezado_seleccion, 52),
-            ("Buque", 240),
-            ("IMO", 120),
-            ("Bandera", 135),
-            ("Categoría / Subtipo", 180),
-            ("Dimensiones y Arqueo", 240),
-            ("Propulsión / Estado", 180),
-            ("Detalles", 80),
+            (self._encabezado_columna("Buque", ft.Icons.DIRECTIONS_BOAT_OUTLINED), 240),
+            (self._encabezado_columna("IMO", ft.Icons.BADGE_OUTLINED), 120),
+            (self._encabezado_columna("Bandera", ft.Icons.FLAG_OUTLINED), 135),
+            (self._encabezado_columna("Categoría / Subtipo", ft.Icons.CATEGORY_OUTLINED), 180),
+            (self._encabezado_columna("Dimensiones y arqueo", ft.Icons.STRAIGHTEN_OUTLINED), 240),
+            (self._encabezado_columna("Propulsión / Estado", ft.Icons.SETTINGS_OUTLINED), 180),
+            ("Acciones", 80),
         ]
 
         return tabla(
             columnas=columnas,
             filas=filas,
-            column_spacing=15,
-            horizontal_margin=10,
-            heading_row_height=44,
-            data_row_min_height=60,
+            column_spacing=6,
+            horizontal_margin=6,
+            heading_row_height=46,
+            data_row_min_height=68,
             data_row_max_height=float("inf"),
             columnas_flexibles=True,
             heading_row_color="#EEF5FD",
@@ -1528,8 +1607,10 @@ class PantallaBuques(ft.Container):
             columnas_compactas=True,
         )
 
+
     def directorio(self):
         offset = (self.pagina_actual - 1) * self.registros_por_pagina
+
         buques, self.total_buques = self.controlador.obtener_buques(
             texto=self.busqueda,
             limit=self.registros_por_pagina,
@@ -1540,8 +1621,10 @@ class PantallaBuques(ft.Container):
         tabla_buques = self.crear_tabla_buques(buques)
 
         controles_seleccion = []
+
         if self.buques_seleccionados:
             cantidad = len(self.buques_seleccionados)
+
             controles_seleccion = [
                 ft.Row(
                     spacing=7,
@@ -1586,33 +1669,36 @@ class PantallaBuques(ft.Container):
             vertical_alignment=ft.CrossAxisAlignment.CENTER,
             controls=[
                 ft.Container(
-                    width=52,
-                    height=52,
+                    width=48,
+                    height=48,
                     alignment=ft.Alignment(0, 0),
                     bgcolor=COLOR_NARANJA,
-                    border_radius=13,
+                    border_radius=12,
                     content=ft.Icon(
                         ft.Icons.DIRECTIONS_BOAT_OUTLINED,
                         color=COLOR_BLANCO,
-                        size=27,
+                        size=25,
                     ),
                 ),
-                ft.Column(
+                ft.Container(
                     expand=True,
-                    spacing=3,
-                    controls=[
-                        ft.Text(
-                            "Directorio de buques",
-                            size=20,
-                            weight=ft.FontWeight.BOLD,
-                            color=COLOR_NEGRO,
-                        ),
-                        ft.Text(
-                            f"{self.total_buques} buques registrados",
-                            size=13,
-                            color=COLOR_GRIS,
-                        ),
-                    ],
+                    content=ft.Column(
+                        expand=True,
+                        spacing=3,
+                        controls=[
+                            ft.Text(
+                                "Directorio de buques",
+                                size=18,
+                                weight=ft.FontWeight.BOLD,
+                                color=COLOR_NEGRO,
+                            ),
+                            ft.Text(
+                                f"{self.total_buques} buques registrados",
+                                size=12,
+                                color=COLOR_GRIS,
+                            ),
+                        ],
+                    ),
                 ),
                 *controles_seleccion,
                 boton(
@@ -1631,48 +1717,79 @@ class PantallaBuques(ft.Container):
             ],
         )
 
+        contenedor_tabla = ft.Container(
+            expand=True,
+            border=ft.Border.all(1, "#E2EDF9"),
+            border_radius=12,
+            bgcolor=COLOR_BLANCO,
+            clip_behavior=ft.ClipBehavior.HARD_EDGE,
+            content=tabla_buques,
+        )
+
+        pie_directorio = ft.Row(
+            alignment=ft.MainAxisAlignment.SPACE_BETWEEN,
+            vertical_alignment=ft.CrossAxisAlignment.CENTER,
+            controls=[
+                ft.Text(
+                    f"Mostrando {len(buques)} de {self.total_buques} buques",
+                    size=12,
+                    color=COLOR_GRIS,
+                ),
+                paginacion(
+                    total_registros=self.total_buques,
+                    registros_por_pagina=self.registros_por_pagina,
+                    pagina_actual=self.pagina_actual,
+                    on_change=self.cambiar_pagina,
+                ),
+            ],
+        )
+
         controles = [
             cabecera_directorio,
             ft.Divider(height=1, color="#E2EDF9"),
-            ft.Container(
-                expand=True,
-                border=ft.Border.all(1, "#E2EDF9"),
-                border_radius=12,
-                bgcolor=COLOR_BLANCO,
-                clip_behavior=ft.ClipBehavior.HARD_EDGE,
-                content=tabla_buques,
-            ),
-            ft.Row(
-                alignment=ft.MainAxisAlignment.SPACE_BETWEEN,
-                vertical_alignment=ft.CrossAxisAlignment.CENTER,
-                controls=[
-                    ft.Text(
-                        f"Mostrando {len(buques)} de {self.total_buques} buques",
-                        size=12,
-                        color=COLOR_GRIS,
-                    ),
-                    paginacion(
-                        total_registros=self.total_buques,
-                        registros_por_pagina=self.registros_por_pagina,
-                        pagina_actual=self.pagina_actual,
-                        on_change=self.cambiar_pagina,
-                    ),
-                ],
-            ),
+            contenedor_tabla,
+            pie_directorio,
         ]
 
+        contenido_directorio = ft.Stack(
+            expand=True,
+            clip_behavior=ft.ClipBehavior.NONE,
+            controls=[
+                ft.Column(
+                    expand=True,
+                    spacing=12,
+                    horizontal_alignment=ft.CrossAxisAlignment.STRETCH,
+                    controls=controles,
+                ),
+            ],
+        )
+
         return card(
-            ft.Column(
-                expand=True,
-                spacing=10,
-                horizontal_alignment=ft.CrossAxisAlignment.STRETCH,
-                controls=controles,
-            ),
-            padding=14,
-            radius=16,
+            contenido_directorio,
+            padding=ft.Padding(12, 11, 12, 11),
+            radius=12,
             border_color="#E0ECF9",
             shadow=sombra_suave(),
             expand=True,
+        )
+
+    def _encabezado_columna(self, texto, icono):
+        return ft.Row(
+            tight=True,
+            spacing=6,
+            alignment=ft.MainAxisAlignment.CENTER,
+            vertical_alignment=ft.CrossAxisAlignment.CENTER,
+            controls=[
+                ft.Icon(icono, size=15, color="#6684A8"),
+                ft.Text(
+                    texto,
+                    size=14,
+                    weight=ft.FontWeight.BOLD,
+                    color=COLOR_NEGRO,
+                    max_lines=1,
+                    overflow=ft.TextOverflow.ELLIPSIS,
+                ),
+            ],
         )
 
     def exportar_buques(self, e):

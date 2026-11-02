@@ -336,13 +336,16 @@ class PantallaRegistrarBuque(ft.Container):
             ],
         )
 
+
     def build_ui(self):
         formulario = card(
             ft.Stack(
+                expand=True,
                 clip_behavior=ft.ClipBehavior.NONE,
                 controls=[
                     # Contenido principal del formulario
                     ft.Column(
+                        expand=True,
                         spacing=24,
                         controls=[
                             self.seccion(
@@ -558,30 +561,25 @@ class PantallaRegistrarBuque(ft.Container):
             ),
         )
 
-        self.content = ft.Column(
+        self.content = ft.Container(
             expand=True,
-            scroll=ft.ScrollMode.AUTO,
-            spacing=16,
-            controls=[
-                ft.Container(
-                    padding=ft.Padding(
-                        left=24,
-                        right=24,
-                        top=20,
-                        bottom=24,
-                    ),
-                    content=ft.Column(
-                        expand=True,
-                        spacing=16,
-                        horizontal_alignment=ft.CrossAxisAlignment.STRETCH,
-                        controls=[
-                            encabezado,
-                            formulario,
-                        ],
-                    ),
-                )
-            ],
+            padding=ft.Padding(
+                left=24,
+                right=24,
+                top=20,
+                bottom=24,
+            ),
+            content=ft.Column(
+                expand=True,
+                spacing=16,
+                horizontal_alignment=ft.CrossAxisAlignment.STRETCH,
+                controls=[
+                    encabezado,
+                    formulario,
+                ],
+            ),
         )
+
 
     def seccion(self, icono, titulo, contenido):
         return ft.Column(

@@ -196,10 +196,9 @@ class PantallaClientes(ft.Container):
             on_change=self._cambio_fecha_filtro,
         )
         self._panel_filtros = self._crear_panel_filtros()
-        self._contenido.controls = [
-            self._contenido.controls[0],
-            self._panel_filtros,
-        ]
+        self._panel_filtros.top = 218
+        self._panel_filtros.right = 167
+        self._layout_principal.controls.append(self._panel_filtros)
         self._panel_filtros_abierto = True
         self.update()
 
@@ -485,7 +484,8 @@ class PantallaClientes(ft.Container):
 
     def cerrar_filtros(self, e=None):
         if self._panel_filtros_abierto:
-            self._contenido.controls = [self._contenido.controls[0]]
+            if self._panel_filtros in self._layout_principal.controls:
+                self._layout_principal.controls.remove(self._panel_filtros)
             self._panel_filtros_abierto = False
             self.update()
 

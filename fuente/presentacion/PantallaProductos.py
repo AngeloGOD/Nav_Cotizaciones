@@ -558,12 +558,12 @@ class PantallaProductos(ft.Container):
             on_limpiar=self.limpiar_filtros,
             on_aplicar=self.aplicar_filtros,
             on_cerrar=self.cerrar_filtros,
-            top=210,
-            right=310,
+            top=218,
+            right=324,
             width=340,
             height=405,
         )
-        self._contenido.controls.append(self._panel_filtros)
+        self._layout_principal.controls.append(self._panel_filtros)
         self._panel_filtros_abierto = True
         if self.page is not None:
             self.update()
@@ -639,10 +639,8 @@ class PantallaProductos(ft.Container):
     def cerrar_filtros(self, e=None):
         if not self._panel_filtros_abierto:
             return
-        self._contenido.controls = [
-            self._contenido.controls[0],
-            self._menu_exportacion,
-        ]
+        if self._panel_filtros in self._layout_principal.controls:
+            self._layout_principal.controls.remove(self._panel_filtros)
         self._panel_filtros_abierto = False
         if self.page is not None:
             self.update()
@@ -1047,7 +1045,7 @@ class PantallaProductos(ft.Container):
             ],
         )
 
-        self.content = ft.Stack(
+        self._layout_principal = ft.Stack(
             expand=True,
             clip_behavior=ft.ClipBehavior.NONE,
             controls=[
@@ -1065,5 +1063,6 @@ class PantallaProductos(ft.Container):
                 )
             ],
         )
+        self.content = self._layout_principal
 
         self._actualizar_resultados(actualizar=False)

@@ -1,21 +1,12 @@
-from datetime import date, datetime, timedelta
+from datetime import date, datetime
 
 from fuente.negocio.controlador.ControladorRegistrarCliente import (
     ControladorRegistrarCliente,
 )
+from fuente.negocio.modelo.ENUMs import TipoPersona
 
 
 class ControladorClientes:
-    _TAMANO_LOTE_CONTEO = 500
-    _TIPOS_PERSONA = {
-        "FISICA": "FISICA",
-        "PERSONA FISICA": "FISICA",
-        "PERSONA FÍSICA": "FISICA",
-        "MORAL": "MORAL",
-        "PERSONA MORAL": "MORAL",
-        "EXTRANJERO": "EXTRANJERO",
-    }
-
     def __init__(self, servicio_cliente):
         self.servicio_cliente = servicio_cliente
         self.controlador_registro = ControladorRegistrarCliente(servicio_cliente)
@@ -87,12 +78,17 @@ class ControladorClientes:
         tipos_crudos = cls._valores_filtro(filtros.get("tipos_persona"))
         tipos = set()
         for valor in tipos_crudos:
-            tipo = cls._TIPOS_PERSONA.get(str(valor).strip().upper())
-            if tipo is None:
+            try:
+                tipo = (
+                    valor
+                    if isinstance(valor, TipoPersona)
+                    else TipoPersona(str(valor).strip().upper())
+                )
+            except (TypeError, ValueError):
                 raise ValueError("El filtro de tipo de persona contiene una opción no válida.")
             tipos.add(tipo)
-        if tipos and len(tipos) < len(set(cls._TIPOS_PERSONA.values())):
-            filtros_servicio["tipo_persona"] = sorted(tipos)
+        if tipos and len(tipos) < len(TipoPersona):
+            filtros_servicio["tipo_persona"] = sorted(tipo.value for tipo in tipos)
 
         estados = {
             str(valor).strip().upper()
@@ -134,19 +130,9 @@ class ControladorClientes:
         texto = (texto or "").strip()
         if texto:
             filtros_servicio["nombre"] = texto
+            filtros_servicio["rfc"] = texto
 
         return filtros_servicio
-
-    @staticmethod
-    def _fecha_cliente(cliente, zona_local):
-        fecha_creacion = getattr(cliente, "creado_en", None)
-        if isinstance(fecha_creacion, datetime):
-            if fecha_creacion.tzinfo is not None:
-                fecha_creacion = fecha_creacion.astimezone(zona_local)
-            return fecha_creacion.date()
-        if isinstance(fecha_creacion, date):
-            return fecha_creacion
-        return None
 
     def obtener_clientes(self, texto="", limit=10, offset=0, filtros=None):
         if limit <= 0:
@@ -155,68 +141,17 @@ class ControladorClientes:
             raise ValueError("El desplazamiento no puede ser negativo.")
 
         filtros_servicio = self.normalizar_filtros(filtros, texto)
-        fecha_hasta_obj = self._normalizar_fecha(
-            (filtros or {}).get("fecha_hasta"), "hasta"
-        )[1]
-        zona_local = datetime.now().astimezone().tzinfo
-        if fecha_hasta_obj:
-            # El servicio limita la hora final a 23:59:59. Consultar el día
-            # siguiente permite incluir fracciones de segundo del día elegido.
-            filtros_servicio["fecha_hasta"] = (
-                fecha_hasta_obj + timedelta(days=1)
-            ).isoformat()
-
-        if not filtros_servicio:
-            pagina = (offset // limit) + 1
-            clientes = self.servicio_cliente.obtener_pagina(pagina, limit) or []
-            total = self.servicio_cliente.obtener_cantidad_registros()
-            inicio_en_pagina = offset % limit
-            if inicio_en_pagina and len(clientes) == limit:
-                clientes += (
-                    self.servicio_cliente.obtener_pagina(pagina + 1, limit) or []
-                )
-            return clientes[inicio_en_pagina : inicio_en_pagina + limit], total
-
-        clientes_pagina = []
-        total = 0
-        pagina = 1
-        while True:
-            lote_consultado = (
-                self.servicio_cliente.obtener_pagina(
-                    pagina,
-                    self._TAMANO_LOTE_CONTEO,
-                    filtros_servicio,
-                )
-                or []
-            )
-            fin_consulta = len(lote_consultado) < self._TAMANO_LOTE_CONTEO
-            lote = lote_consultado
-            if fecha_hasta_obj:
-                lote = []
-                for cliente in lote_consultado:
-                    fecha_cliente = self._fecha_cliente(cliente, zona_local)
-                    if fecha_cliente is not None and fecha_cliente <= fecha_hasta_obj:
-                        lote.append(cliente)
-            inicio_lote = total
-            fin_lote = inicio_lote + len(lote)
-            inicio_solicitado = max(offset, inicio_lote)
-            fin_solicitado = min(offset + limit, fin_lote)
-            if inicio_solicitado < fin_solicitado:
-                clientes_pagina.extend(
-                    lote[
-                        inicio_solicitado - inicio_lote :
-                        fin_solicitado - inicio_lote
-                    ]
-                )
-            total = fin_lote
-            if fin_consulta:
-                break
-            pagina += 1
-
-        return clientes_pagina, total
+        return self.servicio_cliente.consultar_pagina(
+            desplazamiento=offset,
+            limite=limit,
+            filtros=filtros_servicio,
+        )
 
     def obtener_pagina(self, pagina, limite=10):
         return self.servicio_cliente.obtener_pagina(pagina, limite)
+
+    def buscar_por_rfc(self, rfc):
+        return self.servicio_cliente.buscar_por_rfc(rfc)
 
     def modificar_cliente(
         self,

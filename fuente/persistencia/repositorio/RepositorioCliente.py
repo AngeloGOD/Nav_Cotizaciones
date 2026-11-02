@@ -1,7 +1,7 @@
 from sqlalchemy.orm.session import Session
 from fuente.negocio.modelo.Cliente import Cliente
 from fuente.persistencia.repositorio.Repositorio import Repositorio
-from sqlalchemy import select, update, delete, func
+from sqlalchemy import select, update, delete, func, or_
 
 class RepositorioCliente(Repositorio):
 
@@ -11,9 +11,8 @@ class RepositorioCliente(Repositorio):
     def insertar(self, cliente: Cliente):
         self.sesion.add(cliente)
     
-    def consultar_pagina(self, desplazamiento, limite, filtros: dict = {}):
-        stmt = select(Cliente)
-
+    @staticmethod
+    def _aplicar_filtros(stmt, filtros):
         if filtros:
             tipos = filtros.get("tipo_persona", [])
             if tipos and 0 < len(tipos) < 3:
@@ -36,15 +35,34 @@ class RepositorioCliente(Repositorio):
                 stmt = stmt.where(Cliente.creado_en <= fecha_hasta)
 
             nombre = filtros.get("nombre", "")
-            if nombre and len(nombre) > 0:
-                stmt = stmt.where(Cliente.razon_social.ilike(f"%{nombre}%"))
+            rfc = filtros.get("rfc", "")
+            condiciones_busqueda = []
+            if nombre:
+                condiciones_busqueda.append(
+                    Cliente.razon_social.ilike(f"%{nombre}%")
+                )
+            if rfc:
+                condiciones_busqueda.append(Cliente.rfc.ilike(f"%{rfc}%"))
+            if condiciones_busqueda:
+                stmt = stmt.where(or_(*condiciones_busqueda))
 
+        return stmt
+
+    def consultar_pagina(self, desplazamiento, limite, filtros: dict = {}):
+        stmt = self._aplicar_filtros(select(Cliente), filtros)
         stmt = (
             stmt.order_by(Cliente.id)
             .limit(limite)
             .offset(desplazamiento)
         )
         return self.sesion.scalars(stmt).all()
+
+    def contar(self, filtros=None):
+        stmt = self._aplicar_filtros(
+            select(func.count()).select_from(Cliente),
+            filtros or {},
+        )
+        return self.sesion.scalar(stmt) or 0
 
     def modificar(self, cliente: Cliente):
         stmt = (
@@ -75,6 +93,15 @@ class RepositorioCliente(Repositorio):
         stmt = (
             select(Cliente)
             .where(Cliente.razon_social.ilike(f"%{nombre}%"))
+            .order_by(Cliente.id)
+            .limit(10)
+        )
+        return self.sesion.scalars(stmt).all()
+
+    def buscar_por_rfc(self, rfc: str):
+        stmt = (
+            select(Cliente)
+            .where(Cliente.rfc.ilike(f"%{rfc}%"))
             .order_by(Cliente.id)
             .limit(10)
         )

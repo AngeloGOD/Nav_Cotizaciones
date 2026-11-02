@@ -1,3 +1,4 @@
+import asyncio
 from datetime import datetime
 
 import flet as ft
@@ -34,6 +35,8 @@ class PantallaClientes(ft.Container):
         self._panel_filtros_abierto = False
         self._menu_exportacion_abierto = False
         self._clic_en_boton_menu = False
+        self._tarea_busqueda = None
+        self._texto_busqueda_pendiente = ""
         self._date_picker_filtros = ft.DatePicker(
             on_change=self._fecha_seleccionada,
             first_date=datetime(1900, 1, 1),
@@ -86,7 +89,7 @@ class PantallaClientes(ft.Container):
 
     def cabecera_clientes(self):
         buscador = barra_busqueda(
-            hint="Buscar por nombre o razón social...",
+            hint="Buscar por nombre, razón social o RFC...",
             on_change=self._con_cierre_de_menus(self.buscar),
         )
         buscador.height = 44
@@ -156,7 +159,31 @@ class PantallaClientes(ft.Container):
         )
 
     def buscar(self, e):
-        self.busqueda = e.control.value or ""
+        texto = (e.control.value or "").strip()
+        self._texto_busqueda_pendiente = texto
+        if self._tarea_busqueda is not None:
+            self._tarea_busqueda.cancel()
+            self._tarea_busqueda = None
+
+        if len(texto) < 3:
+            if self.busqueda:
+                self.busqueda = ""
+                self.pagina_actual = 1
+                self.clientes_seleccionados.clear()
+                self.actualizar_directorio()
+            return
+
+        self._tarea_busqueda = self._page.run_task(
+            self._buscar_con_demora,
+            texto,
+        )
+
+    async def _buscar_con_demora(self, texto):
+        await asyncio.sleep(0.2)
+        if texto != self._texto_busqueda_pendiente:
+            return
+        self._tarea_busqueda = None
+        self.busqueda = texto
         self.pagina_actual = 1
         self.clientes_seleccionados.clear()
         self.actualizar_directorio()

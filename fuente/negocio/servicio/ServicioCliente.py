@@ -27,14 +27,16 @@ class ServicioCliente():
             return None
 
         tz_local = datetime.now().astimezone().tzinfo
-        hora_objetivo = time(23, 59, 59) if es_hasta else time(0, 0, 0)
+        hora_objetivo = (
+            time(23, 59, 59, 999999) if es_hasta else time(0, 0, 0)
+        )
 
         if isinstance(valor_fecha, datetime):
             fecha_dt = valor_fecha.replace(
                 hour=hora_objetivo.hour,
                 minute=hora_objetivo.minute,
                 second=hora_objetivo.second,
-                microsecond=0,
+                microsecond=999999 if es_hasta else 0,
             )
             return fecha_dt if fecha_dt.tzinfo else fecha_dt.replace(tzinfo=tz_local)
 
@@ -116,6 +118,10 @@ class ServicioCliente():
             nombre = filtros.get("nombre")
             filtros_limpios["nombre"] = nombre.strip() if isinstance(nombre, str) else ""
 
+        if "rfc" in filtros:
+            rfc = filtros.get("rfc")
+            filtros_limpios["rfc"] = rfc.strip() if isinstance(rfc, str) else ""
+
         return filtros_limpios
 
     def obtener_pagina(self, no_pagina, limite = 10, filtros: dict = {}):
@@ -130,6 +136,17 @@ class ServicioCliente():
                     desplazamiento, limite, filtros_limpios
                 )
         return resultado
+
+    def consultar_pagina(self, desplazamiento, limite=10, filtros=None):
+        filtros_limpios = self._limpiar_filtros(filtros or {})
+        with self.uow:
+            registros = self.uow.cliente.consultar_pagina(
+                desplazamiento,
+                limite,
+                filtros_limpios,
+            )
+            total = self.uow.cliente.contar(filtros_limpios)
+        return registros, total
 
     def modificar_cliente(self, cliente: Cliente):
         with self.uow:
@@ -151,6 +168,12 @@ class ServicioCliente():
         resultado = None
         with self.uow:
             resultado = self.uow.cliente.buscar_por_nombre(nombre)
+        return resultado
+
+    def buscar_por_rfc(self, rfc: str):
+        resultado = None
+        with self.uow:
+            resultado = self.uow.cliente.buscar_por_rfc(rfc)
         return resultado
 
     def obtener_cantidad_registros(self):

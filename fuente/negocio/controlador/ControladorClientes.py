@@ -7,9 +7,44 @@ from fuente.negocio.modelo.ENUMs import TipoPersona
 
 
 class ControladorClientes:
+    GRUPOS_FILTROS = ("tipos_persona", "estados", "tipos_cliente")
+    CAMPOS_FECHA_FILTRO = ("fecha_desde", "fecha_hasta")
+    COLUMNAS_EXPORTACION = {
+        "Cliente": "razon_social",
+        "Fecha de registro": "creado_en",
+        "RFC": "rfc",
+        "Tipo de persona": "tipo_persona",
+        "Dirección": "direccion",
+        "Teléfono": "telefono",
+        "Correo electrónico": "correo_elect",
+        "Estado": "estado",
+        "Tipo de cliente": "tipo_cliente",
+    }
+
     def __init__(self, servicio_cliente):
         self.servicio_cliente = servicio_cliente
         self.controlador_registro = ControladorRegistrarCliente(servicio_cliente)
+
+    @classmethod
+    def crear_filtros_vacios(cls):
+        return {
+            **{grupo: set() for grupo in cls.GRUPOS_FILTROS},
+            **{campo: None for campo in cls.CAMPOS_FECHA_FILTRO},
+        }
+
+    @classmethod
+    def contar_filtros(cls, filtros):
+        return sum(
+            len(filtros.get(grupo) or ())
+            for grupo in cls.GRUPOS_FILTROS
+        ) + sum(
+            bool(filtros.get(campo))
+            for campo in cls.CAMPOS_FECHA_FILTRO
+        )
+
+    @staticmethod
+    def clave_cliente(cliente):
+        return getattr(cliente, "id_cliente", getattr(cliente, "id", id(cliente)))
 
     def registrar_cliente(
         self,
@@ -147,6 +182,48 @@ class ControladorClientes:
             filtros=filtros_servicio,
         )
 
+    def obtener_datos_exportacion(
+        self,
+        clientes_seleccionados=None,
+        texto="",
+        filtros=None,
+    ):
+        if clientes_seleccionados is not None:
+            clientes = list(clientes_seleccionados)
+        else:
+            clientes = []
+            desplazamiento = 0
+            total = 0
+            while desplazamiento == 0 or desplazamiento < total:
+                pagina, total = self.obtener_clientes(
+                    texto=texto,
+                    limit=500,
+                    offset=desplazamiento,
+                    filtros=filtros,
+                )
+                if not pagina:
+                    break
+                clientes.extend(pagina)
+                desplazamiento += len(pagina)
+
+        filas = [
+            {
+                "razon_social": cliente.razon_social,
+                "creado_en": cliente.creado_en,
+                "rfc": cliente.rfc,
+                "tipo_persona": cliente.tipo_persona,
+                "direccion": cliente.direccion,
+                "telefono": cliente.telefono,
+                "correo_elect": cliente.correo_elect,
+                "estado": "Activo" if cliente.activo else "Inactivo",
+                "tipo_cliente": (
+                    "Nuevo" if cliente.es_nuevo_cliente else "Existente"
+                ),
+            }
+            for cliente in clientes
+        ]
+        return filas, self.COLUMNAS_EXPORTACION
+
     def obtener_pagina(self, pagina, limite=10):
         return self.servicio_cliente.obtener_pagina(pagina, limite)
 
@@ -175,6 +252,10 @@ class ControladorClientes:
             es_nuevo_cliente,
             activo,
         )
+        if not datos["razon_social"] or not datos["tipo_persona"]:
+            raise ValueError(
+                "La razón social y el tipo de persona son obligatorios."
+            )
         for atributo, valor in datos.items():
             setattr(cliente, atributo, valor)
 

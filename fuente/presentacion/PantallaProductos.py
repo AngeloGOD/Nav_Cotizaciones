@@ -8,11 +8,14 @@ from fuente.utilidades.Componentes import (
     card,
     fila_producto,
     menu_exportacion,
+    mostrar_notificacion,
     panel_filtros,
     seccion_opciones_filtro,
     sombra_suave,
     tarjeta_producto,
 )
+from fuente.utilidades.ExportacionExcel import exportar_excel
+from fuente.negocio.controlador.ControladorProductos import ControladorProductos
 from fuente.presentacion.PantallaRegistrarProducto import PantallaRegistrarProducto
 
 
@@ -21,10 +24,8 @@ class PantallaProductos(ft.Container):
         super().__init__(expand=True, bgcolor=COLOR_FONDO)
 
         self._page = page
-        self.productos = [
-            self._normalizar(p)
-            for p in (productos if productos is not None else self._demo())
-        ]
+        self.controlador = ControladorProductos(productos)
+        self.productos = self.controlador.productos
 
         self.pagina_actual = 1
         self.registros_por_pagina = 8
@@ -53,129 +54,6 @@ class PantallaProductos(ft.Container):
 
         # Construir la pantalla una sola vez.
         self.build_ui()
-
-    # ---------------------------------------------------------
-    # DATOS DE PRUEBA
-    # ---------------------------------------------------------
-    def _demo(self):
-        fotos = "https://images.unsplash.com/{}?auto=format&fit=crop&w=700&q=80"
-
-        datos = [
-            ("Tomate rojo fresco", "Frutas y verduras", "Tomate rojo de alta calidad, ideal para consumo y distribución.", "Caja", "Cajas (10 kg)", "photo-1546094096-0df4bcaaa337"),
-            ("Lechuga fresca", "Frutas y verduras", "Lechuga fresca, seleccionada y de excelente calidad.", "Caja", "Cajas (10 kg)", "photo-1622206151226-18ca2c9ab4a1"),
-            ("Pepino fresco", "Frutas y verduras", "Pepino fresco, ideal para ensaladas y consumo directo.", "Kilo", "Kilos", "photo-1604977042946-1eecc30f269e"),
-            ("Limón", "Frutas y verduras", "Limón fresco empacado para abastecimiento de la embarcación.", "Saco", "Sacos (15 kg)", "photo-1589927986089-35812388d1f4"),
-            ("Pimiento morrón verde", "Frutas y verduras", "Pimiento de buena frescura y tamaño uniforme.", "Caja", "Cajas (10 kg)", "photo-1563565375-f3fdfdbefa83"),
-            ("Zanahoria", "Frutas y verduras", "Zanahoria fresca, limpia y de gran calidad.", "Saco", "Sacos (15 kg)", "photo-1445282768818-728615cc910a"),
-            ("Papa grande", "Frutas y verduras", "Papa de tamaño grande, perfecta para cocina.", "Caja", "Cajas (10 kg)", "photo-1518977676601-b53f82aba655"),
-            ("Cebolla roja", "Frutas y verduras", "Cebolla roja, fresca y de excelente calidad.", "Saco", "Sacos (15 kg)", "photo-1618512496248-a07fe83aa8cb"),
-            ("Aguacate Hass", "Frutas y verduras", "Aguacate de buena calidad, ideal para consumo.", "Caja", "Cajas (10 kg)", "photo-1523049673857-eb18f1d7b578"),
-            ("Arrachera", "Carnes", "Corte de res para preparación de alimentos a bordo.", "Kilo", "Kilos", "photo-1607623814075-e51df1bdc82f"),
-            ("Pollo entero", "Carnes", "Pollo entero para abastecimiento de cocina.", "Kilo", "Kilos", "photo-1604503468506-a8da13d82791"),
-            ("Camarón de mar", "Pescados y mariscos", "Camarón de mar con cáscara, tamaño grande.", "Kilo", "Kilos", "photo-1565680018434-b513d5e5fd47"),
-            ("Queso fresco", "Lácteos", "Queso fresco para consumo y preparación de alimentos.", "Kilo", "Kilos", "photo-1486297678162-eb2a19b0a32d"),
-            ("Pan de caja", "Abarrotes", "Pan empacado para el consumo diario de la tripulación.", "Paquete", "Paquetes", "photo-1509440159596-0249088772ff"),
-            ("Arroz grano largo", "Abarrotes", "Arroz de grano largo en saco para cocina.", "Saco", "Sacos (25 kg)", "photo-1586201375761-83865001e31c"),
-            ("Agua purificada", "Bebidas", "Agua purificada embotellada en paquete.", "Caja", "Cajas", "photo-1527960471264-932f39eb5846"),
-        ]
-
-        return [
-            {
-                "nombre": n,
-                "categoria": c,
-                "descripcion": d,
-                "unidad_medida": u,
-                "presentacion": p,
-                "imagen": fotos.format(img),
-            }
-            for n, c, d, u, p, img in datos
-        ]
-
-    def _normalizar(self, producto):
-        if isinstance(producto, dict):
-            datos = producto.copy()
-        else:
-            concepto = getattr(producto, "concepto", producto)
-            categoria = (
-                getattr(producto, "categoria", None)
-                or getattr(producto, "categ_producto", None)
-                or getattr(producto, "categoria_producto", None)
-            )
-
-            datos = {
-                "nombre": (
-                    getattr(concepto, "nombre", None)
-                    or getattr(concepto, "nombre_es", "Producto sin nombre")
-                ),
-                "descripcion": getattr(concepto, "descripcion", ""),
-                "categoria": getattr(
-                    categoria,
-                    "nombre_categoria",
-                    getattr(categoria, "value", "Otros productos"),
-                ),
-                "unidad_medida": getattr(producto, "unidad_medida", "Unidad"),
-                "imagen": getattr(producto, "imagen", ""),
-                "sku": (
-                    getattr(producto, "sku_interno", None)
-                    or getattr(concepto, "codigo", "")
-                ),
-                "activo": getattr(concepto, "activo", True),
-                "es_perecedero": getattr(producto, "es_perecedero", False),
-                "requiere_refrigeracion": getattr(
-                    producto,
-                    "requiere_refrigeracion",
-                    False,
-                ),
-            }
-
-        categoria = datos.get("categoria") or "Otros productos"
-
-        if not isinstance(categoria, str):
-            categoria = getattr(
-                categoria,
-                "nombre_categoria",
-                getattr(categoria, "value", "Otros productos"),
-            )
-
-        unidad = datos.get("unidad_medida") or datos.get("unidad") or "Unidad"
-
-        return {
-            **datos,
-            "nombre": datos.get("nombre") or "Producto sin nombre",
-            "descripcion": datos.get("descripcion") or "Sin descripción disponible.",
-            "categoria": categoria,
-            "unidad_medida": unidad,
-            "presentacion": datos.get("presentacion") or unidad,
-            "imagen": datos.get("imagen") or "",
-            "sku": (
-                datos.get("sku")
-                or datos.get("sku_interno")
-                or datos.get("codigo")
-                or ""
-            ),
-            "activo": bool(datos.get("activo", True)),
-            "es_perecedero": bool(datos.get("es_perecedero", False)),
-            "requiere_refrigeracion": bool(
-                datos.get("requiere_refrigeracion", False)
-            ),
-        }
-
-    def _opciones(self, campo):
-        valores = sorted({
-            p[campo]
-            for p in self.productos
-            if p.get(campo)
-        })
-
-        texto_todas = (
-            "Todas las categorías"
-            if campo == "categoria"
-            else "Todas las unidades"
-        )
-
-        return [("todas", texto_todas)] + [
-            (v, v) for v in valores
-        ]
 
     # ---------------------------------------------------------
     # BUSQUEDA Y FILTROS
@@ -334,46 +212,10 @@ class PantallaProductos(ft.Container):
         self._actualizar_resultados()
 
     def _filtrar_productos(self):
-        texto = self.busqueda.strip().casefold()
-        resultado = []
-
-        for p in self.productos:
-            buscar_en = " ".join(
-                str(p.get(c, "")) for c in ("nombre", "sku")
-            ).casefold()
-
-            if texto and texto not in buscar_en:
-                continue
-
-            if (
-                self.filtros_seleccionados["categoria"] != "todas"
-                and p["categoria"] != self.filtros_seleccionados["categoria"]
-            ):
-                continue
-
-            if (
-                self.filtros_seleccionados["unidad_medida"] != "todas"
-                and p["unidad_medida"]
-                != self.filtros_seleccionados["unidad_medida"]
-            ):
-                continue
-
-            filtros_booleanos = (
-                ("activo", "activo"),
-                ("es_perecedero", "es_perecedero"),
-                ("requiere_refrigeracion", "requiere_refrigeracion"),
-            )
-            if any(
-                self.filtros_seleccionados[filtro]
-                and ("si" if bool(p[campo]) else "no")
-                not in self.filtros_seleccionados[filtro]
-                for filtro, campo in filtros_booleanos
-            ):
-                continue
-
-            resultado.append(p)
-
-        return resultado
+        return self.controlador.obtener_productos_filtrados(
+            self.busqueda,
+            self.filtros_seleccionados,
+        )
 
     # ---------------------------------------------------------
     # ENCABEZADO Y HERRAMIENTAS
@@ -456,7 +298,7 @@ class PantallaProductos(ft.Container):
         self._menu_exportacion = menu_exportacion(
             descripcion=self._texto_resumen_exportacion,
             on_pdf=lambda e: self._informar_exportacion("PDF"),
-            on_excel=lambda e: self._informar_exportacion("Excel"),
+            on_excel=self._exportar_productos_excel,
             descripcion_pdf="Genera un archivo PDF del catálogo de productos.",
             descripcion_excel="Descarga una hoja de cálculo de los productos.",
             top=210,
@@ -514,7 +356,7 @@ class PantallaProductos(ft.Container):
                     "categoria",
                     "Categoría / Subtipo",
                     ft.Icons.CATEGORY_OUTLINED,
-                    self._opciones("categoria"),
+                    self.controlador.obtener_opciones_filtro("categoria"),
                     self.filtros_seleccionados["categoria"],
                 ),
                 ft.Divider(height=1, color="#E2EDF9"),
@@ -522,7 +364,7 @@ class PantallaProductos(ft.Container):
                     "unidad_medida",
                     "Unidad de medida base",
                     ft.Icons.SCALE_OUTLINED,
-                    self._opciones("unidad_medida"),
+                    self.controlador.obtener_opciones_filtro("unidad_medida"),
                     self.filtros_seleccionados["unidad_medida"],
                 ),
                 ft.Divider(height=1, color="#E2EDF9"),
@@ -711,6 +553,32 @@ class PantallaProductos(ft.Container):
                 ],
             )
         )
+
+    async def _exportar_productos_excel(self, e=None):
+        self.cerrar_menu_exportacion()
+        try:
+            productos, columnas = self.controlador.obtener_datos_exportacion(
+                self._filtrar_productos()
+            )
+            guardado = await exportar_excel(
+                self._page,
+                productos,
+                columnas,
+                "productos.xlsx",
+                nombre_hoja="Productos",
+            )
+            if guardado:
+                mostrar_notificacion(
+                    self._page,
+                    f"Se exportaron {len(productos)} productos a Excel.",
+                    COLOR_VERDE,
+                )
+        except Exception as error:
+            mostrar_notificacion(
+                self._page,
+                f"No se pudieron exportar los productos: {error}",
+                COLOR_ROJO,
+            )
 
     def _con_cierre_de_menus(self, accion):
         def ejecutar(*args, **kwargs):
@@ -1000,6 +868,7 @@ class PantallaProductos(ft.Container):
         self.content = PantallaRegistrarProducto(
             page=self._page,
             vista_anterior=self,
+            controlador=self.controlador,
         )
 
         self.update()

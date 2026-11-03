@@ -5,6 +5,7 @@ import flet as ft
 
 from fuente.utilidades.Colores import *
 from fuente.utilidades.Componentes import *
+from fuente.utilidades.ExportacionExcel import exportar_excel
 from fuente.negocio.controlador.ControladorClientes import ControladorClientes
 from fuente.presentacion.PantallaRegistrarCliente import PantallaRegistrarCliente
 
@@ -23,13 +24,7 @@ class PantallaClientes(ft.Container):
         self.total_clientes = 0
         self.busqueda = ""
         self.clientes_seleccionados = {}
-        self.filtros_seleccionados = {
-            "tipos_persona": set(),
-            "estados": set(),
-            "tipos_cliente": set(),
-            "fecha_desde": None,
-            "fecha_hasta": None,
-        }
+        self.filtros_seleccionados = self.controlador.crear_filtros_vacios()
         self._checks_filtros = {}
         self._campo_fecha_filtro_activo = None
         self._panel_filtros_abierto = False
@@ -230,7 +225,7 @@ class PantallaClientes(ft.Container):
         self.update()
 
     def _actualizar_indicador_filtros(self):
-        cantidad = self._contar_filtros(self.filtros_seleccionados)
+        cantidad = self.controlador.contar_filtros(self.filtros_seleccionados)
         controles = [
             ft.Icon(ft.Icons.TUNE, size=18, color=COLOR_AZUL),
             ft.Text("Filtros", size=14, color=COLOR_AZUL, max_lines=1),
@@ -258,15 +253,6 @@ class PantallaClientes(ft.Container):
             controls=controles,
         )
 
-    def _contar_filtros(self, filtros):
-        return (
-            len(filtros["tipos_persona"])
-            + len(filtros["estados"])
-            + len(filtros["tipos_cliente"])
-            + int(bool(filtros["fecha_desde"]))
-            + int(bool(filtros["fecha_hasta"]))
-        )
-
     def _formatear_fecha_filtro(self, valor):
         if isinstance(valor, str):
             return valor
@@ -287,7 +273,9 @@ class PantallaClientes(ft.Container):
         return seccion
 
     def _crear_panel_filtros(self):
-        cantidad_filtros = self._contar_filtros(self.filtros_seleccionados)
+        cantidad_filtros = self.controlador.contar_filtros(
+            self.filtros_seleccionados
+        )
         resumen_filtros = (
             "1 filtro seleccionado"
             if cantidad_filtros == 1
@@ -451,13 +439,7 @@ class PantallaClientes(ft.Container):
                 self._date_picker_filtros,
             ]
         )
-        self.filtros_seleccionados = {
-            "tipos_persona": set(),
-            "estados": set(),
-            "tipos_cliente": set(),
-            "fecha_desde": None,
-            "fecha_hasta": None,
-        }
+        self.filtros_seleccionados = self.controlador.crear_filtros_vacios()
         if self._date_picker_filtros in self._page.overlay:
             self._date_picker_filtros.update()
         self._actualizar_indicador_filtros()
@@ -486,13 +468,13 @@ class PantallaClientes(ft.Container):
         )
 
     def aplicar_filtros(self, e=None):
-        filtros = {
-            "tipos_persona": set(),
-            "estados": set(),
-            "tipos_cliente": set(),
-            "fecha_desde": (self._campo_fecha_desde.value or "").strip() or None,
-            "fecha_hasta": (self._campo_fecha_hasta.value or "").strip() or None,
-        }
+        filtros = self.controlador.crear_filtros_vacios()
+        filtros["fecha_desde"] = (
+            (self._campo_fecha_desde.value or "").strip() or None
+        )
+        filtros["fecha_hasta"] = (
+            (self._campo_fecha_hasta.value or "").strip() or None
+        )
         for (grupo, valor), checkbox in self._checks_filtros.items():
             if checkbox.value:
                 filtros[grupo].add(valor)
@@ -1026,14 +1008,6 @@ class PantallaClientes(ft.Container):
         campos = self.campos_ficha
         razon_social = (campos["razon_social"].value or "").strip()
         tipo_persona = (campos["tipo_persona"].value or "").strip()
-        if not razon_social or not tipo_persona:
-            mostrar_notificacion(
-                self._page,
-                "La razón social y el tipo de persona son obligatorios.",
-                COLOR_ROJO,
-            )
-            return
-
         try:
             self.controlador.modificar_cliente(
                 cliente=self.cliente_seleccionado,
@@ -1108,11 +1082,8 @@ class PantallaClientes(ft.Container):
     def cerrar_ficha(self, e):
         self._page.pop_dialog()
 
-    def _clave_cliente(self, cliente):
-        return getattr(cliente, "id_cliente", getattr(cliente, "id", id(cliente)))
-
     def seleccionar_cliente(self, cliente, seleccionado):
-        clave = self._clave_cliente(cliente)
+        clave = self.controlador.clave_cliente(cliente)
         if seleccionado:
             self.clientes_seleccionados[clave] = cliente
         else:
@@ -1122,7 +1093,7 @@ class PantallaClientes(ft.Container):
     def seleccionar_pagina(self, clientes, seleccionado):
         claves = set()
         for cliente in clientes:
-            clave = self._clave_cliente(cliente)
+            clave = self.controlador.clave_cliente(cliente)
             claves.add(clave)
             if seleccionado:
                 self.clientes_seleccionados[clave] = cliente
@@ -1196,7 +1167,10 @@ class PantallaClientes(ft.Container):
         except Exception as error:
             # No se modifica el controlador; se informa el fallo desde la pantalla.
             for cliente in seleccionados[:eliminados]:
-                self.clientes_seleccionados.pop(self._clave_cliente(cliente), None)
+                self.clientes_seleccionados.pop(
+                    self.controlador.clave_cliente(cliente),
+                    None,
+                )
             self.actualizar_directorio()
             mostrar_notificacion(
                 self._page,
@@ -1245,7 +1219,10 @@ class PantallaClientes(ft.Container):
             COLOR_NARANJA_SUAVE,
             COLOR_AZUL_PETROLEO,
         )
-        claves_pagina = [self._clave_cliente(c) for c in clientes]
+        claves_pagina = [
+            self.controlador.clave_cliente(cliente)
+            for cliente in clientes
+        ]
         pagina_completa_seleccionada = bool(clientes) and all(
             clave in self.clientes_seleccionados for clave in claves_pagina
         )
@@ -1284,7 +1261,7 @@ class PantallaClientes(ft.Container):
                 if getattr(cliente, "creado_en", None)
                 else "—"
             )
-            clave = self._clave_cliente(cliente)
+            clave = self.controlador.clave_cliente(cliente)
             seleccionado = clave in self.clientes_seleccionados
             inicial_cliente = (nombre_cliente.strip()[:1] or "?").upper()
 
@@ -1578,7 +1555,7 @@ class PantallaClientes(ft.Container):
         self._menu_exportacion = menu_exportacion(
             descripcion=self._texto_resumen_exportacion,
             on_pdf=self.cerrar_menu_exportacion,
-            on_excel=self.cerrar_menu_exportacion,
+            on_excel=self._exportar_clientes_excel,
             descripcion_pdf="Genera un archivo PDF en el directorio de clientes.",
             descripcion_excel="Descarga un archivo Excel con los datos de clientes.",
             top=52,
@@ -1714,7 +1691,7 @@ class PantallaClientes(ft.Container):
         self._menu_exportacion.update()
 
     def _clic_fondo_filtros(self, e=None):
-        if self._clic_en_boton_menu:
+        if self._clic_en_boton_menu or self._menu_exportacion_abierto:
             return
         self.cerrar_menus()
 
@@ -1751,3 +1728,42 @@ class PantallaClientes(ft.Container):
         if self.busqueda.strip() or filtros_activos:
             return "Elige un formato para exportar los clientes filtrados."
         return "Elige un formato para exportar los clientes encontrados."
+
+    async def _exportar_clientes_excel(self, e=None):
+        self.cerrar_menu_exportacion()
+        try:
+            seleccionados = (
+                list(self.clientes_seleccionados.values())
+                if self.clientes_seleccionados
+                else None
+            )
+            filas, columnas = self.controlador.obtener_datos_exportacion(
+                clientes_seleccionados=seleccionados,
+                texto=self.busqueda,
+                filtros=self.filtros_seleccionados,
+            )
+            nombre_archivo = (
+                "clientes_seleccionados.xlsx"
+                if seleccionados is not None
+                else "clientes.xlsx"
+            )
+
+            guardado = await exportar_excel(
+                self._page,
+                filas,
+                columnas,
+                nombre_archivo,
+                nombre_hoja="Clientes",
+            )
+            if guardado:
+                mostrar_notificacion(
+                    self._page,
+                    f"Se exportaron {len(filas)} clientes a Excel.",
+                    COLOR_VERDE,
+                )
+        except Exception as error:
+            mostrar_notificacion(
+                self._page,
+                f"No se pudieron exportar los clientes: {error}",
+                COLOR_ROJO,
+            )

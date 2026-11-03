@@ -9,14 +9,16 @@ from fuente.utilidades.Componentes import (
     banner_imagen_desvanecida,
     sombra_suave,
 )
+from fuente.negocio.controlador.ControladorProductos import ControladorProductos
 
 
 class PantallaRegistrarProducto(ft.Container):
-    def __init__(self, page: ft.Page, vista_anterior=None):
+    def __init__(self, page: ft.Page, vista_anterior=None, controlador=None):
         super().__init__(expand=True, bgcolor=COLOR_FONDO)
 
         self._page = page
         self.vista_anterior = vista_anterior
+        self.controlador = controlador or ControladorProductos([])
 
         self.nombre = self.ajustar_campo(
             campo("Ej. Agua embotellada", ft.Icons.SHOPPING_BAG_OUTLINED)
@@ -300,14 +302,9 @@ class PantallaRegistrarProducto(ft.Container):
             return
 
         archivo = archivos[0]
-        extension = archivo.name.rsplit(".", 1)[-1].lower()
-        if extension not in {"jpg", "jpeg", "png"}:
-            self.mostrar_error_imagen("Selecciona una imagen JPG o PNG.")
-            return
-        if archivo.size > 2 * 1024 * 1024:
-            self.mostrar_error_imagen(
-                "La imagen debe pesar 2 MB o menos."
-            )
+        error = self.controlador.validar_imagen(archivo.name, archivo.size)
+        if error:
+            self.mostrar_error_imagen(error)
             return
 
         self._archivo_imagen = archivo

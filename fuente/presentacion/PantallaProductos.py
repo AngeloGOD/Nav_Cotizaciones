@@ -4,17 +4,21 @@ from fuente.utilidades.Colores import *
 
 from fuente.utilidades.Componentes import (
     banner_modulo,
+    agregar_panel_flotante,
+    boton_exportacion,
     boton_vista,
     card,
     fila_producto,
     menu_exportacion,
     mostrar_notificacion,
     panel_filtros,
+    quitar_panel_flotante,
     seccion_opciones_filtro,
     sombra_suave,
     tarjeta_producto,
 )
 from fuente.utilidades.ExportacionExcel import exportar_excel
+from fuente.utilidades.ExportacionPDF import exportar_pdf
 from fuente.negocio.controlador.ControladorProductos import ControladorProductos
 from fuente.presentacion.PantallaRegistrarProducto import PantallaRegistrarProducto
 
@@ -261,28 +265,9 @@ class PantallaProductos(ft.Container):
             size=14,
             color=COLOR_AZUL,
         )
-        self._boton_exportar = ft.OutlinedButton(
-            content=ft.Row(
-                tight=True,
-                spacing=7,
-                alignment=ft.MainAxisAlignment.CENTER,
-                controls=[
-                    ft.Icon(
-                        ft.Icons.DOWNLOAD_OUTLINED,
-                        size=18,
-                        color=COLOR_AZUL,
-                    ),
-                    self._texto_boton_exportar,
-                ],
-            ),
-            width=145,
-            height=44,
+        self._boton_exportar = boton_exportacion(
+            texto=self._texto_boton_exportar,
             on_click=self.alternar_menu_exportacion,
-            style=ft.ButtonStyle(
-                color=COLOR_AZUL,
-                side=ft.BorderSide(1, "#C7DAFF"),
-                shape=ft.RoundedRectangleBorder(radius=9),
-            ),
         )
         boton_exportar = ft.GestureDetector(
             on_tap_down=self._marcar_clic_en_boton_menu,
@@ -297,7 +282,7 @@ class PantallaProductos(ft.Container):
         )
         self._menu_exportacion = menu_exportacion(
             descripcion=self._texto_resumen_exportacion,
-            on_pdf=lambda e: self._informar_exportacion("PDF"),
+            on_pdf=self._exportar_productos_pdf,
             on_excel=self._exportar_productos_excel,
             descripcion_pdf="Genera un archivo PDF del catálogo de productos.",
             descripcion_excel="Descarga una hoja de cálculo de los productos.",
@@ -400,12 +385,12 @@ class PantallaProductos(ft.Container):
             on_limpiar=self.limpiar_filtros,
             on_aplicar=self.aplicar_filtros,
             on_cerrar=self.cerrar_filtros,
-            top=218,
-            right=324,
+            top=210,
+            right=310,
             width=340,
             height=405,
         )
-        self._layout_principal.controls.append(self._panel_filtros)
+        agregar_panel_flotante(self._contenido, self._panel_filtros)
         self._panel_filtros_abierto = True
         if self.page is not None:
             self.update()
@@ -481,8 +466,7 @@ class PantallaProductos(ft.Container):
     def cerrar_filtros(self, e=None):
         if not self._panel_filtros_abierto:
             return
-        if self._panel_filtros in self._layout_principal.controls:
-            self._layout_principal.controls.remove(self._panel_filtros)
+        quitar_panel_flotante(self._contenido, self._panel_filtros)
         self._panel_filtros_abierto = False
         if self.page is not None:
             self.update()
@@ -528,31 +512,11 @@ class PantallaProductos(ft.Container):
         self._texto_boton_exportar.value = (
             "Exportar filtrados" if filtrados else "Exportar"
         )
-        self._boton_exportar.width = 190 if filtrados else 145
 
     def _descripcion_exportacion(self):
         if self._hay_filtros_exportacion():
             return "Elige un formato para exportar los productos filtrados."
         return "Elige un formato para exportar los productos del catálogo."
-
-    def _informar_exportacion(self, formato):
-        self.cerrar_menu_exportacion()
-        self._page.show_dialog(
-            ft.AlertDialog(
-                modal=True,
-                title=ft.Text("Exportación no disponible"),
-                content=ft.Text(
-                    f"La exportación de productos a {formato} todavía "
-                    "no está conectada."
-                ),
-                actions=[
-                    ft.TextButton(
-                        "Aceptar",
-                        on_click=lambda e: self._page.pop_dialog(),
-                    )
-                ],
-            )
-        )
 
     async def _exportar_productos_excel(self, e=None):
         self.cerrar_menu_exportacion()
@@ -577,6 +541,48 @@ class PantallaProductos(ft.Container):
             mostrar_notificacion(
                 self._page,
                 f"No se pudieron exportar los productos: {error}",
+                COLOR_ROJO,
+            )
+
+    async def _exportar_productos_pdf(self, e=None):
+        self.cerrar_menu_exportacion()
+        try:
+            filas, _ = self.controlador.obtener_datos_exportacion(
+                self._filtrar_productos()
+            )
+            activos = sum(fila["estado"] == "Activo" for fila in filas)
+            guardado = await exportar_pdf(
+                self._page,
+                filas,
+                self.controlador.COLUMNAS_PDF,
+                "productos.pdf",
+                titulo="Catálogo de productos",
+                subtitulo="Gestión de productos",
+                etiqueta_registros=f"Productos exportados: {len(filas)}",
+                metricas={
+                    "Productos": len(filas),
+                    "Activos": activos,
+                    "Inactivos": len(filas) - activos,
+                },
+                orientacion="landscape",
+                columnas_centradas=(
+                    "Categoría",
+                    "Estado",
+                    "Perecedero",
+                    "Requiere refrigeración",
+                ),
+                nombre_registro="productos",
+            )
+            if guardado:
+                mostrar_notificacion(
+                    self._page,
+                    f"Se exportaron {len(filas)} productos a PDF.",
+                    COLOR_VERDE,
+                )
+        except Exception as error:
+            mostrar_notificacion(
+                self._page,
+                f"No se pudieron exportar los productos a PDF: {error}",
                 COLOR_ROJO,
             )
 

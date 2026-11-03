@@ -10,6 +10,21 @@ class ControladorProductos:
         "Perecedero": "es_perecedero",
         "Requiere refrigeración": "requiere_refrigeracion",
     }
+    COLUMNAS_PDF = {
+        "Producto": "nombre",
+        "Código / SKU": "sku",
+        "Categoría": "categoria",
+        "Descripción": "descripcion",
+        "Unidad de medida": "unidad_medida",
+        "Presentación": "presentacion",
+        "Estado": "estado",
+        "Perecedero": lambda producto: (
+            "Sí" if producto["es_perecedero"] else "No"
+        ),
+        "Requiere refrigeración": lambda producto: (
+            "Sí" if producto["requiere_refrigeracion"] else "No"
+        ),
+    }
 
     def __init__(self, productos=None):
         origen = self._productos_demo() if productos is None else productos
@@ -159,7 +174,7 @@ class ControladorProductos:
 
             filtros_booleanos = (
                 ("activo", "activo"),
-                ("es_perecedario", "es_perecedario"),
+                ("es_perecedero", "es_perecedero"),
                 ("requiere_refrigeracion", "requiere_refrigeracion"),
             )
             if any(
@@ -196,7 +211,7 @@ class ControladorProductos:
                 "estado": (
                     "Activo" if producto.get("activo", True) else "Inactivo"
                 ),
-                "es_perecedario": producto["es_perecedario"],
+                "es_perecedero": producto["es_perecedero"],
                 "requiere_refrigeracion": producto["requiere_refrigeracion"],
             }
             for producto in productos

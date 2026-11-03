@@ -10,6 +10,7 @@ from fuente.utilidades.Componentes import (
     sombra_suave,
 )
 from fuente.negocio.controlador.ControladorProductos import ControladorProductos
+from fuente.utilidades.ExportacionArchivos import obtener_selector_archivos
 
 
 class PantallaRegistrarProducto(ft.Container):
@@ -41,17 +42,7 @@ class PantallaRegistrarProducto(ft.Container):
             campo("Ej. AGU-001", ft.Icons.BARCODE_READER)
         )
         self._archivo_imagen = None
-        self._selector_archivos = next(
-            (
-                servicio
-                for servicio in page.services
-                if isinstance(servicio, ft.FilePicker)
-            ),
-            None,
-        )
-        if self._selector_archivos is None:
-            self._selector_archivos = ft.FilePicker()
-            page.services.append(self._selector_archivos)
+        self._selector_archivos = obtener_selector_archivos(page)
         self.boton_imagen = ft.OutlinedButton(
             content=self.contenido_boton_imagen(),
             on_click=self.seleccionar_imagen,

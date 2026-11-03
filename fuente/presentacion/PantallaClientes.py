@@ -6,6 +6,7 @@ import flet as ft
 from fuente.utilidades.Colores import *
 from fuente.utilidades.Componentes import *
 from fuente.utilidades.ExportacionExcel import exportar_excel
+from fuente.utilidades.ExportacionPDF import exportar_pdf
 from fuente.negocio.controlador.ControladorClientes import ControladorClientes
 from fuente.presentacion.PantallaRegistrarCliente import PantallaRegistrarCliente
 
@@ -218,9 +219,9 @@ class PantallaClientes(ft.Container):
             on_change=self._cambio_fecha_filtro,
         )
         self._panel_filtros = self._crear_panel_filtros()
-        self._panel_filtros.top = 218
-        self._panel_filtros.right = 167
-        self._layout_principal.controls.append(self._panel_filtros)
+        self._panel_filtros.top = 210
+        self._panel_filtros.right = 153
+        agregar_panel_flotante(self._contenido, self._panel_filtros)
         self._panel_filtros_abierto = True
         self.update()
 
@@ -493,8 +494,7 @@ class PantallaClientes(ft.Container):
 
     def cerrar_filtros(self, e=None):
         if self._panel_filtros_abierto:
-            if self._panel_filtros in self._layout_principal.controls:
-                self._layout_principal.controls.remove(self._panel_filtros)
+            quitar_panel_flotante(self._contenido, self._panel_filtros)
             self._panel_filtros_abierto = False
             self.update()
 
@@ -1127,9 +1127,11 @@ class PantallaClientes(ft.Container):
         self._barra_seleccion.visible = cantidad > 0
         self._barra_seleccion.update()
 
-        self._boton_exportar.width = 230 if cantidad else 150
+        self._boton_exportar.width = (
+            230 if cantidad else 190 if self._hay_filtros_exportacion() else 150
+        )
         self._boton_exportar.content.controls[1].value = (
-            f"Exportar seleccionados ({cantidad})" if cantidad else "Exportar"
+            self._texto_boton_exportar()
         )
         self._boton_exportar.update()
 
@@ -1534,17 +1536,8 @@ class PantallaClientes(ft.Container):
                 ),
             ],
         )
-        self._boton_exportar = boton(
-            texto=(
-                f"Exportar seleccionados ({len(self.clientes_seleccionados)})"
-                if self.clientes_seleccionados
-                else "Exportar"
-            ),
-            icono=ft.Icons.DOWNLOAD_OUTLINED,
-            tipo="secundario",
-            width=230 if self.clientes_seleccionados else 150,
-            height=44,
-            border_color="#C9DDF7",
+        self._boton_exportar = boton_exportacion(
+            texto=self._texto_boton_exportar(),
             on_click=self.alternar_menu_exportacion,
         )
         self._texto_resumen_exportacion = ft.Text(
@@ -1554,7 +1547,7 @@ class PantallaClientes(ft.Container):
         )
         self._menu_exportacion = menu_exportacion(
             descripcion=self._texto_resumen_exportacion,
-            on_pdf=self.cerrar_menu_exportacion,
+            on_pdf=self._exportar_clientes_pdf,
             on_excel=self._exportar_clientes_excel,
             descripcion_pdf="Genera un archivo PDF en el directorio de clientes.",
             descripcion_excel="Descarga un archivo Excel con los datos de clientes.",
@@ -1718,16 +1711,23 @@ class PantallaClientes(ft.Container):
         if self.clientes_seleccionados:
             return "Elige un formato para exportar los clientes seleccionados."
 
-        filtros_activos = any(
-            self.filtros_seleccionados.get(grupo)
-            for grupo in ("tipos_persona", "estados", "tipos_cliente")
-        ) or any(
-            self.filtros_seleccionados.get(campo)
-            for campo in ("fecha_desde", "fecha_hasta")
-        )
-        if self.busqueda.strip() or filtros_activos:
+        if self._hay_filtros_exportacion():
             return "Elige un formato para exportar los clientes filtrados."
         return "Elige un formato para exportar los clientes encontrados."
+
+    def _hay_filtros_exportacion(self):
+        return bool(
+            self.busqueda.strip()
+            or self.controlador.contar_filtros(self.filtros_seleccionados)
+        )
+
+    def _texto_boton_exportar(self):
+        if self.clientes_seleccionados:
+            cantidad = len(self.clientes_seleccionados)
+            return f"Exportar seleccionados ({cantidad})"
+        if self._hay_filtros_exportacion():
+            return "Exportar filtrados"
+        return "Exportar"
 
     async def _exportar_clientes_excel(self, e=None):
         self.cerrar_menu_exportacion()
@@ -1765,5 +1765,75 @@ class PantallaClientes(ft.Container):
             mostrar_notificacion(
                 self._page,
                 f"No se pudieron exportar los clientes: {error}",
+                COLOR_ROJO,
+            )
+
+    async def _exportar_clientes_pdf(self, e=None):
+        self.cerrar_menu_exportacion()
+        try:
+            seleccionados = (
+                list(self.clientes_seleccionados.values())
+                if self.clientes_seleccionados
+                else None
+            )
+            filas, _ = self.controlador.obtener_datos_exportacion(
+                clientes_seleccionados=seleccionados,
+                texto=self.busqueda,
+                filtros=self.filtros_seleccionados,
+            )
+            if seleccionados is not None:
+                etiqueta_registros = f"Clientes seleccionados: {len(filas)}"
+                nombre_archivo = "clientes_seleccionados.pdf"
+            elif self._hay_filtros_exportacion():
+                etiqueta_registros = f"Clientes filtrados: {len(filas)}"
+                nombre_archivo = "clientes_filtrados.pdf"
+            else:
+                etiqueta_registros = f"Clientes registrados: {len(filas)}"
+                nombre_archivo = "clientes.pdf"
+
+            activos = sum(fila["estado"] == "Activo" for fila in filas)
+            metricas = {
+                "Clientes incluidos": len(filas),
+                "Activos": activos,
+                "Inactivos": len(filas) - activos,
+            }
+            guardado = await exportar_pdf(
+                self._page,
+                filas,
+                self.controlador.COLUMNAS_PDF,
+                nombre_archivo,
+                titulo="Directorio de clientes",
+                subtitulo="Gestión de clientes",
+                etiqueta_registros=etiqueta_registros,
+                metricas=metricas,
+                orientacion="landscape",
+                proporciones_columnas=(
+                    0.14,
+                    0.10,
+                    0.10,
+                    0.13,
+                    0.09,
+                    0.14,
+                    0.08,
+                    0.10,
+                    0.12,
+                ),
+                columnas_centradas=(
+                    "Tipo de persona",
+                    "Estado",
+                    "Tipo de cliente",
+                ),
+                nombre_registro="clientes",
+            )
+            if guardado:
+                mostrar_notificacion(
+                    self._page,
+                    f"Se exportaron {len(filas)} clientes a PDF.",
+                    COLOR_VERDE,
+                )
+        except Exception as error:
+            mostrar_notificacion(
+                self._page,
+                f"No se pudieron exportar los clientes a PDF: {error}",
                 COLOR_ROJO,
             )

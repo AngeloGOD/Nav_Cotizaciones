@@ -20,6 +20,17 @@ class ControladorClientes:
         "Estado": "estado",
         "Tipo de cliente": "tipo_cliente",
     }
+    COLUMNAS_PDF = {
+        "Cliente": "razon_social",
+        "RFC": "rfc",
+        "Tipo de persona": "tipo_persona",
+        "Dirección": "direccion",
+        "Teléfono": "telefono",
+        "Correo electrónico": "correo_elect",
+        "Estado": "estado",
+        "Tipo de cliente": "tipo_cliente",
+        "Fecha de registro": "creado_en",
+    }
 
     def __init__(self, servicio_cliente):
         self.servicio_cliente = servicio_cliente
@@ -211,7 +222,9 @@ class ControladorClientes:
                 "razon_social": cliente.razon_social,
                 "creado_en": cliente.creado_en,
                 "rfc": cliente.rfc,
-                "tipo_persona": cliente.tipo_persona,
+                "tipo_persona": self._etiqueta_tipo_persona(
+                    cliente.tipo_persona
+                ),
                 "direccion": cliente.direccion,
                 "telefono": cliente.telefono,
                 "correo_elect": cliente.correo_elect,
@@ -223,6 +236,17 @@ class ControladorClientes:
             for cliente in clientes
         ]
         return filas, self.COLUMNAS_EXPORTACION
+
+    @staticmethod
+    def _etiqueta_tipo_persona(tipo_persona):
+        valor = getattr(tipo_persona, "value", tipo_persona)
+        etiquetas = {
+            "FISICA": "Persona física",
+            "FÍSICA": "Persona física",
+            "MORAL": "Persona moral",
+            "EXTRANJERO": "Persona extranjera",
+        }
+        return etiquetas.get(str(valor).strip().upper(), valor)
 
     def obtener_pagina(self, pagina, limite=10):
         return self.servicio_cliente.obtener_pagina(pagina, limite)

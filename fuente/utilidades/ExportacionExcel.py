@@ -9,18 +9,11 @@ from openpyxl import Workbook
 from openpyxl.styles import Alignment, Font, PatternFill
 from openpyxl.utils import get_column_letter
 
+from fuente.utilidades.Colores import COLOR_BLANCO, COLOR_SIDEBAR
+from fuente.utilidades.ExportacionArchivos import obtener_selector_archivos
+
 
 ValorColumna = str | Callable[[Any], object]
-
-
-def obtener_selector_archivos(page: ft.Page) -> ft.FilePicker:
-    for servicio in page.services:
-        if isinstance(servicio, ft.FilePicker):
-            return servicio
-
-    selector = ft.FilePicker()
-    page.services.append(selector)
-    return selector
 
 
 def crear_excel(
@@ -41,8 +34,11 @@ def crear_excel(
     hoja.title = nombre_hoja
     hoja.freeze_panes = "A2"
 
-    encabezado = Font(bold=True, color="FFFFFF")
-    fondo_encabezado = PatternFill("solid", fgColor="168A59")
+    encabezado = Font(bold=True, color=COLOR_BLANCO.lstrip("#"))
+    fondo_encabezado = PatternFill(
+        "solid",
+        fgColor=COLOR_SIDEBAR.lstrip("#"),
+    )
     for indice, titulo in enumerate(columnas, start=1):
         celda = hoja.cell(row=1, column=indice, value=titulo)
         celda.font = encabezado

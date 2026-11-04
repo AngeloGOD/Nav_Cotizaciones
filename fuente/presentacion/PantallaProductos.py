@@ -60,7 +60,6 @@ class PantallaProductos(ft.Container):
         self.build_ui()
 
     # ---------------------------------------------------------
-<<<<<<< HEAD
     # DATOS DE PRUEBA
     # ---------------------------------------------------------
     def _demo(self):
@@ -193,8 +192,6 @@ class PantallaProductos(ft.Container):
         ]
 
     # ---------------------------------------------------------
-=======
->>>>>>> bbc7f5adebd06e2a482e05f347fc79eb38acee23
     # BUSQUEDA Y FILTROS
     # ---------------------------------------------------------
     def _crear_busqueda(self):

@@ -1,6 +1,5 @@
 import flet as ft
 from fuente.utilidades.Colores import COLOR_NARANJA, COLOR_BLANCO, COLOR_GRIS
-from fuente.presentacion.PantallaNuevoServicio import PantallaNuevoServicio
 
 COLOR_AZUL_OSCURO = "#0d1b2a" 
 COLOR_FONDO_TABLA = "#f8f9fa"
@@ -204,9 +203,7 @@ class PantallaServicios(ft.Container):
         # Guardar la vista de la tabla actual en memoria
         self.vista_catalogo = self.content 
         
-        # Cargar el nuevo formulario pasándole la referencia actual (self)
-        self.content = PantallaNuevoServicio(vista_anterior=self)
-        self.update()
+
 
     # --- LÓGICA DE EVENTOS ---
     def alternar_menu_exportacion(self, e=None):

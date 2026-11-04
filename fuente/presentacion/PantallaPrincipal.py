@@ -80,7 +80,7 @@ class PantallaPrincipal(ft.Container):
             self.content_area.content = PantallaProductos(
                 self.main_page
             )
-        elif ruta == "ruta_Servicios":
+        elif ruta == "ruta_servicios":
             self.content_area.content = PantallaServicios(
                 self.main_page
                         )

@@ -4,15 +4,22 @@ from fuente.utilidades.Colores import *
 
 from fuente.utilidades.Componentes import (
     banner_modulo,
+    agregar_panel_flotante,
+    boton_exportacion,
     boton_vista,
     card,
     fila_producto,
     menu_exportacion,
+    mostrar_notificacion,
     panel_filtros,
+    quitar_panel_flotante,
     seccion_opciones_filtro,
     sombra_suave,
     tarjeta_producto,
 )
+from fuente.utilidades.ExportacionExcel import exportar_excel
+from fuente.utilidades.ExportacionPDF import exportar_pdf
+from fuente.negocio.controlador.ControladorProductos import ControladorProductos
 from fuente.presentacion.PantallaRegistrarProducto import PantallaRegistrarProducto
 
 
@@ -21,10 +28,8 @@ class PantallaProductos(ft.Container):
         super().__init__(expand=True, bgcolor=COLOR_FONDO)
 
         self._page = page
-        self.productos = [
-            self._normalizar(p)
-            for p in (productos if productos is not None else self._demo())
-        ]
+        self.controlador = ControladorProductos(productos)
+        self.productos = self.controlador.productos
 
         self.pagina_actual = 1
         self.registros_por_pagina = 8
@@ -55,6 +60,7 @@ class PantallaProductos(ft.Container):
         self.build_ui()
 
     # ---------------------------------------------------------
+<<<<<<< HEAD
     # DATOS DE PRUEBA
     # ---------------------------------------------------------
     def _demo(self):
@@ -187,6 +193,8 @@ class PantallaProductos(ft.Container):
         ]
 
     # ---------------------------------------------------------
+=======
+>>>>>>> bbc7f5adebd06e2a482e05f347fc79eb38acee23
     # BUSQUEDA Y FILTROS
     # ---------------------------------------------------------
     def _crear_busqueda(self):
@@ -343,46 +351,10 @@ class PantallaProductos(ft.Container):
         self._actualizar_resultados()
 
     def _filtrar_productos(self):
-        texto = self.busqueda.strip().casefold()
-        resultado = []
-
-        for p in self.productos:
-            buscar_en = " ".join(
-                str(p.get(c, "")) for c in ("nombre", "sku")
-            ).casefold()
-
-            if texto and texto not in buscar_en:
-                continue
-
-            if (
-                self.filtros_seleccionados["categoria"] != "todas"
-                and p["categoria"] != self.filtros_seleccionados["categoria"]
-            ):
-                continue
-
-            if (
-                self.filtros_seleccionados["unidad_medida"] != "todas"
-                and p["unidad_medida"]
-                != self.filtros_seleccionados["unidad_medida"]
-            ):
-                continue
-
-            filtros_booleanos = (
-                ("activo", "activo"),
-                ("es_perecedero", "es_perecedero"),
-                ("requiere_refrigeracion", "requiere_refrigeracion"),
-            )
-            if any(
-                self.filtros_seleccionados[filtro]
-                and ("si" if bool(p[campo]) else "no")
-                not in self.filtros_seleccionados[filtro]
-                for filtro, campo in filtros_booleanos
-            ):
-                continue
-
-            resultado.append(p)
-
-        return resultado
+        return self.controlador.obtener_productos_filtrados(
+            self.busqueda,
+            self.filtros_seleccionados,
+        )
 
     # ---------------------------------------------------------
     # ENCABEZADO Y HERRAMIENTAS
@@ -428,28 +400,9 @@ class PantallaProductos(ft.Container):
             size=14,
             color=COLOR_AZUL,
         )
-        self._boton_exportar = ft.OutlinedButton(
-            content=ft.Row(
-                tight=True,
-                spacing=7,
-                alignment=ft.MainAxisAlignment.CENTER,
-                controls=[
-                    ft.Icon(
-                        ft.Icons.DOWNLOAD_OUTLINED,
-                        size=18,
-                        color=COLOR_AZUL,
-                    ),
-                    self._texto_boton_exportar,
-                ],
-            ),
-            width=145,
-            height=44,
+        self._boton_exportar = boton_exportacion(
+            texto=self._texto_boton_exportar,
             on_click=self.alternar_menu_exportacion,
-            style=ft.ButtonStyle(
-                color=COLOR_AZUL,
-                side=ft.BorderSide(1, "#C7DAFF"),
-                shape=ft.RoundedRectangleBorder(radius=9),
-            ),
         )
         boton_exportar = ft.GestureDetector(
             on_tap_down=self._marcar_clic_en_boton_menu,
@@ -464,8 +417,8 @@ class PantallaProductos(ft.Container):
         )
         self._menu_exportacion = menu_exportacion(
             descripcion=self._texto_resumen_exportacion,
-            on_pdf=lambda e: self._informar_exportacion("PDF"),
-            on_excel=lambda e: self._informar_exportacion("Excel"),
+            on_pdf=self._exportar_productos_pdf,
+            on_excel=self._exportar_productos_excel,
             descripcion_pdf="Genera un archivo PDF del catálogo de productos.",
             descripcion_excel="Descarga una hoja de cálculo de los productos.",
             top=210,
@@ -523,7 +476,7 @@ class PantallaProductos(ft.Container):
                     "categoria",
                     "Categoría / Subtipo",
                     ft.Icons.CATEGORY_OUTLINED,
-                    self._opciones("categoria"),
+                    self.controlador.obtener_opciones_filtro("categoria"),
                     self.filtros_seleccionados["categoria"],
                 ),
                 ft.Divider(height=1, color="#E2EDF9"),
@@ -531,7 +484,7 @@ class PantallaProductos(ft.Container):
                     "unidad_medida",
                     "Unidad de medida base",
                     ft.Icons.SCALE_OUTLINED,
-                    self._opciones("unidad_medida"),
+                    self.controlador.obtener_opciones_filtro("unidad_medida"),
                     self.filtros_seleccionados["unidad_medida"],
                 ),
                 ft.Divider(height=1, color="#E2EDF9"),
@@ -567,12 +520,12 @@ class PantallaProductos(ft.Container):
             on_limpiar=self.limpiar_filtros,
             on_aplicar=self.aplicar_filtros,
             on_cerrar=self.cerrar_filtros,
-            top=218,
-            right=324,
+            top=210,
+            right=310,
             width=340,
             height=405,
         )
-        self._layout_principal.controls.append(self._panel_filtros)
+        agregar_panel_flotante(self._contenido, self._panel_filtros)
         self._panel_filtros_abierto = True
         if self.page is not None:
             self.update()
@@ -648,8 +601,7 @@ class PantallaProductos(ft.Container):
     def cerrar_filtros(self, e=None):
         if not self._panel_filtros_abierto:
             return
-        if self._panel_filtros in self._layout_principal.controls:
-            self._layout_principal.controls.remove(self._panel_filtros)
+        quitar_panel_flotante(self._contenido, self._panel_filtros)
         self._panel_filtros_abierto = False
         if self.page is not None:
             self.update()
@@ -695,31 +647,79 @@ class PantallaProductos(ft.Container):
         self._texto_boton_exportar.value = (
             "Exportar filtrados" if filtrados else "Exportar"
         )
-        self._boton_exportar.width = 190 if filtrados else 145
 
     def _descripcion_exportacion(self):
         if self._hay_filtros_exportacion():
             return "Elige un formato para exportar los productos filtrados."
         return "Elige un formato para exportar los productos del catálogo."
 
-    def _informar_exportacion(self, formato):
+    async def _exportar_productos_excel(self, e=None):
         self.cerrar_menu_exportacion()
-        self._page.show_dialog(
-            ft.AlertDialog(
-                modal=True,
-                title=ft.Text("Exportación no disponible"),
-                content=ft.Text(
-                    f"La exportación de productos a {formato} todavía "
-                    "no está conectada."
-                ),
-                actions=[
-                    ft.TextButton(
-                        "Aceptar",
-                        on_click=lambda e: self._page.pop_dialog(),
-                    )
-                ],
+        try:
+            productos, columnas = self.controlador.obtener_datos_exportacion(
+                self._filtrar_productos()
             )
-        )
+            guardado = await exportar_excel(
+                self._page,
+                productos,
+                columnas,
+                "productos.xlsx",
+                nombre_hoja="Productos",
+            )
+            if guardado:
+                mostrar_notificacion(
+                    self._page,
+                    f"Se exportaron {len(productos)} productos a Excel.",
+                    COLOR_VERDE,
+                )
+        except Exception as error:
+            mostrar_notificacion(
+                self._page,
+                f"No se pudieron exportar los productos: {error}",
+                COLOR_ROJO,
+            )
+
+    async def _exportar_productos_pdf(self, e=None):
+        self.cerrar_menu_exportacion()
+        try:
+            filas, _ = self.controlador.obtener_datos_exportacion(
+                self._filtrar_productos()
+            )
+            activos = sum(fila["estado"] == "Activo" for fila in filas)
+            guardado = await exportar_pdf(
+                self._page,
+                filas,
+                self.controlador.COLUMNAS_PDF,
+                "productos.pdf",
+                titulo="Catálogo de productos",
+                subtitulo="Gestión de productos",
+                etiqueta_registros=f"Productos exportados: {len(filas)}",
+                metricas={
+                    "Productos": len(filas),
+                    "Activos": activos,
+                    "Inactivos": len(filas) - activos,
+                },
+                orientacion="landscape",
+                columnas_centradas=(
+                    "Categoría",
+                    "Estado",
+                    "Perecedero",
+                    "Requiere refrigeración",
+                ),
+                nombre_registro="productos",
+            )
+            if guardado:
+                mostrar_notificacion(
+                    self._page,
+                    f"Se exportaron {len(filas)} productos a PDF.",
+                    COLOR_VERDE,
+                )
+        except Exception as error:
+            mostrar_notificacion(
+                self._page,
+                f"No se pudieron exportar los productos a PDF: {error}",
+                COLOR_ROJO,
+            )
 
     def _con_cierre_de_menus(self, accion):
         def ejecutar(*args, **kwargs):
@@ -1009,6 +1009,7 @@ class PantallaProductos(ft.Container):
         self.content = PantallaRegistrarProducto(
             page=self._page,
             vista_anterior=self,
+            controlador=self.controlador,
         )
 
         self.update()

@@ -37,6 +37,48 @@ def sombra_suave():
     )
 
 
+def boton_exportacion(texto, on_click, width=None, height=44):
+    etiqueta = (
+        texto
+        if isinstance(texto, ft.Text)
+        else ft.Text(texto, size=14, color=COLOR_AZUL, max_lines=1)
+    )
+    return ft.OutlinedButton(
+        width=width,
+        height=height,
+        content=ft.Row(
+            tight=True,
+            spacing=7,
+            alignment=ft.MainAxisAlignment.CENTER,
+            controls=[
+                ft.Icon(
+                    ft.Icons.DOWNLOAD_OUTLINED,
+                    size=18,
+                    color=COLOR_AZUL,
+                ),
+                etiqueta,
+            ],
+        ),
+        style=ft.ButtonStyle(
+            color=COLOR_AZUL,
+            side=ft.BorderSide(1, "#C9DDF7"),
+            shape=ft.RoundedRectangleBorder(radius=9),
+            padding=ft.Padding(14, 0, 14, 0),
+        ),
+        on_click=on_click,
+    )
+
+
+def agregar_panel_flotante(contenedor, panel):
+    if panel not in contenedor.controls:
+        contenedor.controls.append(panel)
+
+
+def quitar_panel_flotante(contenedor, panel):
+    if panel in contenedor.controls:
+        contenedor.controls.remove(panel)
+
+
 def menu_exportacion(
     descripcion,
     on_pdf,

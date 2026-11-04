@@ -22,7 +22,6 @@ class PantallaNuevaCotizacion(ft.Container):
         self.chk_ganancia = ft.Checkbox(label="Ganancia (%)", value=True, on_change=self.toggle_columnas, active_color=ft.Colors.BLUE_600)
         self.chk_iva = ft.Checkbox(label="IVA (%)", value=True, on_change=self.toggle_columnas, active_color=ft.Colors.BLUE_600)
         
-        
         self.switch_cliente = ft.Switch(value=False, on_change=self.toggle_vista_cliente, active_color=COLOR_NARANJA)
 
         self.input_activo_fecha = None 
@@ -88,7 +87,6 @@ class PantallaNuevaCotizacion(ft.Container):
         )
 
     def panel_izquierdo(self):
-        
         boton_cancelar = ft.Container(
             content=ft.Row([ft.Icon(ft.Icons.CHEVRON_LEFT, size=18, color=COLOR_GRIS), ft.Text("Cancelar", color=COLOR_GRIS, weight=ft.FontWeight.W_600, size=13)], spacing=4, alignment=ft.MainAxisAlignment.CENTER),
             padding=ft.Padding(10, 8, 15, 8), border=self.crear_borde_completo(1, ft.Colors.GREY_300), border_radius=6, ink=True,
@@ -139,13 +137,13 @@ class PantallaNuevaCotizacion(ft.Container):
                     padding=20,
                     content=ft.Column([
                         ft.Row([
-                            self.crear_input("Nombre del Buque *", "Ej. MV Ocean Star", ft.Icons.DIRECTIONS_BOAT_OUTLINED, ), 
+                            self.crear_input("Nombre del Buque *", "Ej. MV Ocean Star", ft.Icons.DIRECTIONS_BOAT_OUTLINED), 
                             self.crear_input_fecha("ETA (Fecha y hora) *", "25/10/2026", ft.Icons.CALENDAR_TODAY_OUTLINED), 
                             self.crear_dropdown("Cliente *", "ABC Logística S.A. de C.V.", ft.Icons.PERSON_OUTLINE, ["ABC Logística S.A. de C.V.", "Maersk Line"])
                         ], spacing=20),
                         ft.Row([
                             self.crear_dropdown("Tipo de Operación *", "Importación", ft.Icons.SWAP_HORIZ, ["Importación", "Exportación", "Transbordo"]), 
-                            self.crear_dropdown("Puerto de Destino *", "Manzanillo, Colima", ft.Icons.LOCATION_ON_OUTLINED, ["Manzanillo, Colima", "Lázaro Cárdenas", "Veracruz"]), 
+                            self.crear_input_fecha("ETA (Fecha y hora) *", "25/10/2026", ft.Icons.CALENDAR_TODAY_OUTLINED), 
                             self.crear_dropdown("Moneda *", "MXN - Peso Mexicano", ft.Icons.ATTACH_MONEY, ["MXN - Peso Mexicano", "USD - Dólar Americano"])
                         ], spacing=20),
                         ft.Row([
@@ -174,6 +172,17 @@ class PantallaNuevaCotizacion(ft.Container):
             ]
         )
         
+        boton_calcular = ft.Container(
+            content=ft.Row([
+                ft.Icon(ft.Icons.CALCULATE_OUTLINED, color=COLOR_BLANCO, size=16),
+                ft.Text("Calcular Tarifas", color=COLOR_BLANCO, weight=ft.FontWeight.W_600, size=13)
+            ], spacing=5),
+            bgcolor=COLOR_NARANJA,
+            padding=ft.Padding(15, 5, 15, 5),
+            border_radius=6,
+            ink=True,
+            on_click=self.abrir_modal_calculos 
+        )
         
         contenedor_tabla_con_scroll = ft.Row(
             scroll=ft.ScrollMode.ADAPTIVE,
@@ -197,7 +206,7 @@ class PantallaNuevaCotizacion(ft.Container):
                     bgcolor=COLOR_BLANCO, padding=ft.Padding(20, 15, 20, 15), border=ft.Border(bottom=ft.BorderSide(1, ft.Colors.GREY_100)),
                     content=ft.Row([
                         ft.Row([self.crear_indicador_numero("2", ft.Colors.BLUE_600), ft.Column([ft.Text("Productos y servicios cotizados", weight=ft.FontWeight.BOLD, size=15, color=COLOR_AZUL_OSCURO), ft.Text("Agrega los productos y servicios que serán incluidos en esta cotización.", size=11, color=COLOR_GRIS)], spacing=0)], spacing=15),
-                        ft.Row([boton_agregar_menu], alignment=ft.MainAxisAlignment.END)
+                        ft.Row([boton_agregar_menu, boton_calcular], alignment=ft.MainAxisAlignment.END, spacing=10)
                     ], alignment=ft.MainAxisAlignment.SPACE_BETWEEN)
                 ),
                 ft.Container(
@@ -242,7 +251,7 @@ class PantallaNuevaCotizacion(ft.Container):
         self.update()
 
     def mostrar_dialogo_columna(self, e):
-        print("¡Clic en agregar nueva columna! Preparando Pop-up...")
+        print("¡Clic en agregar nueva columna.")
 
     def toggle_vista_cliente(self, e):
         es_vista = e.control.value
@@ -354,3 +363,149 @@ class PantallaNuevaCotizacion(ft.Container):
         ])
         
         return fila
+
+   
+    def abrir_modal_calculos(self, e):
+        trb = "42,500"
+        eslora = "180.00 m"
+        calado = "9.50 m"
+        
+       
+        def crear_fila_modal(icono, concepto, tarifa, cant, subtotal):
+            return ft.Container(
+                border=ft.Border(bottom=ft.BorderSide(1, ft.Colors.GREY_100)),
+                padding=ft.Padding(0, 8, 0, 8),
+                content=ft.Row([
+                    ft.Container(expand=3, content=ft.Row([ft.Icon(icono, size=16, color=COLOR_GRIS), ft.Text(concepto, size=13)])),
+                    ft.Container(expand=2, content=ft.Text(tarifa, size=13)),
+                    
+                    ft.Container(expand=2, content=ft.TextField(value=cant, height=28, content_padding=0, text_size=12, text_align=ft.TextAlign.CENTER, border_color=ft.Colors.GREY_300, border_radius=4)),
+                    ft.Container(expand=2, content=ft.Text(subtotal, size=13, weight=ft.FontWeight.BOLD, color=COLOR_AZUL_OSCURO)),
+                ])
+            )
+
+        tabla_tarifas = ft.Column([
+            ft.Row([
+                ft.Container(expand=3, content=ft.Text("Concepto", size=12, weight=ft.FontWeight.BOLD, color=COLOR_AZUL_OSCURO)),
+                ft.Container(expand=2, content=ft.Text("Tarifa", size=12, weight=ft.FontWeight.BOLD, color=COLOR_AZUL_OSCURO)),
+                ft.Container(expand=2, content=ft.Text("Cant.", size=12, weight=ft.FontWeight.BOLD, color=COLOR_AZUL_OSCURO)),
+                ft.Container(expand=2, content=ft.Text("Subtotal", size=12, weight=ft.FontWeight.BOLD, color=COLOR_AZUL_OSCURO)),
+            ]),
+            ft.Divider(height=10, color=ft.Colors.GREY_200),
+            crear_fila_modal(ft.Icons.DIRECTIONS_BOAT_OUTLINED, "Lanchaje", "$120.00", "1", "$120.00"),
+            crear_fila_modal(ft.Icons.VERIFIED_USER_OUTLINED, "Practicaje", "$250.00", "1", "$250.00"),
+            crear_fila_modal(ft.Icons.ANCHOR, "Amarre", "$180.00", "1", "$180.00"),
+        ], spacing=0)
+
+        # 2. CONTENEDOR MAESTRO
+        contenido_modal = ft.Container(
+            width=650, 
+            bgcolor=COLOR_BLANCO,
+            border_radius=10,
+            clip_behavior=ft.ClipBehavior.HARD_EDGE,
+            content=ft.Column([
+                
+                
+                ft.Container(
+                    image=ft.DecorationImage(src="assets/fondo_menulateral.jpg", fit="cover"), 
+                    content=ft.Container(
+                        
+                        bgcolor="#CC0d1b2a", 
+                        padding=ft.Padding(25, 25, 25, 25),
+                        content=ft.Row([
+                            ft.Container(
+                                content=ft.Icon(ft.Icons.ANCHOR, color=COLOR_BLANCO, size=24),
+                                bgcolor=COLOR_NARANJA, padding=10, border_radius=8
+                            ),
+                            ft.Column([
+                                ft.Text("Cálculo de Tarifas Portuarias", size=22, weight=ft.FontWeight.BOLD, color=COLOR_BLANCO),
+                                ft.Text("Desglose automático basado en las dimensiones del buque.", size=13, color="white70")
+                            ], spacing=2)
+                        ], spacing=15)
+                    )
+                ),
+                
+                # --- CUERPO DEL POP-UP ---
+                ft.Container(
+                    padding=ft.Padding(25, 15, 25, 25),
+                    content=ft.Column([
+                        # Ficha técnica
+                        ft.Container(
+                            bgcolor=ft.Colors.BLUE_50,
+                            border=ft.Border(top=ft.BorderSide(1, ft.Colors.BLUE_100), bottom=ft.BorderSide(1, ft.Colors.BLUE_100), left=ft.BorderSide(1, ft.Colors.BLUE_100), right=ft.BorderSide(1, ft.Colors.BLUE_100)),
+                            border_radius=8,
+                            padding=15,
+                            content=ft.Column([
+                                ft.Row([
+                                    ft.Icon(ft.Icons.DIRECTIONS_BOAT, color=ft.Colors.BLUE_700, size=20),
+                                    ft.Column([
+                                        ft.Text("MV Ocean Star", weight=ft.FontWeight.BOLD, size=15, color=COLOR_AZUL_OSCURO),
+                                        ft.Text("Buque de Carga General", size=12, color=COLOR_GRIS)
+                                    ], spacing=0)
+                                ], spacing=10),
+                                ft.Divider(height=15, color=ft.Colors.BLUE_100),
+                                ft.Row([
+                                    ft.Column([ft.Text("TRB", size=11, color=COLOR_GRIS), ft.Text(trb, weight=ft.FontWeight.BOLD, size=14, color=COLOR_AZUL_OSCURO)]),
+                                    ft.Column([ft.Text("Eslora", size=11, color=COLOR_GRIS), ft.Text(eslora, weight=ft.FontWeight.BOLD, size=14, color=COLOR_AZUL_OSCURO)]),
+                                    ft.Column([ft.Text("Calado", size=11, color=COLOR_GRIS), ft.Text(calado, weight=ft.FontWeight.BOLD, size=14, color=COLOR_AZUL_OSCURO)]),
+                                    ft.Column([
+                                        ft.Text("Estadía (Horas)", size=11, color=COLOR_GRIS), 
+                                        ft.TextField(value="72", prefix_icon=ft.Icons.ACCESS_TIME, width=110, height=36, content_padding=0, text_size=13, text_align=ft.TextAlign.CENTER, border_color=ft.Colors.BLUE_400, border_radius=6)
+                                    ])
+                                ], alignment=ft.MainAxisAlignment.SPACE_BETWEEN)
+                            ])
+                        ),
+                        
+                        ft.Container(height=5),
+                        
+                        # Título de tabla
+                        ft.Row([
+                            ft.Row([ft.Icon(ft.Icons.RECEIPT_LONG_OUTLINED, color=COLOR_AZUL_OSCURO, size=18), ft.Text("Tarifas Calculadas", size=14, weight=ft.FontWeight.BOLD, color=COLOR_AZUL_OSCURO)]),
+                            ft.Container(content=ft.Row([ft.Icon(ft.Icons.CHECK_CIRCLE, color=ft.Colors.GREEN_600, size=14), ft.Text("Tarifas actualizadas", size=11, color=ft.Colors.GREEN_700)], spacing=4), bgcolor=ft.Colors.GREEN_50, padding=ft.Padding(8, 4, 8, 4), border_radius=12)
+                        ], alignment=ft.MainAxisAlignment.SPACE_BETWEEN),
+                        
+                        # TABLA
+                        tabla_tarifas,
+                        
+                        # Barra de Totales
+                        ft.Container(
+                            padding=ft.Padding(15, 12, 15, 12),
+                            bgcolor=ft.Colors.ORANGE_50,
+                            border_radius=6,
+                            content=ft.Row([
+                                ft.Row([ft.Icon(ft.Icons.MONETIZATION_ON_OUTLINED, color=COLOR_NARANJA, size=20), ft.Text("Total de Tarifas Portuarias", size=14, weight=ft.FontWeight.BOLD, color=COLOR_AZUL_OSCURO)]),
+                                ft.Text("$ 550.00 USD", size=18, weight=ft.FontWeight.W_900, color=COLOR_NARANJA)
+                            ], alignment=ft.MainAxisAlignment.SPACE_BETWEEN)
+                        ),
+                        
+                        # BOTÓN APLICAR
+                        ft.Container(
+                            content=ft.Row([
+                                ft.Icon(ft.Icons.CHECK, color=COLOR_BLANCO, size=18),
+                                ft.Text("Aplicar a Cotización", color=COLOR_BLANCO, weight=ft.FontWeight.BOLD, size=15)
+                            ], alignment=ft.MainAxisAlignment.CENTER),
+                            bgcolor=COLOR_NARANJA,
+                            padding=12,
+                            border_radius=6,
+                            ink=True,
+                            on_click=lambda e: self.cerrar_modal_y_aplicar(e, modal)
+                        )
+                    ], spacing=10, tight=True, scroll=ft.ScrollMode.ADAPTIVE)
+                )
+            ], spacing=0)
+        )
+
+        modal = ft.AlertDialog(
+            shape=ft.RoundedRectangleBorder(radius=10),
+            content_padding=0, 
+            title_padding=0,   
+            content=contenido_modal
+        )
+        
+        e.page.overlay.append(modal)
+        modal.open = True
+        e.page.update()
+
+    def cerrar_modal_y_aplicar(self, e, modal):
+        modal.open = False
+        e.page.update()

@@ -1,12 +1,17 @@
 from decimal import Decimal
 
 from fuente.negocio.modelo.Buque import Buque
-from fuente.negocio.modelo.ENUMs import CategoriaBuque
+from fuente.negocio.servicio.ServicioCategoriaBuque import ServicioCategoriaBuque
 
 
 class ControladorBuque:
-    def __init__(self, servicio_buque):
+    def __init__(self, servicio_buque, servicio_categoria_buque=None):
         self.servicio_buque = servicio_buque
+        self.servicio_categoria_buque = (
+            servicio_categoria_buque
+            if servicio_categoria_buque is not None
+            else ServicioCategoriaBuque(servicio_buque.uow)
+        )
 
     @staticmethod
     def _texto_o_none(valor):
@@ -19,24 +24,34 @@ class ControladorBuque:
             return None
         return Decimal(str(valor).strip())
 
-    def registrar_buque(self, nombre, categoria_buque, trb_arqueo_bruto,
+    def obtener_categorias_buque(self, no_pagina=1, limite=10, filtros=None):
+        return self.servicio_categoria_buque.obtener_pagina(
+            no_pagina, limite=limite, filtros=filtros or {}
+        )
+
+    def buscar_categorias_buque(self, termino="", limite=10):
+        termino = (termino or "").strip()
+        filtros = {"nombre": termino} if termino else {}
+        return self.servicio_categoria_buque.obtener_pagina(
+            1, limite=limite, filtros=filtros
+        )
+
+    def registrar_buque(self, nombre, categoria_buque_id, trb_arqueo_bruto,
                         eslora_metros, cliente_id=None, numero_imo=None,
                         subtipo_descripcion=None, calado_metros=None,
                         propulsores_proa_popa=False, es_autopropulsado=True,
                         bandera_pais=None, activo=True):
-        if isinstance(categoria_buque, str):
-            categoria_buque = CategoriaBuque(categoria_buque.strip().upper())
-
         cliente_id_val = int(str(cliente_id).strip()) if self._texto_o_none(cliente_id) else None
+        categoria_id_val = int(str(categoria_buque_id).strip())
         buque = Buque(
             cliente_id=cliente_id_val,
             nombre=str(nombre).strip(),
             numero_imo=self._texto_o_none(numero_imo),
-            categoria_buque=categoria_buque,
+            categoria_buque_id=categoria_id_val,
             subtipo_descripcion=self._texto_o_none(subtipo_descripcion),
-            trb_arqueo_bruto=Decimal(str(trb_arqueo_bruto).strip()),
-            eslora_metros=Decimal(str(eslora_metros).strip()),
-            calado_metros=self._decimal_o_none(calado_metros),
+            trb=Decimal(str(trb_arqueo_bruto).strip()),
+            eslora=Decimal(str(eslora_metros).strip()),
+            calado=self._decimal_o_none(calado_metros),
             propulsores_proa_popa=bool(propulsores_proa_popa),
             es_autopropulsado=bool(es_autopropulsado),
             bandera_pais=self._texto_o_none(bandera_pais),
@@ -56,21 +71,22 @@ class ControladorBuque:
             no_pagina=pagina, limite=limite, filtros=filtros or {}, texto=texto or ""
         )
 
-    def modificar_buque(self, buque, nombre, categoria_buque, trb_arqueo_bruto,
+    def modificar_buque(self, buque, nombre, categoria_buque_id, trb_arqueo_bruto,
                         eslora_metros, cliente_id=None, numero_imo=None,
                         subtipo_descripcion=None, calado_metros=None,
                         propulsores_proa_popa=False, es_autopropulsado=True,
                         bandera_pais=None, activo=True):
-        if isinstance(categoria_buque, str):
-            categoria_buque = CategoriaBuque(categoria_buque.strip().upper())
+        categoria_id_val = int(str(categoria_buque_id).strip())
         buque.cliente_id = int(str(cliente_id).strip()) if self._texto_o_none(cliente_id) else None
         buque.nombre = str(nombre).strip()
         buque.numero_imo = self._texto_o_none(numero_imo)
-        buque.categoria_buque = categoria_buque
+        buque.categoria_buque_id = categoria_id_val
+        if self.servicio_categoria_buque is not None:
+            buque.categoria_buque = self.servicio_categoria_buque.buscar_por_id(categoria_id_val)
         buque.subtipo_descripcion = self._texto_o_none(subtipo_descripcion)
-        buque.trb_arqueo_bruto = Decimal(str(trb_arqueo_bruto).strip())
-        buque.eslora_metros = Decimal(str(eslora_metros).strip())
-        buque.calado_metros = self._decimal_o_none(calado_metros)
+        buque.trb = Decimal(str(trb_arqueo_bruto).strip())
+        buque.eslora = Decimal(str(eslora_metros).strip())
+        buque.calado = self._decimal_o_none(calado_metros)
         buque.propulsores_proa_popa = bool(propulsores_proa_popa)
         buque.es_autopropulsado = bool(es_autopropulsado)
         buque.bandera_pais = self._texto_o_none(bandera_pais)

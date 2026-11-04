@@ -3,15 +3,18 @@ from fuente.negocio.controlador.ControladorBuque import ControladorBuque
 
 class ControladorRegistrarBuques:
 
-    def __init__(self, servicio_buque):
-        self.controlador_buque = ControladorBuque(servicio_buque)
+    def __init__(self, servicio_buque, servicio_categoria_buque=None):
+        self.controlador_buque = ControladorBuque(
+            servicio_buque,
+            servicio_categoria_buque=servicio_categoria_buque,
+        )
 
     def obtener_datos(self, pantalla):
         return {
             "nombre": (pantalla.nombre.value or "").strip(),
             "numero_imo": (pantalla.numero_imo.value or "").strip(),
             "cliente_id": pantalla.cliente_busqueda.cliente_id_seleccionado,
-            "categoria_buque": (pantalla.categoria_buque.value or "").strip(),
+            "categoria_buque_id": pantalla.categoria_buque.categoria_buque_id_seleccionada,
             "subtipo_descripcion": (pantalla.subtipo_descripcion.value or "").strip(),
             "bandera_pais": (pantalla.bandera_pais.value or "").strip(),
             "trb_arqueo_bruto": (pantalla.trb_arqueo_bruto.value or "").strip(),
@@ -25,7 +28,7 @@ class ControladorRegistrarBuques:
     def validar_datos(self, datos):
         if not datos["nombre"]:
             return False, "El nombre del buque es obligatorio."
-        if not datos["categoria_buque"]:
+        if not datos["categoria_buque_id"]:
             return False, "Selecciona la categoría del buque."
         if not datos["trb_arqueo_bruto"]:
             return False, "El arqueo bruto es obligatorio."

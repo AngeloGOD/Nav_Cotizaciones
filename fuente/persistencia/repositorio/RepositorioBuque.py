@@ -1,11 +1,11 @@
 from decimal import Decimal, InvalidOperation
 
-from sqlalchemy import String, and_, cast, delete, func, or_, select, update
+from sqlalchemy import and_, delete, func, or_, select, update
 from sqlalchemy.orm import selectinload
 from sqlalchemy.orm.session import Session
 
 from fuente.negocio.modelo.Buque import Buque
-from fuente.negocio.modelo.ENUMs import CategoriaBuque
+from fuente.negocio.modelo.CategoriaBuque import CategoriaBuque
 from fuente.persistencia.repositorio.Repositorio import Repositorio
 
 
@@ -36,22 +36,32 @@ class RepositorioBuque(Repositorio):
                 Buque.numero_imo.ilike(patron),
                 Buque.bandera_pais.ilike(patron),
                 Buque.subtipo_descripcion.ilike(patron),
-                cast(Buque.categoria_buque, String).ilike(patron),
+                Buque.categoria_buque.has(CategoriaBuque.categoria.ilike(patron)),
             ))
 
         categorias = filtros.get("categorias") or []
         if categorias:
-            categorias_enum = []
+            categorias_ids = []
+            categorias_nombres = []
             for categoria in categorias:
-                if isinstance(categoria, CategoriaBuque):
-                    categorias_enum.append(categoria)
-                else:
-                    try:
-                        categorias_enum.append(CategoriaBuque(str(categoria).strip().upper()))
-                    except (ValueError, TypeError):
-                        continue
-            if categorias_enum:
-                condiciones.append(Buque.categoria_buque.in_(categorias_enum))
+                if isinstance(categoria, CategoriaBuque) and categoria.id is not None:
+                    categorias_ids.append(int(categoria.id))
+                elif isinstance(categoria, int) or (isinstance(categoria, str) and categoria.strip().isdigit()):
+                    categorias_ids.append(int(str(categoria).strip()))
+                elif isinstance(categoria, str) and categoria.strip():
+                    categorias_nombres.append(categoria.strip().upper())
+
+            condiciones_cat = []
+            if categorias_ids:
+                condiciones_cat.append(Buque.categoria_buque_id.in_(categorias_ids))
+            if categorias_nombres:
+                condiciones_cat.append(
+                    Buque.categoria_buque.has(
+                        func.upper(CategoriaBuque.categoria).in_(categorias_nombres)
+                    )
+                )
+            if condiciones_cat:
+                condiciones.append(or_(*condiciones_cat))
 
         banderas = {
             str(p).strip().casefold()
@@ -74,9 +84,9 @@ class RepositorioBuque(Repositorio):
             condiciones.append(Buque.activo.is_(next(iter(estados)) == "ACTIVO"))
 
         for clave_min, clave_max, columna in (
-            ("trb_min", "trb_max", Buque.trb_arqueo_bruto),
-            ("eslora_min", "eslora_max", Buque.eslora_metros),
-            ("calado_min", "calado_max", Buque.calado_metros),
+            ("trb_min", "trb_max", Buque.trb),
+            ("eslora_min", "eslora_max", Buque.eslora),
+            ("calado_min", "calado_max", Buque.calado),
         ):
             minimo = self._decimal_o_none(filtros.get(clave_min))
             maximo = self._decimal_o_none(filtros.get(clave_max))
@@ -87,7 +97,10 @@ class RepositorioBuque(Repositorio):
         return condiciones
 
     def consultar_pagina(self, desplazamiento, limite, filtros=None, texto=""):
-        stmt = select(Buque).options(selectinload(Buque.cliente))
+        stmt = select(Buque).options(
+            selectinload(Buque.cliente),
+            selectinload(Buque.categoria_buque),
+        )
         condiciones = self._construir_condiciones(texto=texto, filtros=filtros)
         if condiciones:
             stmt = stmt.where(and_(*condiciones))
@@ -106,14 +119,18 @@ class RepositorioBuque(Repositorio):
 
     def modificar(self, buque: Buque):
         stmt = update(Buque).where(Buque.id == buque.id).values(
-            cliente_id=buque.cliente_id, nombre=buque.nombre,
-            numero_imo=buque.numero_imo, categoria_buque=buque.categoria_buque,
+            cliente_id=buque.cliente_id,
+            nombre=buque.nombre,
+            numero_imo=buque.numero_imo,
+            categoria_buque_id=buque.categoria_buque_id,
             subtipo_descripcion=buque.subtipo_descripcion,
-            trb_arqueo_bruto=buque.trb_arqueo_bruto, eslora_metros=buque.eslora_metros,
-            calado_metros=buque.calado_metros,
+            trb=buque.trb,
+            eslora=buque.eslora,
+            calado=buque.calado,
             propulsores_proa_popa=buque.propulsores_proa_popa,
             es_autopropulsado=buque.es_autopropulsado,
-            bandera_pais=buque.bandera_pais, activo=buque.activo,
+            bandera_pais=buque.bandera_pais,
+            activo=buque.activo,
         )
         self.sesion.execute(stmt)
 
@@ -121,11 +138,25 @@ class RepositorioBuque(Repositorio):
         self.sesion.execute(delete(Buque).where(Buque.id == buque.id))
 
     def buscar_por_id(self, id: int):
-        stmt = select(Buque).options(selectinload(Buque.cliente)).where(Buque.id == id)
+        stmt = (
+            select(Buque)
+            .options(
+                selectinload(Buque.cliente),
+                selectinload(Buque.categoria_buque),
+            )
+            .where(Buque.id == id)
+        )
         return self.sesion.scalars(stmt).first()
 
     def buscar_por_nombre(self, nombre: str):
-        stmt = (select(Buque).options(selectinload(Buque.cliente))
-                .where(Buque.nombre.ilike(f"%{nombre}%"))
-                .order_by(Buque.id).limit(10))
+        stmt = (
+            select(Buque)
+            .options(
+                selectinload(Buque.cliente),
+                selectinload(Buque.categoria_buque),
+            )
+            .where(Buque.nombre.ilike(f"%{nombre}%"))
+            .order_by(Buque.id)
+            .limit(10)
+        )
         return self.sesion.scalars(stmt).all()

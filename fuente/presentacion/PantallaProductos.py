@@ -1,4 +1,4 @@
-
+﻿
 import flet as ft
 from fuente.utilidades.Colores import *
 
@@ -110,13 +110,18 @@ class PantallaProductos(ft.Container):
                 "descripcion": getattr(concepto, "descripcion", ""),
                 "categoria": getattr(
                     categoria,
-                    "nombre_categoria",
-                    getattr(categoria, "value", "Otros productos"),
+                    "nombre",
+                    getattr(
+                        categoria,
+                        "nombre_categoria",
+                        getattr(categoria, "value", "Otros productos"),
+                    ),
                 ),
                 "unidad_medida": getattr(producto, "unidad_medida", "Unidad"),
                 "imagen": getattr(producto, "imagen", ""),
                 "sku": (
-                    getattr(producto, "sku_interno", None)
+                    getattr(producto, "sku", None)
+                    or getattr(producto, "sku_interno", None)
                     or getattr(concepto, "codigo", "")
                 ),
                 "activo": getattr(concepto, "activo", True),
@@ -133,8 +138,12 @@ class PantallaProductos(ft.Container):
         if not isinstance(categoria, str):
             categoria = getattr(
                 categoria,
-                "nombre_categoria",
-                getattr(categoria, "value", "Otros productos"),
+                "nombre",
+                getattr(
+                    categoria,
+                    "nombre_categoria",
+                    getattr(categoria, "value", "Otros productos"),
+                ),
             )
 
         unidad = datos.get("unidad_medida") or datos.get("unidad") or "Unidad"

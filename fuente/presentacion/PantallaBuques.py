@@ -4,13 +4,21 @@ import flet as ft
 from fuente.utilidades.Colores import *
 from fuente.utilidades.Componentes import *
 from fuente.negocio.controlador.ControladorBuque import ControladorBuque
+from fuente.negocio.servicio.ServicioCategoriaBuque import ServicioCategoriaBuque
 from fuente.presentacion.PantallaRegistrarBuque import PantallaRegistrarBuque
 from fuente.presentacion.SelectorCliente import SelectorCliente
+from fuente.presentacion.SelectorCategoriaBuque import SelectorCategoriaBuque
 from fuente.infraestructura.servicios_externos.ServicioPaises import ServicioPaises
 
 
 class PantallaBuques(ft.Container):
-    def __init__(self, page: ft.Page, servicio_buque, servicio_cliente):
+    def __init__(
+        self,
+        page: ft.Page,
+        servicio_buque,
+        servicio_cliente,
+        servicio_categoria_buque=None,
+    ):
         super().__init__(
             expand=True,
             bgcolor=COLOR_FONDO,
@@ -19,7 +27,15 @@ class PantallaBuques(ft.Container):
         self._page = page
         self.servicio_buque = servicio_buque
         self.servicio_cliente = servicio_cliente
-        self.controlador = ControladorBuque(servicio_buque)
+        self.servicio_categoria_buque = (
+            servicio_categoria_buque
+            if servicio_categoria_buque is not None
+            else ServicioCategoriaBuque(servicio_buque.uow)
+        )
+        self.controlador = ControladorBuque(
+            servicio_buque,
+            servicio_categoria_buque=self.servicio_categoria_buque,
+        )
         self.pagina_actual = 1
         self.registros_por_pagina = 10
         self.total_buques = 0
@@ -332,6 +348,19 @@ class PantallaBuques(ft.Container):
             contenedor.visible = termino in nombre.casefold()
         self._lista_banderas_filtro.update()
 
+    def _obtener_opciones_categorias_filtro(self):
+        try:
+            categorias = self.controlador.obtener_categorias_buque(1, limite=50)
+            if categorias:
+                return [(int(c.id), c.categoria) for c in categorias]
+        except Exception:
+            pass
+        return [
+            ("COMERCIAL", "Comercial"), ("TURISTICO", "Turístico"),
+            ("PESQUERO", "Pesquero"), ("PETROLERO", "Petrolero"),
+            ("RO_RO", "Ro-Ro"), ("RECREO_MENOR", "Recreo / Menor"),
+        ]
+
     def _crear_panel_filtros(self):
         cantidad = self._contar_filtros()
         resumen = (
@@ -343,11 +372,11 @@ class PantallaBuques(ft.Container):
         self._panel_filtros, self._texto_resumen_filtros_control = panel_filtros(
             titulo="Filtrar buques",
             secciones=[
-                self._seccion_checks_filtro("Categoría del buque", "categorias", [
-                    ("COMERCIAL", "Comercial"), ("TURISTICO", "Turístico"),
-                    ("PESQUERO", "Pesquero"), ("PETROLERO", "Petrolero"),
-                    ("RO_RO", "Ro-Ro"), ("RECREO_MENOR", "Recreo / Menor"),
-                ]),
+                self._seccion_checks_filtro(
+                    "Categoría del buque",
+                    "categorias",
+                    self._obtener_opciones_categorias_filtro(),
+                ),
                 ft.Divider(height=1, color="#E2EDF9"),
                 self._seccion_rango_filtro("Arqueo bruto (TRB)", "trb", "TRB"),
                 ft.Divider(height=1, color="#E2EDF9"),
@@ -435,6 +464,7 @@ class PantallaBuques(ft.Container):
             self.servicio_buque,
             self.servicio_cliente,
             vista_anterior=self,
+            servicio_categoria_buque=self.servicio_categoria_buque,
         )
         self.update()
 
@@ -539,11 +569,14 @@ class PantallaBuques(ft.Container):
         buque = self.buque_en_detalle
         self.campos_ficha_buque = {}
 
-        categoria = getattr(buque, "categoria_buque", "")
+        categoria_obj = getattr(buque, "categoria_buque", None)
         categoria = (
-            categoria.value
-            if hasattr(categoria, "value")
-            else str(categoria or "")
+            getattr(categoria_obj, "categoria", None)
+            or (
+                categoria_obj.value
+                if hasattr(categoria_obj, "value")
+                else str(categoria_obj or "")
+            )
         )
 
         identificacion = ft.Column(
@@ -702,21 +735,31 @@ class PantallaBuques(ft.Container):
 
         if self.modo_edicion_buque:
             selector_cliente = self.campos_ficha_buque.get("cliente_id")
+            selector_categoria = self.campos_ficha_buque.get("categoria_buque")
 
+            capas = [contenido]
             if selector_cliente:
+                capas.append(
+                    ft.Container(
+                        top=205,
+                        left=14,
+                        width=330,
+                        content=selector_cliente.contenido_resultados,
+                    )
+                )
+            if selector_categoria and hasattr(selector_categoria, "contenido_resultados"):
+                capas.append(
+                    ft.Container(
+                        top=332,
+                        left=14,
+                        width=330,
+                        content=selector_categoria.contenido_resultados,
+                    )
+                )
+            if len(capas) > 1:
                 return ft.Stack(
                     clip_behavior=ft.ClipBehavior.NONE,
-                    controls=[
-                        contenido,
-
-                        # Desplegable alineado con el campo Cliente asignado.
-                        ft.Container(
-                            top=205,
-                            left=14,
-                            width=330,
-                            content=selector_cliente.contenido_resultados,
-                        ),
-                    ],
+                    controls=capas,
                 )
 
         return contenido
@@ -738,26 +781,11 @@ class PantallaBuques(ft.Container):
                 self.campos_ficha_buque[nombre] = control
                 return campo_detalle(etiqueta, control, expand=expand)
             elif tipo_categoria:
-                valor_actual = str(valor or "").upper()
-                control = ft.Dropdown(
-                    value=valor_actual or None,
-                    options=[
-                        ft.DropdownOption(key="COMERCIAL", text="Comercial"),
-                        ft.DropdownOption(key="TURISTICO", text="Turístico"),
-                        ft.DropdownOption(key="PESQUERO", text="Pesquero"),
-                        ft.DropdownOption(key="PETROLERO", text="Petrolero"),
-                        ft.DropdownOption(key="RO_RO", text="Ro-Ro"),
-                        ft.DropdownOption(key="RECREO_MENOR", text="Recreo / Menor"),
-                    ],
-                    height=44,
-                    text_size=14,
-                    content_padding=ft.Padding(12, 8, 12, 8),
-                    border=ft.InputBorder.OUTLINE,
-                    border_color=COLOR_GRIS_CLARO,
-                    focused_border_color=COLOR_NARANJA,
-                    border_radius=9,
-                )
+                control = SelectorCategoriaBuque(self.servicio_categoria_buque, height=44)
+                categoria_obj = getattr(self.buque_en_detalle, "categoria_buque", None)
+                control.establecer_categoria(categoria_obj)
                 self.campos_ficha_buque[nombre] = control
+                return campo_detalle(etiqueta, control, expand=expand)
             elif nombre == "bandera_pais":
                 try:
                     paises = ServicioPaises.obtener_paises()
@@ -845,7 +873,9 @@ class PantallaBuques(ft.Container):
                     "RO_RO": "Ro-Ro",
                     "RECREO_MENOR": "Recreo / Menor",
                 }
-                texto = etiquetas.get(str(valor or "").upper(), valor or "—")
+                categoria_obj = getattr(self.buque_en_detalle, "categoria_buque", None)
+                nombre_cat = getattr(categoria_obj, "categoria", None) or valor
+                texto = etiquetas.get(str(nombre_cat or "").upper(), nombre_cat or "—")
             else:
                 texto = valor if valor not in (None, "") else "—"
             control = ft.Text(
@@ -996,11 +1026,15 @@ class PantallaBuques(ft.Container):
     def guardar_cambios_buque(self, e):
         campos = self.campos_ficha_buque
         nombre = (campos["nombre"].value or "").strip()
-        categoria = (campos["categoria_buque"].value or "").strip()
+        categoria_buque_id = getattr(
+            campos["categoria_buque"],
+            "categoria_buque_id_seleccionada",
+            None,
+        )
         trb = (campos["trb_arqueo_bruto"].value or "").strip()
         eslora = (campos["eslora_metros"].value or "").strip()
 
-        if not nombre or not categoria or not trb or not eslora:
+        if not nombre or not categoria_buque_id or not trb or not eslora:
             self._mostrar_notificacion(
                 "El nombre, la categoría, el arqueo bruto y la eslora son obligatorios.",
                 COLOR_ROJO,
@@ -1013,7 +1047,7 @@ class PantallaBuques(ft.Container):
             self.controlador.modificar_buque(
                 buque=self.buque_en_detalle,
                 nombre=nombre,
-                categoria_buque=categoria,
+                categoria_buque_id=categoria_buque_id,
                 trb_arqueo_bruto=trb,
                 eslora_metros=eslora,
                 cliente_id=cliente_id,
@@ -1374,14 +1408,18 @@ class PantallaBuques(ft.Container):
                 ],
             )
 
+            categoria_obj = getattr(buque, "categoria_buque", None)
             valor_cat = (
-                buque.categoria_buque.value
-                if hasattr(buque.categoria_buque, "value")
-                else str(buque.categoria_buque or "")
+                getattr(categoria_obj, "categoria", None)
+                or (
+                    categoria_obj.value
+                    if hasattr(categoria_obj, "value")
+                    else str(categoria_obj or "")
+                )
             )
 
             texto_cat = etiquetas_categoria.get(
-                valor_cat.upper(),
+                str(valor_cat).upper(),
                 valor_cat or "N/A",
             )
 

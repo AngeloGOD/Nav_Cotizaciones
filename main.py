@@ -8,14 +8,27 @@ from fuente.persistencia.uow.UnitOFWork import AlchemyUnitOfWork
 from fuente.negocio.modelo.Base import Base
 from fuente.negocio.modelo.Cliente import Cliente
 from fuente.negocio.modelo.Usuario import Usuario
+from fuente.negocio.modelo.Proveedor import Proveedor
+from fuente.negocio.modelo.CategoriaPDA import CategoriaPDA
+from fuente.negocio.modelo.CategoriaProducto import CategoriaProducto
+from fuente.negocio.modelo.CategoriaBuque import CategoriaBuque
 from fuente.negocio.modelo.Buque import Buque
-from fuente.negocio.modelo.CategoriaProductos import CategoriaProductos
-from fuente.negocio.modelo.CategoriaServicios import CategServicios
-from fuente.negocio.modelo.Concepto import Concepto
+from fuente.negocio.modelo.Concepto import Concepto, concepto_proveedor
 from fuente.negocio.modelo.Producto import Producto
-from fuente.negocio.modelo.Servicio import Servicio
+from fuente.negocio.modelo.Servicio import (
+    Servicio,
+    ServicioCuotaFija,
+    ServicioFactorUnitario,
+    ServicioLinealMixto,
+    ServicioFactorCompuesto,
+    ServicioRango,
+    Rango,
+    ServicioIncremental,
+    Tramo,
+)
 from fuente.negocio.servicio.ServicioCliente import ServicioCliente
 from fuente.negocio.servicio.ServicioBuque import ServicioBuque
+from fuente.negocio.servicio.ServicioCategoriaBuque import ServicioCategoriaBuque
 from fuente.negocio.servicio.ServicioProducto import ServicioProducto
 from fuente.infraestructura.servicios_externos.ServicioPaises import ServicioPaises
 
@@ -28,7 +41,7 @@ IMAGENES_ESTATICAS = (
 )
 
 
-def main(page: ft.Page, servicio_cliente, servicio_buque):
+def main(page: ft.Page, servicio_cliente, servicio_buque, servicio_categoria_buque=None):
     page.bgcolor = COLOR_FONDO
     page.padding = 0
     page.spacing = 0
@@ -61,6 +74,7 @@ def main(page: ft.Page, servicio_cliente, servicio_buque):
                                 page,
                                 servicio_cliente,
                                 servicio_buque,
+                                servicio_categoria_buque=servicio_categoria_buque,
                             ),
                         )
                     ],
@@ -99,11 +113,11 @@ def run():
         'cliente_id': 1,
         'nombre': "Santa María",
         'numero_imo': "9876543",
-        'categoria_buque': "COMERCIAL",
+        'categoria_buque_id': 1,
         'subtipo_descripcion': "Buque de Carga General",
-        'trb_arqueo_bruto': Decimal('2100.00'),
-        'eslora_metros': Decimal('120.50'),
-        'calado_metros': Decimal('7.80'),
+        'trb': Decimal('2100.00'),
+        'eslora': Decimal('120.50'),
+        'calado': Decimal('7.80'),
         'propulsores_proa_popa': False,
         'es_autopropulsado': True,
         'bandera_pais': "México",
@@ -126,6 +140,7 @@ def run():
 
     serv_cliente = ServicioCliente(uow=uow)
     serv_buque = ServicioBuque(uow=uow)
+    serv_categoria_buque = ServicioCategoriaBuque(uow=uow)
     servicio_producto = ServicioProducto(uow=uow)
 
     # serv_buque.registrar_buque(Buque(**datos_buque))
@@ -139,7 +154,7 @@ def run():
     # serv_cliente.registrar_cliente(cliente=Cliente(**args))
     # A partir de aquí se puede inyectar el uow al servicio
 
-    ft.run(lambda page: main(page, serv_cliente, serv_buque))
+    ft.run(lambda page: main(page, serv_cliente, serv_buque, serv_categoria_buque))
 
 
 if __name__ == "__main__":

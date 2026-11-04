@@ -11,7 +11,13 @@ from fuente.utilidades.Colores import COLOR_FONDO
 
 
 class PantallaPrincipal(ft.Container):
-    def __init__(self, page: ft.Page, servicio_cliente, servicio_buque):
+    def __init__(
+        self,
+        page: ft.Page,
+        servicio_cliente,
+        servicio_buque,
+        servicio_categoria_buque=None,
+    ):
         super().__init__(
             expand=True,
             bgcolor=COLOR_FONDO,
@@ -21,6 +27,7 @@ class PantallaPrincipal(ft.Container):
         self.main_page = page
         self.servicio_cliente = servicio_cliente
         self.servicio_buque = servicio_buque
+        self.servicio_categoria_buque = servicio_categoria_buque
 
         self.content_area = ft.Container(
             expand=True,
@@ -62,6 +69,7 @@ class PantallaPrincipal(ft.Container):
                 self.main_page,
                 self.servicio_buque,
                 self.servicio_cliente,
+                servicio_categoria_buque=self.servicio_categoria_buque,
             )
         elif ruta == "ruta_cotizaciones":
             self.content_area.content = PantallaCotizaciones(

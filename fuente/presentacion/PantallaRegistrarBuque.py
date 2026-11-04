@@ -3,14 +3,16 @@ import flet as ft
 from fuente.utilidades.Colores import *
 from fuente.utilidades.Componentes import *
 from fuente.negocio.controlador.ControladorRegistrarBuques import ControladorRegistrarBuques
+from fuente.negocio.servicio.ServicioCategoriaBuque import ServicioCategoriaBuque
 from fuente.infraestructura.servicios_externos.ServicioPaises import ServicioPaises
 from fuente.presentacion.SelectorCliente import SelectorCliente
+from fuente.presentacion.SelectorCategoriaBuque import SelectorCategoriaBuque
 
 
 class PantallaRegistrarBuque(ft.Container):
     def __init__(
         self, page: ft.Page, servicio_buque, servicio_cliente,
-        vista_anterior=None, buque_a_editar=None
+        vista_anterior=None, buque_a_editar=None, servicio_categoria_buque=None
     ):
         super().__init__(
             expand=True,
@@ -21,7 +23,15 @@ class PantallaRegistrarBuque(ft.Container):
         self.vista_anterior = vista_anterior
         self.servicio_buque = servicio_buque
         self.servicio_cliente = servicio_cliente
-        self.controlador = ControladorRegistrarBuques(servicio_buque)
+        self.servicio_categoria_buque = (
+            servicio_categoria_buque
+            if servicio_categoria_buque is not None
+            else ServicioCategoriaBuque(servicio_buque.uow)
+        )
+        self.controlador = ControladorRegistrarBuques(
+            servicio_buque,
+            servicio_categoria_buque=self.servicio_categoria_buque,
+        )
         self.buque_a_editar = buque_a_editar
         self.modo_edicion = buque_a_editar is not None
         self.nombre = self._crear_campo_etiquetado(
@@ -87,23 +97,7 @@ class PantallaRegistrarBuque(ft.Container):
             icono=ft.Icons.DESCRIPTION_OUTLINED,
         )
 
-        self.categoria_buque = ft.Dropdown(
-            hint_text="Categoría del buque *",
-            leading_icon=ft.Icons.CATEGORY_OUTLINED,
-            border=ft.InputBorder.OUTLINE,
-            border_color=COLOR_GRIS_CLARO,
-            focused_border_color=COLOR_NARANJA,
-            border_radius=9,
-            text_size=14,
-            options=[
-                ft.DropdownOption(key="COMERCIAL", text="Comercial (Carga general, portacontenedores, granelero)"),
-                ft.DropdownOption(key="TURISTICO", text="Turístico (Cruceros)"),
-                ft.DropdownOption(key="PESQUERO", text="Pesquero (Atuneros, camaroneros, etc.)"),
-                ft.DropdownOption(key="PETROLERO", text="Petrolero (Tanqueros, gaseros, petroquímicos)"),
-                ft.DropdownOption(key="RO_RO", text="Ro-Ro (Roll On - Roll Off)"),
-                ft.DropdownOption(key="RECREO_MENOR", text="Recreo y Embarcación Menor (Yates, veleros)"),
-            ],
-        )
+        self.categoria_buque = SelectorCategoriaBuque(self.servicio_categoria_buque)
 
         # Campos numéricos para especificaciones técnicas
         self.trb_arqueo_bruto = self._crear_campo_etiquetado(
@@ -155,16 +149,13 @@ class PantallaRegistrarBuque(ft.Container):
                     key=pais_actual, text=f"🌐  {pais_actual} (valor anterior)"
                 )
                 self._opciones_paises_bandera.append(opcion_anterior)
-                self.bandera_pais.options.append(opcion_anterior)
             self.bandera_pais.value = pais_actual or ""
             self.subtipo_descripcion.value = (
                 self.buque_a_editar.subtipo_descripcion or ""
             )
 
-            categoria = self.buque_a_editar.categoria_buque
-            self.categoria_buque.value = (
-                categoria.value if hasattr(categoria, "value") else str(categoria)
-            ) if categoria else None
+            categoria_obj = getattr(self.buque_a_editar, "categoria_buque", None)
+            self.categoria_buque.establecer_categoria(categoria_obj)
 
             self.trb_arqueo_bruto.value = str(
                 self.buque_a_editar.trb_arqueo_bruto or ""
@@ -487,6 +478,24 @@ class PantallaRegistrarBuque(ft.Container):
                                     expand=True,
                                     content=self.cliente_busqueda.contenido_resultados,
                                 ),
+                            ],
+                        ),
+                    ),
+
+                    # Desplegable de categorías de buque por encima del formulario
+                    ft.Container(
+                        top=166,
+                        left=0,
+                        right=0,
+                        content=ft.Row(
+                            spacing=14,
+                            controls=[
+                                ft.Container(
+                                    expand=True,
+                                    content=self.categoria_buque.contenido_resultados,
+                                ),
+                                ft.Container(expand=True),
+                                ft.Container(expand=True),
                             ],
                         ),
                     ),

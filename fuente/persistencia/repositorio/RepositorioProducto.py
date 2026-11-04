@@ -1,7 +1,10 @@
+from sqlalchemy import select
+from sqlalchemy.orm import selectinload
 from sqlalchemy.orm.session import Session
+
 from fuente.negocio.modelo.Producto import Producto
 from fuente.persistencia.repositorio.Repositorio import Repositorio
-from sqlalchemy import select
+
 
 class RepositorioProducto(Repositorio):
 
@@ -10,11 +13,15 @@ class RepositorioProducto(Repositorio):
 
     def insertar(self, producto: Producto):
         self.sesion.add(producto)
-    
+
     def consultar_pagina(self, desplazamiento, limite, filtros: dict = {}):
         stmt = (
             select(Producto)
-            .order_by(Producto.id_producto)
+            .options(
+                selectinload(Producto.categoria_producto),
+                selectinload(Producto.categoria_pda),
+            )
+            .order_by(Producto.id)
             .limit(limite)
             .offset(desplazamiento)
         )

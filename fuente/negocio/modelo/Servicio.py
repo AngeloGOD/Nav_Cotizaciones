@@ -1,92 +1,234 @@
-from datetime import date
-
-
-from fuente.negocio.modelo.ENUMs import CategoriaBuque, EstadoCargaContenedor, TipoConcepto, TipoEntidadProveedora, TipoModificador
-from fuente.negocio.modelo.Base import Base
-from sqlalchemy.orm import mapped_column, relationship
-from sqlalchemy.orm import Mapped
-from sqlalchemy import Boolean, Date, Integer, String, CheckConstraint, Numeric, ForeignKey
+from __future__ import annotations
 from decimal import Decimal
-
+from typing import TYPE_CHECKING
+from sqlalchemy import (
+    CheckConstraint,
+    Enum as SqlEnum,
+    ForeignKey,
+    Integer,
+    Numeric,
+    text,
+)
+from sqlalchemy.orm import Mapped, mapped_column, relationship
+from fuente.negocio.modelo.Base import Base
+from fuente.negocio.modelo.CategoriaBuque import CategoriaBuque
 from fuente.negocio.modelo.Concepto import Concepto
-from fuente.negocio.modelo.ENUMs import ArquetipoCalculo, VariableMedida
+from fuente.negocio.modelo.ENUMs import TipoConcepto, VariableMedida
 
-class Proveedor(Base):
-    __tablename__ = "proveedor"
 
-    id: Mapped[int] = mapped_column(primary_key=True)
-    nombre: Mapped[str] = mapped_column(String(200))
-    tipo_entidad: Mapped[TipoEntidadProveedora]
-    rfc: Mapped[str | None] = mapped_column(String(20))
-    porcentaje_anticipo_exigido: Mapped[Decimal] = mapped_column(Numeric(5, 2), default=Decimal("100.00"))
-    dias_plazo_liquidacion: Mapped[int] = mapped_column(Integer, default=3)
-    servicios: Mapped[list["Servicio"]] = relationship(back_populates="proveedor")
-
-    
 class Servicio(Concepto):
-    """Subtipo B: Servicios portuarios (ASIPONA, Prestadores, Derechos y Agencia)."""
+    """Nivel 1 (Rama B): Subtipo intermedio 'servicio'."""
     __tablename__ = "servicio"
 
-    concepto_id: Mapped[int] = mapped_column(ForeignKey("concepto.id", ondelete="CASCADE"), primary_key=True)
-    proveedor_id: Mapped[int] = mapped_column(ForeignKey("proveedor.id"))
-    arquetipo_calculo: Mapped[ArquetipoCalculo]
-    variable_primaria: Mapped[VariableMedida]
-    variable_secundaria: Mapped[VariableMedida | None]  # Nullable si solo usa una variable
-    minimo_unidades: Mapped[Decimal] = mapped_column(Numeric(12, 2), default=Decimal("0.00"))
-    divisor_bloque_redondeo: Mapped[Decimal] = mapped_column(Numeric(10, 2), default=Decimal("1.00"))
-    duracion_base_minutos: Mapped[int | None] = mapped_column(Integer)
-    oficio_referencia: Mapped[str | None] = mapped_column(String(100))
-    proveedor: Mapped["Proveedor"] = relationship(back_populates="servicios")
-    tarifas_base: Mapped[list["TarifaBaseServicio"]] = relationship(
-        back_populates="servicio", cascade="all, delete-orphan"
+    id: Mapped[int] = mapped_column(
+        ForeignKey("concepto.id", ondelete="CASCADE"),
+        primary_key=True,
     )
-    reglas_modificadoras: Mapped[list["ReglaModificadorServicio"]] = relationship(
-        back_populates="servicio", cascade="all, delete-orphan"
+    categoria_buque_id: Mapped[int | None] = mapped_column(
+        ForeignKey("categoria_buque.id", ondelete="RESTRICT"),
+        nullable=True,
     )
+
+    categoria_buque: Mapped["CategoriaBuque | None"] = relationship(
+        back_populates="servicios"
+    )
+
+
+class ServicioCuotaFija(Servicio):
+    """Nivel 2.A: Servicio de Cuota Fija."""
+    __tablename__ = "servicio_cuota_fija"
+
+    id: Mapped[int] = mapped_column(
+        ForeignKey("servicio.id", ondelete="CASCADE"),
+        primary_key=True,
+    )
+    cuota: Mapped[Decimal] = mapped_column(Numeric(12, 2), nullable=False)
+
+    __table_args__ = (
+        CheckConstraint("cuota >= 0", name="chk_servicio_cuota_fija_cuota"),
+    )
+
     __mapper_args__ = {
-        "polymorphic_identity": TipoConcepto.SERVICIO,
+        "polymorphic_identity": TipoConcepto.SERVICIO_CUOTA_FIJA,
     }
 
-class TarifaBaseServicio(Base):
-    __tablename__ = "tarifa_base_servicio"
 
-    id: Mapped[int] = mapped_column(primary_key=True)
-    servicio_id: Mapped[int] = mapped_column(ForeignKey("servicio.concepto_id", ondelete="CASCADE"))
-    categoria_buque_aplicable: Mapped[CategoriaBuque | None]  # None = Aplica a todos los buques
-    estado_carga: Mapped[EstadoCargaContenedor | None]
-    cuota_fija_mxn: Mapped[Decimal] = mapped_column(Numeric(12, 2), default=Decimal("0.00"))
-    factor_unitario_mxn: Mapped[Decimal] = mapped_column(Numeric(12, 4), default=Decimal("0.0000"))
-    vigencia_desde: Mapped[date] = mapped_column(Date)
-    vigencia_hasta: Mapped[date | None] = mapped_column(Date)
-    activo: Mapped[bool] = mapped_column(Boolean, default=True) 
-    servicio: Mapped["Servicio"] = relationship(back_populates="tarifas_base")
-    rangos_tramos: Mapped[list["TarifaRangoTramo"]] = relationship(
-        back_populates="tarifa_base", cascade="all, delete-orphan", order_by="TarifaRangoTramo.numero_orden"
+class ServicioFactorUnitario(Servicio):
+    """Nivel 2.B: Servicio de Factor Unitario (Padre de Lineal Mixto y Factor Compuesto)."""
+    __tablename__ = "servicio_factor_unitario"
+
+    id: Mapped[int] = mapped_column(
+        ForeignKey("servicio.id", ondelete="CASCADE"),
+        primary_key=True,
+    )
+    variable_primaria: Mapped[VariableMedida] = mapped_column(
+        SqlEnum(VariableMedida, name="variable_medida_enum", native_enum=True),
+        nullable=False,
+    )
+    factor_mxn: Mapped[Decimal] = mapped_column(Numeric(12, 4), nullable=False)
+    unidades_minimas: Mapped[Decimal] = mapped_column(
+        Numeric(12, 2),
+        nullable=False,
+        default=Decimal("0.00"),
+        server_default=text("0.00"),
     )
 
-class TarifaRangoTramo(Base):
-    __tablename__ = "tarifa_rango_tramo"
+    __table_args__ = (
+        CheckConstraint("factor_mxn >= 0", name="chk_servicio_factor_unitario_factor"),
+        CheckConstraint("unidades_minimas >= 0", name="chk_servicio_factor_unitario_minimas"),
+    )
 
-    id: Mapped[int] = mapped_column(primary_key=True)
-    tarifa_base_id: Mapped[int] = mapped_column(ForeignKey("tarifa_base_servicio.id", ondelete="CASCADE"))
-    numero_orden: Mapped[int] = mapped_column(Integer)
-    limite_inferior: Mapped[Decimal] = mapped_column(Numeric(12, 2))
-    limite_superior: Mapped[Decimal | None] = mapped_column(Numeric(12, 2))  # None = "en adelante"
-    cuota_mxn: Mapped[Decimal] = mapped_column(Numeric(12, 2))
-    tarifa_base: Mapped["TarifaBaseServicio"] = relationship(back_populates="rangos_tramos")
+    __mapper_args__ = {
+        "polymorphic_identity": TipoConcepto.SERVICIO_FACTOR_UNITARIO,
+    }
 
-class ReglaModificadorServicio(Base):
-    __tablename__ = "regla_modificador_servicio"
 
-    id: Mapped[int] = mapped_column(primary_key=True)
-    servicio_id: Mapped[int] = mapped_column(ForeignKey("servicio.concepto_id", ondelete="CASCADE"))
-    codigo_regla: Mapped[str] = mapped_column(String(50))
-    nombre_regla: Mapped[str] = mapped_column(String(200))
-    fundamento_legal: Mapped[str | None] = mapped_column(String(100))
-    tipo_modificador: Mapped[TipoModificador]
-    factor_multiplicador: Mapped[Decimal | None] = mapped_column(Numeric(6, 4))
-    monto_fijo_mxn: Mapped[Decimal | None] = mapped_column(Numeric(12, 2))
-    minutos_tolerancia: Mapped[int] = mapped_column(Integer, default=0)
-    minutos_bloque: Mapped[int | None] = mapped_column(Integer)
-    aplicacion_automatica: Mapped[bool] = mapped_column(Boolean, default=False)
-    servicio: Mapped["Servicio"] = relationship(back_populates="reglas_modificadoras")
+class ServicioLinealMixto(ServicioFactorUnitario):
+    """Nivel 3.B1: Servicio Lineal Mixto."""
+    __tablename__ = "servicio_lineal_mixto"
+
+    id: Mapped[int] = mapped_column(
+        ForeignKey("servicio_factor_unitario.id", ondelete="CASCADE"),
+        primary_key=True,
+    )
+    cuota_base: Mapped[Decimal] = mapped_column(Numeric(12, 2), nullable=False)
+
+    __table_args__ = (
+        CheckConstraint("cuota_base >= 0", name="chk_servicio_lineal_mixto_cuota_base"),
+    )
+
+    __mapper_args__ = {
+        "polymorphic_identity": TipoConcepto.SERVICIO_LINEAL_MIXTO,
+    }
+
+
+class ServicioFactorCompuesto(ServicioFactorUnitario):
+    """Nivel 3.B2: Servicio Factor Compuesto."""
+    __tablename__ = "servicio_factor_compuesto"
+
+    id: Mapped[int] = mapped_column(
+        ForeignKey("servicio_factor_unitario.id", ondelete="CASCADE"),
+        primary_key=True,
+    )
+    variable_secundaria: Mapped[VariableMedida] = mapped_column(
+        SqlEnum(VariableMedida, name="variable_medida_enum", native_enum=True),
+        nullable=False,
+    )
+
+    __mapper_args__ = {
+        "polymorphic_identity": TipoConcepto.SERVICIO_FACTOR_COMPUESTO,
+    }
+
+
+class ServicioRango(Servicio):
+    """Nivel 2.C: Servicio por Rango de Escalón Único."""
+    __tablename__ = "servicio_rango"
+
+    id: Mapped[int] = mapped_column(
+        ForeignKey("servicio.id", ondelete="CASCADE"),
+        primary_key=True,
+    )
+    variable_rangos: Mapped[VariableMedida] = mapped_column(
+        SqlEnum(VariableMedida, name="variable_medida_enum", native_enum=True),
+        nullable=False,
+    )
+
+    rangos: Mapped[list["Rango"]] = relationship(
+        back_populates="servicio",
+        cascade="all, delete-orphan",
+        order_by="Rango.disc",
+    )
+
+    __mapper_args__ = {
+        "polymorphic_identity": TipoConcepto.SERVICIO_RANGO,
+    }
+
+
+class Rango(Base):
+    """Entidad débil de servicio_rango: 'rangos'."""
+    __tablename__ = "rangos"
+
+    servicio_id: Mapped[int] = mapped_column(
+        ForeignKey("servicio_rango.id", ondelete="CASCADE"),
+        primary_key=True,
+    )
+    disc: Mapped[int] = mapped_column(Integer, primary_key=True)
+    limite_inferior: Mapped[Decimal] = mapped_column(Numeric(12, 2), nullable=False)
+    limite_superior: Mapped[Decimal | None] = mapped_column(Numeric(12, 2), nullable=True)
+    cuota_mxn: Mapped[Decimal] = mapped_column(Numeric(12, 2), nullable=False)
+
+    servicio: Mapped["ServicioRango"] = relationship(back_populates="rangos")
+
+    __table_args__ = (
+        CheckConstraint("disc > 0", name="chk_rangos_disc"),
+        CheckConstraint("limite_inferior >= 0", name="chk_rangos_limite_inferior"),
+        CheckConstraint("cuota_mxn >= 0", name="chk_rangos_cuota_mxn"),
+        CheckConstraint(
+            "limite_superior IS NULL OR limite_superior >= limite_inferior",
+            name="chk_rangos_limites",
+        ),
+    )
+
+
+class ServicioIncremental(Servicio):
+    """Nivel 2.D: Servicio Incremental (Progresivo por Tramos de Días)."""
+    __tablename__ = "servicio_incremental"
+
+    id: Mapped[int] = mapped_column(
+        ForeignKey("servicio.id", ondelete="CASCADE"),
+        primary_key=True,
+    )
+    variable_cantidad: Mapped[VariableMedida] = mapped_column(
+        SqlEnum(VariableMedida, name="variable_medida_enum", native_enum=True),
+        nullable=False,
+    )
+    bloque_redondeo: Mapped[Decimal] = mapped_column(
+        Numeric(10, 2),
+        nullable=False,
+        default=Decimal("1.00"),
+        server_default=text("1.00"),
+    )
+    variable_dias: Mapped[VariableMedida] = mapped_column(
+        SqlEnum(VariableMedida, name="variable_medida_enum", native_enum=True),
+        nullable=False,
+    )
+
+    tramos: Mapped[list["Tramo"]] = relationship(
+        back_populates="servicio",
+        cascade="all, delete-orphan",
+        order_by="Tramo.disc",
+    )
+
+    __table_args__ = (
+        CheckConstraint("bloque_redondeo > 0", name="chk_servicio_incremental_bloque"),
+    )
+
+    __mapper_args__ = {
+        "polymorphic_identity": TipoConcepto.SERVICIO_INCREMENTAL,
+    }
+
+
+class Tramo(Base):
+    """Entidad débil de servicio_incremental: 'tramo'."""
+    __tablename__ = "tramo"
+
+    servicio_id: Mapped[int] = mapped_column(
+        ForeignKey("servicio_incremental.id", ondelete="CASCADE"),
+        primary_key=True,
+    )
+    disc: Mapped[int] = mapped_column(Integer, primary_key=True)
+    dia_inicio: Mapped[int] = mapped_column(Integer, nullable=False)
+    dia_fin: Mapped[int | None] = mapped_column(Integer, nullable=True)
+    cuota_diaria_mxn: Mapped[Decimal] = mapped_column(Numeric(12, 2), nullable=False)
+
+    servicio: Mapped["ServicioIncremental"] = relationship(back_populates="tramos")
+
+    __table_args__ = (
+        CheckConstraint("disc > 0", name="chk_tramo_disc"),
+        CheckConstraint("dia_inicio > 0", name="chk_tramo_dia_inicio"),
+        CheckConstraint("cuota_diaria_mxn >= 0", name="chk_tramo_cuota_diaria_mxn"),
+        CheckConstraint(
+            "dia_fin IS NULL OR dia_fin >= dia_inicio",
+            name="chk_tramo_dias",
+        ),
+    )

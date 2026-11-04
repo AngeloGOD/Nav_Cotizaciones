@@ -186,8 +186,17 @@ class _TarjetaMetrica(Flowable):
         lienzo.drawString(x_texto, centro_y_texto - 11, self.valor)
 
 
-def _texto_celda(valor: object, ancho: float, font_size: float) -> str:
-    texto = unescape(_texto(valor).replace("<br/>", " "))
+def _texto_celda(
+    valor: object,
+    ancho: float,
+    font_size: float,
+    envolver: bool = False,
+) -> str:
+    texto_celda = _texto(valor)
+    if envolver:
+        return texto_celda
+
+    texto = unescape(texto_celda.replace("<br/>", " "))
     ancho_util = max(ancho - 8, font_size * 3)
     if stringWidth(texto, "Helvetica", font_size) > ancho_util:
         while texto and stringWidth(f"{texto}…", "Helvetica", font_size) > ancho_util:
@@ -484,6 +493,7 @@ def crear_pdf(
     proporciones_columnas: Sequence[float] | None = None,
     columnas_centradas: Iterable[str] = (),
     nombre_registro: str = "registros",
+    envolver_texto_celdas: bool = False,
 ) -> bytes:
     if not columnas:
         raise ValueError("Debe especificarse al menos una columna.")
@@ -654,6 +664,7 @@ def crear_pdf(
                             valor,
                             anchos[indice_columna],
                             estilo_celda.fontSize,
+                            envolver=envolver_texto_celdas,
                         ),
                         estilo,
                     )

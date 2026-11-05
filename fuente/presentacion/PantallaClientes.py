@@ -115,7 +115,6 @@ class PantallaClientes(ft.Container):
             height=44,
             on_click=self._con_cierre_de_menus(self.ir_a_registro),
         )
-        boton_registrar_cliente.content.controls[1].weight = ft.FontWeight.W_500
 
         barra_herramientas = card(
             ft.Row(
@@ -219,9 +218,9 @@ class PantallaClientes(ft.Container):
             on_change=self._cambio_fecha_filtro,
         )
         self._panel_filtros = self._crear_panel_filtros()
-        self._panel_filtros.top = 210
-        self._panel_filtros.right = 153
-        agregar_panel_flotante(self._contenido, self._panel_filtros)
+        self._panel_filtros.top = 218
+        self._panel_filtros.right = 167
+        agregar_panel_flotante(self._layout_principal, self._panel_filtros)
         self._panel_filtros_abierto = True
         self.update()
 
@@ -494,7 +493,7 @@ class PantallaClientes(ft.Container):
 
     def cerrar_filtros(self, e=None):
         if self._panel_filtros_abierto:
-            quitar_panel_flotante(self._contenido, self._panel_filtros)
+            quitar_panel_flotante(self._layout_principal, self._panel_filtros)
             self._panel_filtros_abierto = False
             self.update()
 
@@ -1128,7 +1127,11 @@ class PantallaClientes(ft.Container):
         self._barra_seleccion.update()
 
         self._boton_exportar.width = (
-            230 if cantidad else 190 if self._hay_filtros_exportacion() else 150
+            230
+            if cantidad
+            else 190
+            if self._hay_filtros_exportacion()
+            else 150
         )
         self._boton_exportar.content.controls[1].value = (
             self._texto_boton_exportar()
@@ -1539,6 +1542,13 @@ class PantallaClientes(ft.Container):
         self._boton_exportar = boton_exportacion(
             texto=self._texto_boton_exportar(),
             on_click=self.alternar_menu_exportacion,
+            width=(
+                230
+                if self.clientes_seleccionados
+                else 190
+                if self._hay_filtros_exportacion()
+                else 150
+            ),
         )
         self._texto_resumen_exportacion = ft.Text(
             self._descripcion_exportacion(),
@@ -1612,7 +1622,15 @@ class PantallaClientes(ft.Container):
                 border_radius=12,
                 bgcolor=COLOR_BLANCO,
                 clip_behavior=ft.ClipBehavior.HARD_EDGE,
-                content=tabla_clientes,
+                content=(
+                    tabla_clientes
+                    if clientes
+                    else estado_vacio(
+                        ft.Icons.GROUPS_OUTLINED,
+                        "No se encontraron clientes",
+                        "Prueba cambiando la búsqueda o los filtros.",
+                    )
+                ),
             ),
             ft.Row(
                 alignment=ft.MainAxisAlignment.SPACE_BETWEEN,

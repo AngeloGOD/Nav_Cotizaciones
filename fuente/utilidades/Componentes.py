@@ -43,6 +43,8 @@ def boton_exportacion(texto, on_click, width=None, height=44):
         if isinstance(texto, ft.Text)
         else ft.Text(texto, size=14, color=COLOR_AZUL, max_lines=1)
     )
+    etiqueta.max_lines = 1
+    etiqueta.overflow = ft.TextOverflow.ELLIPSIS
     return ft.OutlinedButton(
         width=width,
         height=height,
@@ -77,6 +79,36 @@ def agregar_panel_flotante(contenedor, panel):
 def quitar_panel_flotante(contenedor, panel):
     if panel in contenedor.controls:
         contenedor.controls.remove(panel)
+
+
+def estado_vacio(icono, titulo, descripcion):
+    return ft.Container(
+        expand=True,
+        alignment=ft.Alignment(0, 0),
+        content=ft.Column(
+            alignment=ft.MainAxisAlignment.CENTER,
+            horizontal_alignment=ft.CrossAxisAlignment.CENTER,
+            spacing=8,
+            controls=[
+                ft.Icon(icono, size=44, color=COLOR_GRIS),
+                ft.Text(
+                    titulo,
+                    size=17,
+                    font_family="Roboto",
+                    weight=ft.FontWeight.W_600,
+                    color=COLOR_BANNER,
+                    text_align=ft.TextAlign.CENTER,
+                ),
+                ft.Text(
+                    descripcion,
+                    size=13,
+                    font_family="Roboto",
+                    color=COLOR_GRIS,
+                    text_align=ft.TextAlign.CENTER,
+                ),
+            ],
+        ),
+    )
 
 
 def menu_exportacion(

@@ -5,9 +5,12 @@ from fuente.utilidades.Colores import *
 from fuente.utilidades.Componentes import (
     banner_modulo,
     agregar_panel_flotante,
+    barra_busqueda,
+    boton,
     boton_exportacion,
     boton_vista,
     card,
+    estado_vacio,
     fila_producto,
     menu_exportacion,
     mostrar_notificacion,
@@ -195,25 +198,12 @@ class PantallaProductos(ft.Container):
     # BUSQUEDA Y FILTROS
     # ---------------------------------------------------------
     def _crear_busqueda(self):
-        return ft.TextField(
-            hint_text="Buscar producto por nombre o SKU/código interno...",
-            prefix_icon=ft.Icons.SEARCH,
-            expand=True,
-            height=44,
-            text_size=14,
-            content_padding=ft.Padding(12, 8, 12, 8),
-            border={
-                ft.ControlState.DEFAULT: ft.OutlineInputBorder(
-                    border_radius=8,
-                    side=ft.BorderSide(1, COLOR_GRIS_CLARO),
-                ),
-                ft.ControlState.FOCUSED: ft.OutlineInputBorder(
-                    border_radius=8,
-                    side=ft.BorderSide(1, COLOR_AZUL),
-                ),
-            },
+        buscador = barra_busqueda(
+            hint="Buscar producto por nombre o SKU/código interno...",
             on_change=self.buscar,
         )
+        buscador.height = 44
+        return buscador
 
     def _seccion_filtro(self, clave, titulo, icono, opciones, valor):
         dropdown = ft.Dropdown(
@@ -367,24 +357,14 @@ class PantallaProductos(ft.Container):
 
     def barra_herramientas(self):
         self._botones_vista = self._crear_botones_vista()
-        self._boton_filtros = ft.OutlinedButton(
-            content=ft.Row(
-                tight=True,
-                spacing=7,
-                alignment=ft.MainAxisAlignment.CENTER,
-                controls=[
-                    ft.Icon(ft.Icons.TUNE, size=18, color=COLOR_AZUL),
-                    ft.Text("Filtros", size=14, color=COLOR_AZUL),
-                ],
-            ),
-            width=145,
+        self._boton_filtros = boton(
+            texto="Filtros",
+            icono=ft.Icons.TUNE,
+            tipo="secundario",
+            width=160,
             height=44,
+            border_color="#C9DDF7",
             on_click=self._abrir_filtros,
-            style=ft.ButtonStyle(
-                color=COLOR_AZUL,
-                side=ft.BorderSide(1, "#C7DAFF"),
-                shape=ft.RoundedRectangleBorder(radius=9),
-            ),
         )
         boton_filtros = ft.GestureDetector(
             on_tap_down=self._marcar_clic_en_boton_menu,
@@ -400,6 +380,7 @@ class PantallaProductos(ft.Container):
         self._boton_exportar = boton_exportacion(
             texto=self._texto_boton_exportar,
             on_click=self.alternar_menu_exportacion,
+            width=190 if self._hay_filtros_exportacion() else 150,
         )
         boton_exportar = ft.GestureDetector(
             on_tap_down=self._marcar_clic_en_boton_menu,
@@ -431,22 +412,14 @@ class PantallaProductos(ft.Container):
                 controls=[
                     self._campo_busqueda,
                     boton_filtros,
-                    ft.Button(
-                        ft.Text(
-                            "Agregar producto",
-                            size=14,
-                            weight=ft.FontWeight.W_500,
-                            color=COLOR_BLANCO,
-                        ),
-                        icon=ft.Icons.ADD,
+                    boton(
+                        texto="Agregar producto",
+                        icono=ft.Icons.ADD,
+                        tipo="principal",
+                        width=210,
                         height=44,
                         on_click=self._con_cierre_de_menus(
                             self.abrir_registro_producto
-                        ),
-                        style=ft.ButtonStyle(
-                            bgcolor=COLOR_NARANJA,
-                            color=COLOR_BLANCO,
-                            shape=ft.RoundedRectangleBorder(radius=9),
                         ),
                     ),
                     boton_exportar,
@@ -517,12 +490,12 @@ class PantallaProductos(ft.Container):
             on_limpiar=self.limpiar_filtros,
             on_aplicar=self.aplicar_filtros,
             on_cerrar=self.cerrar_filtros,
-            top=210,
-            right=310,
+            top=218,
+            right=324,
             width=340,
             height=405,
         )
-        agregar_panel_flotante(self._contenido, self._panel_filtros)
+        agregar_panel_flotante(self._layout_principal, self._panel_filtros)
         self._panel_filtros_abierto = True
         if self.page is not None:
             self.update()
@@ -598,7 +571,7 @@ class PantallaProductos(ft.Container):
     def cerrar_filtros(self, e=None):
         if not self._panel_filtros_abierto:
             return
-        quitar_panel_flotante(self._contenido, self._panel_filtros)
+        quitar_panel_flotante(self._layout_principal, self._panel_filtros)
         self._panel_filtros_abierto = False
         if self.page is not None:
             self.update()
@@ -644,6 +617,7 @@ class PantallaProductos(ft.Container):
         self._texto_boton_exportar.value = (
             "Exportar filtrados" if filtrados else "Exportar"
         )
+        self._boton_exportar.width = 190 if filtrados else 150
 
     def _descripcion_exportacion(self):
         if self._hay_filtros_exportacion():
@@ -755,32 +729,10 @@ class PantallaProductos(ft.Container):
     # ---------------------------------------------------------
     def _crear_vista(self, productos):
         if not productos:
-            return ft.Container(
-                expand=True,
-                alignment=ft.Alignment(0, 0),
-                content=ft.Column(
-                    alignment=ft.MainAxisAlignment.CENTER,
-                    horizontal_alignment=ft.CrossAxisAlignment.CENTER,
-                    spacing=8,
-                    controls=[
-                        ft.Icon(
-                            ft.Icons.INVENTORY_2_OUTLINED,
-                            size=42,
-                            color=COLOR_GRIS,
-                        ),
-                        ft.Text(
-                            "No se encontraron productos",
-                            size=16,
-                            weight=ft.FontWeight.BOLD,
-                            color=COLOR_BANNER,
-                        ),
-                        ft.Text(
-                            "Prueba cambiando la búsqueda o los filtros.",
-                            size=13,
-                            color=COLOR_GRIS,
-                        ),
-                    ],
-                ),
+            return estado_vacio(
+                ft.Icons.INVENTORY_2_OUTLINED,
+                "No se encontraron productos",
+                "Prueba cambiando la búsqueda o los filtros.",
             )
 
         if self.vista == "lista":

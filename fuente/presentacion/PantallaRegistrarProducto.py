@@ -32,6 +32,8 @@ class PantallaRegistrarProducto(ft.Container):
                 ("bebidas", "Bebidas"),
                 ("agregar", "Añadir categoría"),
             ],
+            editable=True,
+            enable_filter=True,
         )
         self.categoria.on_select = self.seleccionar_categoria
         self.categoria_personalizada = self.ajustar_campo(
@@ -137,13 +139,15 @@ class PantallaRegistrarProducto(ft.Container):
         control.content_padding = ft.Padding(12, 8, 12, 8)
         return control
 
-    def dropdown(self, hint, opciones):
+    def dropdown(self, hint, opciones, editable=False, enable_filter=False):
         return ft.Dropdown(
             hint_text=hint,
             options=[
                 ft.DropdownOption(key=valor, text=texto)
                 for valor, texto in opciones
             ],
+            editable=editable,
+            enable_filter=enable_filter,
             expand=True,
             height=44,
             text_size=14,

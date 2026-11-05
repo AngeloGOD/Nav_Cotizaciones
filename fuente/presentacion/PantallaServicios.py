@@ -1,8 +1,19 @@
 import flet as ft
-from fuente.utilidades.Colores import COLOR_NARANJA, COLOR_BLANCO, COLOR_GRIS
+from fuente.utilidades.Colores import (
+    COLOR_AZUL,
+    COLOR_NARANJA,
+    COLOR_BLANCO,
+    COLOR_GRIS,
+)
+from fuente.utilidades.Componentes import (
+    boton_vista,
+    card,
+    fila_catalogo,
+    sombra_suave,
+    tarjeta_catalogo,
+)
 
 COLOR_AZUL_OSCURO = "#0d1b2a" 
-COLOR_FONDO_TABLA = "#f8f9fa"
 
 class PantallaServicios(ft.Container):
     
@@ -13,6 +24,67 @@ class PantallaServicios(ft.Container):
         self.padding = ft.Padding(20, 20, 20, 20)
         
         self._menu_exportacion_abierto = False
+        self._vista_servicios = "catalogo"
+        self.registros_por_pagina = 8
+        self.pagina_actual = 1
+        self.servicios_demo = [
+            {
+                "nombre": "Manejo de Carga",
+                "categoria": "Logística",
+                "descripcion": "Coordinación integral de carga y descarga.",
+                "detalle": "Por operación",
+                "imagen": "photo-1494412519320-aa613dfb7738",
+            },
+            {
+                "nombre": "Almacenaje en Puerto",
+                "categoria": "Almacenaje",
+                "descripcion": "Resguardo seguro de mercancía.",
+                "detalle": "Por día",
+                "imagen": "photo-1586528116311-ad8dd3c8310d",
+            },
+            {
+                "nombre": "Transporte Terrestre",
+                "categoria": "Transporte",
+                "descripcion": "Traslado eficiente y seguro.",
+                "detalle": "Por viaje",
+                "imagen": "photo-1519003722824-194d4455a60c",
+            },
+            {
+                "nombre": "Gestión Aduanera",
+                "categoria": "Aduanero",
+                "descripcion": "Trámites y asesoría aduanal.",
+                "detalle": "Por trámite",
+                "imagen": "photo-1450101499163-c8848c66ca85",
+            },
+            {
+                "nombre": "Estiba y Desestiba",
+                "categoria": "Operativo",
+                "descripcion": "Operaciones portuarias especializadas.",
+                "detalle": "Por tonelada",
+                "imagen": "photo-1578575437130-527eed3abbec",
+            },
+            {
+                "nombre": "Cadena de Frío",
+                "categoria": "Especializado",
+                "descripcion": "Control de temperatura en todo el proceso.",
+                "detalle": "Por contenedor",
+                "imagen": "photo-1581091226825-a6a2a5aee158",
+            },
+            {
+                "nombre": "Agencia Marítima",
+                "categoria": "Marítimo",
+                "descripcion": "Representación y servicios marítimos.",
+                "detalle": "Cuota fija",
+                "imagen": "photo-1500375592092-40eb2168fd21",
+            },
+            {
+                "nombre": "Distribución Nacional",
+                "categoria": "Terrestre",
+                "descripcion": "Entrega segura en todo México.",
+                "detalle": "Por entrega",
+                "imagen": "photo-1519003722824-194d4455a60c",
+            },
+        ]
         
         banner = ft.Container(
             height=174,
@@ -124,77 +196,222 @@ class PantallaServicios(ft.Container):
         )
         # =========================================================
 
-        # --- TABLA ---
-        titulo_tabla = ft.Row(
-            spacing=12, vertical_alignment=ft.CrossAxisAlignment.CENTER,
+        self._texto_total_servicios = ft.Text(
+            f"{len(self.servicios_demo)} servicios en el catálogo",
+            size=12,
+            color=COLOR_GRIS,
+        )
+        self._contenido_servicios = ft.Container(
+            expand=True,
+            content=self._crear_vista_servicios(),
+        )
+        self._botones_vista = ft.Row(
+            spacing=6,
+            controls=self._crear_botones_vista(),
+        )
+
+        titulo_catalogo = ft.Row(
+            spacing=12,
+            vertical_alignment=ft.CrossAxisAlignment.CENTER,
             controls=[
-                ft.Container(content=ft.Icon(ft.Icons.LOCAL_OFFER_OUTLINED, color=COLOR_BLANCO, size=24), bgcolor=COLOR_NARANJA, border_radius=10, padding=10),
-                ft.Column(expand=True, spacing=2, controls=[
-                    ft.Text("Servicios Activos", size=19, weight=ft.FontWeight.BOLD, color=COLOR_AZUL_OSCURO),
-                    ft.Text("Configuración de tarifas base", size=14, color=COLOR_GRIS),
-                ]),
-                self._boton_exportar # Se coloca el botón manual
+                ft.Container(
+                    width=48,
+                    height=48,
+                    alignment=ft.Alignment(0, 0),
+                    bgcolor=COLOR_NARANJA,
+                    border_radius=12,
+                    content=ft.Icon(
+                        ft.Icons.WORK_OUTLINE,
+                        size=25,
+                        color=COLOR_BLANCO,
+                    ),
+                ),
+                ft.Column(
+                    expand=True,
+                    spacing=3,
+                    controls=[
+                        ft.Text(
+                            "Listado de servicios",
+                            size=18,
+                            weight=ft.FontWeight.BOLD,
+                            color=COLOR_AZUL_OSCURO,
+                        ),
+                        self._texto_total_servicios,
+                    ],
+                ),
+                self._boton_exportar,
+                self._botones_vista,
             ],
         )
 
-        tabla_servicios = ft.ListView(
+        contenido_catalogo = ft.Column(
             expand=True,
+            spacing=12,
             controls=[
-                ft.DataTable(
-                    heading_row_color=COLOR_FONDO_TABLA, heading_row_height=45, data_row_min_height=60, data_row_max_height=80,
-                    vertical_lines=ft.BorderSide(1, ft.Colors.GREY_200), border=self.crear_borde_completo(1, ft.Colors.GREY_200),
-                    columns=[
-                        ft.DataColumn(ft.Text("ID", size=14, color=ft.Colors.BLACK, weight=ft.FontWeight.BOLD)),
-                        ft.DataColumn(ft.Text("Nombre del Servicio", size=14, color=ft.Colors.BLACK, weight=ft.FontWeight.BOLD)),
-                        ft.DataColumn(ft.Text("Categoría / Unidad", size=14, color=ft.Colors.BLACK, weight=ft.FontWeight.BOLD)),
-                        ft.DataColumn(ft.Text("Tipo de Cobro", size=14, color=ft.Colors.BLACK, weight=ft.FontWeight.BOLD)),
-                        ft.DataColumn(ft.Text("Tasa IVA", size=14, color=ft.Colors.BLACK, weight=ft.FontWeight.BOLD)),
-                        ft.DataColumn(ft.Text("Acciones", size=14, color=ft.Colors.BLACK, weight=ft.FontWeight.BOLD)),
-                    ],
-                    rows=[
-                        ft.DataRow(cells=[
-                            ft.DataCell(ft.Text("SRV-001", color=ft.Colors.BLUE_600, size=13)),
-                            ft.DataCell(ft.Text("Lanchaje de Buques", weight=ft.FontWeight.W_600, size=13)),
-                            ft.DataCell(ft.Text("Lanchaje / Servicio", size=13, color=COLOR_GRIS)),
-                            ft.DataCell(self.crear_badge_tipo_cobro("Factor Unitario", ft.Colors.BLUE_600, ft.Colors.BLUE_50)),
-                            ft.DataCell(ft.Text("16.0%", size=13, color=COLOR_GRIS)),
-                            ft.DataCell(ft.Row([ft.IconButton(icon=ft.Icons.EDIT_OUTLINED, icon_color=ft.Colors.BLUE_600, icon_size=18), ft.IconButton(icon=ft.Icons.DELETE_OUTLINE, icon_color=ft.Colors.RED_400, icon_size=18)]))
-                        ])
-                    ]
-                )
-            ]
-        )
-
-        # --- ENSAMBLAJE FINAL CON STACK ---
-        controles_tabla = ft.Column(
-            expand=True, spacing=10,
-            controls=[
-                titulo_tabla,
+                titulo_catalogo,
                 ft.Divider(height=1, color=ft.Colors.GREY_200),
-                tabla_servicios,
-            ]
+                self._contenido_servicios,
+            ],
         )
-        
         contenido_con_menu = ft.Stack(
             expand=True,
-            clip_behavior=ft.ClipBehavior.NONE, 
-            controls=[
-                controles_tabla,
-                self._menu_exportacion 
-            ]
+            clip_behavior=ft.ClipBehavior.NONE,
+            controls=[contenido_catalogo, self._menu_exportacion],
         )
-
-        tabla_datos = ft.Container(
-            border=self.crear_borde_completo(1, ft.Colors.GREY_200), border_radius=10, bgcolor=COLOR_BLANCO, padding=16,
-            shadow=ft.BoxShadow(spread_radius=1, blur_radius=5, color=ft.Colors.with_opacity(0.05, ft.Colors.BLACK), offset=ft.Offset(0, 2)),
+        catalogo_servicios = card(
+            contenido_con_menu,
+            padding=ft.Padding(12, 11, 12, 11),
+            radius=12,
+            shadow=sombra_suave(),
             expand=True,
-            content=contenido_con_menu
+        )
+        pie_catalogo = ft.Row(
+            alignment=ft.MainAxisAlignment.SPACE_BETWEEN,
+            vertical_alignment=ft.CrossAxisAlignment.CENTER,
+            controls=[
+                ft.Text(
+                    f"Mostrando 1–{len(self.servicios_demo)} de "
+                    f"{len(self.servicios_demo)} servicios",
+                    size=12,
+                    color=COLOR_GRIS,
+                ),
+                ft.Row(
+                    spacing=4,
+                    controls=[
+                        ft.Text(
+                            "Página 1 de 1",
+                            size=12,
+                            color=COLOR_GRIS,
+                        ),
+                        ft.Container(
+                            width=34,
+                            height=34,
+                            alignment=ft.Alignment(0, 0),
+                            bgcolor=COLOR_AZUL,
+                            border_radius=8,
+                            content=ft.Text(
+                                "1",
+                                size=13,
+                                color=COLOR_BLANCO,
+                                weight=ft.FontWeight.BOLD,
+                            ),
+                        ),
+                    ],
+                ),
+            ],
         )
 
-        self.content = ft.Column([
-            banner, ft.Container(height=15), barra_herramientas, ft.Container(height=15),
-            tarjetas_resumen, ft.Container(height=15), tabla_datos
-        ], spacing=0)
+        self.content = ft.Column(
+            expand=True,
+            spacing=12,
+            scroll=ft.ScrollMode.AUTO,
+            controls=[
+                banner,
+                barra_herramientas,
+                tarjetas_resumen,
+                catalogo_servicios,
+                pie_catalogo,
+            ],
+        )
+
+    def _crear_etiqueta_servicio(self, categoria):
+        estilos = {
+            "Logística": ("#FFF0C2", "#B26A00"),
+            "Almacenaje": ("#F3F4A8", "#777A00"),
+            "Transporte": ("#FFF0C2", "#B26A00"),
+            "Aduanero": ("#DDF7E6", "#138A3D"),
+            "Operativo": ("#DDF7E6", "#138A3D"),
+            "Especializado": ("#E4E5FF", "#4C55C7"),
+            "Marítimo": ("#D9ECFF", "#176FC1"),
+            "Terrestre": ("#FFF0C2", "#B26A00"),
+        }
+        fondo, color = estilos[categoria]
+        return ft.Container(
+            padding=ft.Padding(8, 4, 8, 4),
+            bgcolor=fondo,
+            border_radius=18,
+            content=ft.Text(
+                categoria,
+                size=11,
+                color=color,
+                weight=ft.FontWeight.W_600,
+                max_lines=1,
+            ),
+        )
+
+    def _crear_vista_servicios(self):
+        servicios = self.servicios_demo[:self.registros_por_pagina]
+        if self._vista_servicios == "lista":
+            return ft.ListView(
+                expand=True,
+                spacing=8,
+                padding=ft.Padding(2, 2, 2, 2),
+                controls=[
+                    fila_catalogo(
+                        titulo=servicio["nombre"],
+                        descripcion=servicio["descripcion"],
+                        etiqueta=self._crear_etiqueta_servicio(
+                            servicio["categoria"]
+                        ),
+                        detalle=servicio["detalle"],
+                        ruta_imagen=(
+                            "https://images.unsplash.com/"
+                            f"{servicio['imagen']}?auto=format&fit=crop&w=700&q=80"
+                        ),
+                        icono_secundario=ft.Icons.ATTACH_MONEY,
+                    )
+                    for servicio in servicios
+                ],
+            )
+
+        tarjetas = [
+            tarjeta_catalogo(
+                titulo=servicio["nombre"],
+                descripcion=servicio["descripcion"],
+                etiqueta=self._crear_etiqueta_servicio(
+                    servicio["categoria"]
+                ),
+                detalle=servicio["detalle"],
+                ruta_imagen=(
+                    "https://images.unsplash.com/"
+                    f"{servicio['imagen']}?auto=format&fit=crop&w=700&q=80"
+                ),
+                icono_secundario=ft.Icons.ATTACH_MONEY,
+            )
+            for servicio in servicios
+        ]
+        filas = []
+        for inicio in range(0, len(tarjetas), 4):
+            controles_fila = tarjetas[inicio:inicio + 4]
+            controles_fila.extend(
+                ft.Container(expand=True)
+                for _ in range(4 - len(controles_fila))
+            )
+            filas.append(ft.Row(spacing=8, controls=controles_fila))
+        return ft.Column(expand=True, spacing=8, controls=filas)
+
+    def _crear_botones_vista(self):
+        return [
+            boton_vista(
+                ft.Icons.GRID_VIEW,
+                "Vista de tarjetas",
+                self._vista_servicios == "catalogo",
+                lambda e: self.cambiar_vista_servicios("catalogo"),
+            ),
+            boton_vista(
+                ft.Icons.VIEW_LIST_OUTLINED,
+                "Vista de lista",
+                self._vista_servicios == "lista",
+                lambda e: self.cambiar_vista_servicios("lista"),
+            ),
+        ]
+
+    def cambiar_vista_servicios(self, vista):
+        self._vista_servicios = vista
+        self._contenido_servicios.content = self._crear_vista_servicios()
+        self._botones_vista.controls = self._crear_botones_vista()
+        if self.main_page is not None:
+            self.main_page.update()
 
     # =========================================================
     # 2. CAMBIO: Función para hacer el cambio de pantalla
@@ -230,10 +447,4 @@ class PantallaServicios(ft.Container):
                 ft.Column([ft.Text(titulo, size=12, color=COLOR_GRIS, weight=ft.FontWeight.W_500), ft.Text(cantidad, size=18, weight=ft.FontWeight.BOLD, color=COLOR_AZUL_OSCURO)], spacing=0, alignment=ft.MainAxisAlignment.CENTER),
                 ft.Container(expand=True), ft.Icon(ft.Icons.CHEVRON_RIGHT, color=ft.Colors.GREY_400, size=18)
             ])
-        )
-
-    def crear_badge_tipo_cobro(self, texto, color_borde_texto, color_fondo):
-        return ft.Container(
-            padding=ft.Padding(10, 4, 10, 4), border=self.crear_borde_completo(1, ft.Colors.with_opacity(0.3, color_borde_texto)), border_radius=15, bgcolor=color_fondo,
-            content=ft.Row([ft.Icon(ft.Icons.CIRCLE, size=8, color=color_borde_texto), ft.Text(texto, size=11, color=color_borde_texto, weight=ft.FontWeight.W_600)], spacing=5)
         )

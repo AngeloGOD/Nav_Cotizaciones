@@ -1137,7 +1137,7 @@ def boton_vista(icono, tooltip, seleccionado=False, on_click=None):
 
 
 def etiqueta_categoria(nombre):
-    """Etiqueta visual de la categoría de un producto."""
+    """Etiqueta visual reutilizable para categorías de catálogo."""
 
     return ft.Container(
         padding=ft.Padding(8, 4, 8, 4),
@@ -1157,117 +1157,161 @@ def etiqueta_categoria(nombre):
                     size=11,
                     color="#07865F",
                     weight=ft.FontWeight.W_600,
+                    max_lines=1,
+                    overflow=ft.TextOverflow.ELLIPSIS,
                 ),
             ],
         ),
     )
 
 
-def tarjeta_producto(producto, on_info=None):
-    """Tarjeta de producto para la vista de cuadrícula."""
+def tarjeta_catalogo(
+    titulo,
+    descripcion,
+    etiqueta,
+    detalle,
+    ruta_imagen=None,
+    icono_secundario=ft.Icons.INVENTORY_2_OUTLINED,
+    on_click=None,
+):
+    """Tarjeta reutilizable e interactiva para catálogos en cuadrícula."""
 
-    imagen = ft.Container(
-        height=120,
+    control_imagen = ft.Container(
+        height=72,
         border_radius=8,
         bgcolor="#EAF1F7",
         alignment=ft.Alignment(0, 0),
         clip_behavior=ft.ClipBehavior.HARD_EDGE,
         content=(
             ft.Image(
-                src=producto.get("imagen", ""),
+                src=ruta_imagen,
                 width=float("inf"),
-                height=120,
+                height=72,
                 fit=ft.BoxFit.COVER,
             )
-            if producto.get("imagen")
+            if ruta_imagen
             else ft.Icon(
                 ft.Icons.IMAGE_OUTLINED,
-                size=36,
+                size=28,
                 color=COLOR_GRIS,
             )
         ),
     )
 
-    contenido = ft.Column(
-        spacing=8,
-        controls=[
-            ft.Stack(
-                controls=[
-                    imagen,
-                    ft.Container(
-                        right=5,
-                        top=5,
-                        content=ft.IconButton(
-                            icon=ft.Icons.INFO_OUTLINE,
-                            tooltip="Ver información",
-                            icon_color=COLOR_AZUL,
-                            bgcolor=COLOR_BLANCO,
-                            on_click=(
-                                lambda e, p=producto: on_info(p)
-                            ) if on_info else None,
-                        ),
-                    ),
-                ],
-            ),
-            etiqueta_categoria(producto["categoria"]),
+    controles = [
+        control_imagen,
+    ]
+    if etiqueta is not None:
+        controles.append(etiqueta)
+    controles.append(
+        ft.Text(
+            titulo,
+            size=14,
+            weight=ft.FontWeight.BOLD,
+            color=COLOR_AZUL,
+            max_lines=1,
+            overflow=ft.TextOverflow.ELLIPSIS,
+        )
+    )
+    if descripcion:
+        controles.append(
             ft.Text(
-                producto["nombre"],
-                size=14,
-                weight=ft.FontWeight.BOLD,
-                color=COLOR_AZUL,
-                max_lines=1,
-                overflow=ft.TextOverflow.ELLIPSIS,
-            ),
-            ft.Text(
-                producto["descripcion"],
+                descripcion,
                 size=12,
                 color=COLOR_GRIS,
                 max_lines=2,
                 overflow=ft.TextOverflow.ELLIPSIS,
-            ),
-            ft.Row(
-                spacing=7,
-                vertical_alignment=ft.CrossAxisAlignment.CENTER,
-                controls=[
-                    ft.Icon(
-                        ft.Icons.INVENTORY_2_OUTLINED,
-                        size=19,
-                        color=COLOR_AZUL,
-                    ),
-                    ft.Text(
-                        producto["presentacion"],
-                        size=12,
-                        color=COLOR_GRIS,
-                    ),
-                ],
-            ),
-        ],
+            )
+        )
+    controles.append(
+        ft.Row(
+            spacing=7,
+            vertical_alignment=ft.CrossAxisAlignment.CENTER,
+            controls=[
+                ft.Icon(icono_secundario, size=19, color=COLOR_AZUL),
+                ft.Text(
+                    detalle or "",
+                    size=12,
+                    color=COLOR_GRIS,
+                    max_lines=1,
+                    overflow=ft.TextOverflow.ELLIPSIS,
+                ),
+            ],
+        )
     )
 
-    return card(
+    contenido = ft.Column(
+        spacing=8,
+        controls=controles,
+    )
+
+    def actualizar_hover(e):
+        esta_sobre_tarjeta = str(e.data).lower() in {
+            "true",
+            "enter",
+            "entered",
+            "hovered",
+        }
+        tarjeta.border = ft.Border.all(
+            1.5,
+            COLOR_AZUL if esta_sobre_tarjeta else ft.Colors.TRANSPARENT,
+        )
+        tarjeta.bgcolor = "#F5F9FF" if esta_sobre_tarjeta else COLOR_BLANCO
+        tarjeta.shadow = (
+            ft.BoxShadow(
+                blur_radius=22,
+                color="#2457D633",
+                offset=ft.Offset(0, 8),
+            )
+            if esta_sobre_tarjeta
+            else sombra_suave()
+        )
+        tarjeta.update()
+
+    tarjeta = card(
         contenido,
         padding=10,
         radius=11,
         shadow=sombra_suave(),
+        border_color="#E3EAF2",
         expand=True,
+    )
+    tarjeta.border = ft.Border.all(1.5, ft.Colors.TRANSPARENT)
+    tarjeta.on_hover = actualizar_hover
+
+    return ft.GestureDetector(
+        expand=True,
+        mouse_cursor=ft.MouseCursor.CLICK,
+        on_tap=on_click,
+        content=tarjeta,
     )
 
 
-def fila_producto(producto, on_info=None):
-    """Fila de producto para la vista de lista."""
+def fila_catalogo(
+    titulo,
+    descripcion,
+    etiqueta,
+    detalle,
+    ruta_imagen=None,
+    icono_detalle=ft.Icons.INFO_OUTLINE,
+    icono_secundario=ft.Icons.INVENTORY_2_OUTLINED,
+    tooltip="Ver información",
+    on_info=None,
+):
+    """Fila compacta reutilizable para catálogos en vista de lista."""
 
-    if producto.get("imagen"):
-        imagen = ft.Image(
-            src=producto["imagen"],
-            width=86,
-            height=72,
+    if ruta_imagen:
+        imagen_control = ft.Image(
+            src=ruta_imagen,
+            width=72,
+            height=60,
             fit=ft.BoxFit.COVER,
             border_radius=8,
         )
     else:
-        imagen = ft.Container(
-            width=86,
-            height=72,
+        imagen_control = ft.Container(
+            width=72,
+            height=60,
             bgcolor="#EAF1F7",
             border_radius=8,
             alignment=ft.Alignment(0, 0),
@@ -1282,24 +1326,27 @@ def fila_producto(producto, on_info=None):
             spacing=14,
             vertical_alignment=ft.CrossAxisAlignment.CENTER,
             controls=[
-                imagen,
+                imagen_control,
                 ft.Column(
                     expand=True,
                     spacing=4,
                     controls=[
                         ft.Text(
-                            producto["nombre"],
+                            titulo,
                             size=14,
                             weight=ft.FontWeight.BOLD,
                             color=COLOR_AZUL,
+                            max_lines=1,
+                            overflow=ft.TextOverflow.ELLIPSIS,
                         ),
                         ft.Text(
-                            producto["descripcion"],
+                            descripcion or "",
                             size=12,
                             color=COLOR_GRIS,
                             max_lines=2,
+                            overflow=ft.TextOverflow.ELLIPSIS,
                         ),
-                        etiqueta_categoria(producto["categoria"]),
+                        etiqueta if etiqueta is not None else ft.Container(),
                     ],
                 ),
                 ft.Row(
@@ -1307,28 +1354,54 @@ def fila_producto(producto, on_info=None):
                     spacing=6,
                     controls=[
                         ft.Icon(
-                            ft.Icons.INVENTORY_2_OUTLINED,
+                            icono_secundario,
                             color=COLOR_AZUL,
                             size=18,
                         ),
                         ft.Text(
-                            producto["presentacion"],
+                            detalle or "",
                             size=12,
                             color=COLOR_GRIS,
+                            max_lines=1,
+                            overflow=ft.TextOverflow.ELLIPSIS,
                         ),
                     ],
                 ),
                 ft.IconButton(
-                    icon=ft.Icons.INFO_OUTLINE,
-                    tooltip="Ver información",
+                    icon=icono_detalle,
+                    tooltip=tooltip,
                     icon_color=COLOR_AZUL,
-                    on_click=(
-                        lambda e, p=producto: on_info(p)
-                    ) if on_info else None,
+                    on_click=on_info,
                 ),
             ],
         ),
         padding=10,
         radius=10,
         shadow=sombra_suave(),
+    )
+
+
+def tarjeta_producto(producto, on_info=None):
+    """Tarjeta de producto para la vista de cuadrícula."""
+
+    return tarjeta_catalogo(
+        titulo=producto["nombre"],
+        descripcion=None,
+        etiqueta=etiqueta_categoria(producto["categoria"]),
+        detalle=producto["presentacion"],
+        ruta_imagen=producto.get("imagen"),
+        on_click=(lambda e, p=producto: on_info(p)) if on_info else None,
+    )
+
+
+def fila_producto(producto, on_info=None):
+    """Fila de producto para la vista de lista."""
+
+    return fila_catalogo(
+        titulo=producto["nombre"],
+        descripcion=producto["descripcion"],
+        etiqueta=etiqueta_categoria(producto["categoria"]),
+        detalle=producto["presentacion"],
+        ruta_imagen=producto.get("imagen"),
+        on_info=(lambda e, p=producto: on_info(p)) if on_info else None,
     )

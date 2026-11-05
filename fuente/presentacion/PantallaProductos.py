@@ -35,7 +35,7 @@ class PantallaProductos(ft.Container):
         self.productos = self.controlador.productos
 
         self.pagina_actual = 1
-        self.registros_por_pagina = 8
+        self.registros_por_pagina = 10
         self.busqueda = ""
         self.categoria = "todas"
         self.unidad = "todas"
@@ -329,6 +329,8 @@ class PantallaProductos(ft.Container):
     def cambiar_vista(self, vista):
         self.cerrar_menus()
         self.vista = vista
+        self.registros_por_pagina = 20 if vista == "lista" else 10
+        self.pagina_actual = 1
         self._botones_vista = self._crear_botones_vista()
         self._campo_busqueda.on_focus = self.cerrar_menus
         self._actualizar_resultados()
@@ -746,17 +748,23 @@ class PantallaProductos(ft.Container):
                 ],
             )
 
-        return ft.GridView(
+        tarjetas = [
+            tarjeta_producto(producto, on_info=self.ver_producto)
+            for producto in productos
+        ]
+        filas = []
+        for inicio in range(0, len(tarjetas), 5):
+            controles_fila = tarjetas[inicio:inicio + 5]
+            controles_fila.extend(
+                ft.Container(expand=True)
+                for _ in range(5 - len(controles_fila))
+            )
+            filas.append(ft.Row(spacing=8, controls=controles_fila))
+
+        return ft.Column(
             expand=True,
-            max_extent=330,
-            child_aspect_ratio=1.02,
-            spacing=12,
-            run_spacing=12,
-            padding=ft.Padding(2, 2, 2, 2),
-            controls=[
-                tarjeta_producto(p, on_info=self.ver_producto)
-                for p in productos
-            ],
+            spacing=8,
+            controls=filas,
         )
 
     def _crear_paginacion(self, total):

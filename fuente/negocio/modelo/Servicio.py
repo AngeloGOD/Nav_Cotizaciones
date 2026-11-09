@@ -14,7 +14,7 @@ from fuente.negocio.modelo.Base import Base
 from fuente.negocio.modelo.CategoriaBuque import CategoriaBuque
 from fuente.negocio.modelo.Concepto import Concepto
 from fuente.negocio.modelo.ENUMs import TipoConcepto, VariableMedida
-
+from fuente.negocio.modelo.ENUMs import CaracterServicio
 
 class Servicio(Concepto):
     """Nivel 1 (Rama B): Subtipo intermedio 'servicio'."""
@@ -24,6 +24,14 @@ class Servicio(Concepto):
         ForeignKey("concepto.id", ondelete="CASCADE"),
         primary_key=True,
     )
+
+    caracter: Mapped[CaracterServicio] = mapped_column(
+         SqlEnum(CaracterServicio, name="caracter_servicio_enum", native_enum=True),
+        nullable=False,
+    )
+
+    requiere_entrada_salida: Mapped[bool] = mapped_column(nullable=False,)
+
     categoria_buque_id: Mapped[int | None] = mapped_column(
         ForeignKey("categoria_buque.id", ondelete="RESTRICT"),
         nullable=True,

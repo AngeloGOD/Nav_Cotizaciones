@@ -41,6 +41,12 @@ class TipoPersona(str, enum.Enum):
     EXTRANJERO = "EXTRANJERO"
 
 
+class CaracterServicio(str, enum.Enum):
+    OBLIGATORIO = "OBLIGATORIO"
+    CONDICIONAL = "CONDICIONAL"
+    OPCIONAL = "OPCIONAL"
+
+
 class TipoProveedor(str, enum.Enum):
     SERVICIOS = "SERVICIOS"
     PRODUCTOS = "PRODUCTOS"

@@ -252,6 +252,74 @@ def card(
     )
 
 
+def tarjeta_indicador(
+    titulo,
+    valor,
+    descripcion,
+    icono,
+    color,
+    fondo,
+    borde,
+    complemento=None,
+    tooltip=None,
+):
+    controles = [
+        ft.Container(
+            width=48,
+            height=48,
+            alignment=ft.Alignment(0, 0),
+            bgcolor=fondo,
+            border_radius=24,
+            content=ft.Icon(icono, size=25, color=color),
+        ),
+        ft.Column(
+            expand=True,
+            spacing=2,
+            controls=[
+                ft.Text(
+                    titulo,
+                    size=13,
+                    color=COLOR_NEGRO,
+                    weight=ft.FontWeight.W_600,
+                    tooltip=tooltip,
+                    max_lines=1,
+                    overflow=ft.TextOverflow.ELLIPSIS,
+                ),
+                ft.Text(
+                    valor,
+                    size=22,
+                    color=COLOR_BANNER,
+                    weight=ft.FontWeight.BOLD,
+                    max_lines=1,
+                    overflow=ft.TextOverflow.ELLIPSIS,
+                ),
+                ft.Text(
+                    descripcion,
+                    size=10,
+                    color=COLOR_GRIS,
+                    max_lines=1,
+                    overflow=ft.TextOverflow.ELLIPSIS,
+                ),
+            ],
+        ),
+    ]
+    if complemento is not None:
+        controles.append(complemento)
+
+    return card(
+        ft.Row(
+            spacing=10,
+            vertical_alignment=ft.CrossAxisAlignment.CENTER,
+            controls=controles,
+        ),
+        padding=12,
+        border_color=borde,
+        radius=12,
+        shadow=sombra_suave(),
+        expand=True,
+    )
+
+
 def seccion_opciones_filtro(
     titulo,
     opciones,

@@ -1,3 +1,5 @@
+import math
+
 import flet as ft
 
 from fuente.utilidades.Colores import (
@@ -11,7 +13,12 @@ from fuente.utilidades.Colores import (
     COLOR_ROJO,
     COLOR_VERDE,
 )
-from fuente.utilidades.Componentes import banner_modulo, card, sombra_suave
+from fuente.utilidades.Componentes import (
+    banner_modulo,
+    card,
+    sombra_suave,
+    tarjeta_indicador,
+)
 
 
 class PantallaReportes(ft.Container):
@@ -236,9 +243,9 @@ class PantallaReportes(ft.Container):
             scroll=ft.ScrollMode.AUTO,
             controls=[
                 ft.Container(
-                    padding=ft.Padding(14, 8, 14, 16),
+                    padding=ft.Padding(14, 2, 14, 4),
                     content=ft.Column(
-                        spacing=10,
+                        spacing=5,
                         controls=[
                             banner_modulo(
                                 "fondo_puerto.jpg",
@@ -246,45 +253,55 @@ class PantallaReportes(ft.Container):
                                 "Análisis y Estadísticas",
                                 "Explora indicadores y análisis de ejemplo; los datos reales aún no están conectados.",
                                 ft.Icons.INSERT_CHART_OUTLINED,
-                                altura=108,
-                                tamano_icono=58,
-                                tamano_grafico=31,
-                                tamano_titulo=25,
-                                tamano_descripcion=14,
-                                padding=ft.Padding(18, 8, 18, 8),
                             ),
                             self._barra_filtros(),
                             self._tarjetas_metricas(),
-                            ft.Row(
-                                height=260,
-                                spacing=10,
-                                vertical_alignment=ft.CrossAxisAlignment.STRETCH,
-                                controls=[
-                                    ft.Container(
-                                        expand=4,
-                                        content=self._panel_grafica,
-                                    ),
-                                    ft.Container(
-                                        expand=1,
-                                        content=self._panel_indicadores,
-                                    ),
-                                ],
-                            ),
-                            ft.Row(
-                                height=154,
-                                spacing=0,
-                                vertical_alignment=ft.CrossAxisAlignment.STRETCH,
-                                controls=[
-                                    ft.Container(
-                                        expand=True,
-                                        content=self._panel_recientes,
-                                    ),
-                                ],
-                            ),
+                            self._panel_inferior(),
                         ],
                     ),
                 )
             ],
+        )
+
+    def _panel_inferior(self):
+        return card(
+            ft.Column(
+                spacing=6,
+                controls=[
+                    ft.Row(
+                        height=294,
+                        spacing=10,
+                        vertical_alignment=ft.CrossAxisAlignment.STRETCH,
+                        controls=[
+                            ft.Container(
+                                expand=4,
+                                content=self._panel_grafica,
+                            ),
+                            ft.Container(
+                                expand=1,
+                                content=self._panel_indicadores,
+                            ),
+                        ],
+                    ),
+                    ft.Row(
+                        height=118,
+                        spacing=0,
+                        vertical_alignment=ft.CrossAxisAlignment.STRETCH,
+                        controls=[
+                            ft.Container(
+                                expand=True,
+                                content=self._panel_recientes,
+                            ),
+                        ],
+                    ),
+                ],
+            ),
+            padding=ft.Padding(8, 4, 8, 14),
+            bgcolor="#F8FAFD",
+            border_color="#DCE6F1",
+            radius=14,
+            shadow=sombra_suave(),
+            expand=True,
         )
 
     def _barra_filtros(self):
@@ -355,6 +372,7 @@ class PantallaReportes(ft.Container):
                 ft.Icons.GROUPS_OUTLINED,
                 COLOR_AZUL,
                 "#EAF2FF",
+                "#D7E6FF",
                 (4, 7, 5, 9, 8, 12, 10, 15),
             ),
             (
@@ -364,6 +382,7 @@ class PantallaReportes(ft.Container):
                 ft.Icons.INVENTORY_2_OUTLINED,
                 COLOR_VERDE,
                 "#EAF8F0",
+                "#D5F0E2",
                 (5, 6, 8, 7, 11, 9, 13, 15),
             ),
             (
@@ -373,6 +392,7 @@ class PantallaReportes(ft.Container):
                 ft.Icons.DIRECTIONS_BOAT_OUTLINED,
                 "#8B35D3",
                 "#F4ECFF",
+                "#E5D4F5",
                 (3, 5, 7, 6, 10, 9, 12, 16),
             ),
             (
@@ -382,6 +402,7 @@ class PantallaReportes(ft.Container):
                 ft.Icons.DESCRIPTION_OUTLINED,
                 COLOR_NARANJA,
                 "#FFF2E8",
+                "#FFE1C9",
                 (4, 5, 7, 9, 8, 11, 13, 16),
             ),
         )
@@ -397,6 +418,7 @@ class PantallaReportes(ft.Container):
                         icono,
                         color,
                         fondo,
+                        borde,
                         serie,
                     ),
                 )
@@ -407,56 +429,25 @@ class PantallaReportes(ft.Container):
                     icono,
                     color,
                     fondo,
+                    borde,
                     serie,
                 ) in metricas
             ],
         )
 
-    def _tarjeta_metrica(self, titulo, valor, aclaracion, icono, color, fondo, serie):
-        return card(
-            ft.Row(
-                spacing=9,
-                vertical_alignment=ft.CrossAxisAlignment.CENTER,
-                controls=[
-                    ft.Container(
-                        width=50,
-                        height=50,
-                        alignment=ft.Alignment(0, 0),
-                        bgcolor=fondo,
-                        border_radius=25,
-                        content=ft.Icon(icono, size=26, color=color),
-                    ),
-                    ft.Column(
-                        expand=True,
-                        spacing=1,
-                        controls=[
-                            ft.Text(
-                                titulo,
-                                size=13,
-                                color=COLOR_NEGRO,
-                                tooltip=aclaracion,
-                            ),
-                            ft.Row(
-                                spacing=3,
-                                controls=[
-                                    ft.Text(
-                                        valor,
-                                        size=22,
-                                        weight=ft.FontWeight.BOLD,
-                                        color=COLOR_BANNER,
-                                    ),
-                                ],
-                            ),
-                            ft.Text(aclaracion, size=9, color=COLOR_GRIS),
-                        ],
-                    ),
-                    self._mini_barras(serie, color),
-                ],
-            ),
-            padding=10,
-            border_color="#E1EAF4",
-            radius=12,
-            shadow=sombra_suave(),
+    def _tarjeta_metrica(
+        self, titulo, valor, aclaracion, icono, color, fondo, borde, serie
+    ):
+        return tarjeta_indicador(
+            titulo,
+            valor,
+            aclaracion,
+            icono,
+            color,
+            fondo,
+            borde,
+            complemento=self._mini_barras(serie, color),
+            tooltip=aclaracion,
         )
 
     def _mini_barras(self, valores, color):
@@ -490,7 +481,7 @@ class PantallaReportes(ft.Container):
         )
         self._valor_periodo = ft.Text(
             "$531,000 MXN",
-            size=22,
+            size=24,
             weight=ft.FontWeight.BOLD,
             color=COLOR_BANNER,
         )
@@ -520,6 +511,7 @@ class PantallaReportes(ft.Container):
             border=ft.Border.all(1, "#E1EAF4"),
             border_radius=14,
             content=ft.Column(
+                expand=True,
                 spacing=10,
                 controls=[
                     ft.Row(
@@ -561,12 +553,13 @@ class PantallaReportes(ft.Container):
                     self._grafica_slot,
                 ],
             ),
+            shadow=sombra_suave(),
         )
 
     def _crear_panel_indicadores(self):
         return ft.Container(
             expand=True,
-            padding=14,
+            padding=10,
             bgcolor="#EAF3FF",
             border=ft.Border.all(1, "#D5E5F8"),
             border_radius=14,
@@ -583,63 +576,96 @@ class PantallaReportes(ft.Container):
                         ),
                     ),
                     ft.Column(
-                        spacing=8,
+                        expand=True,
+                        spacing=6,
                         controls=[
                             ft.Row(
-                                spacing=6,
+                                spacing=8,
+                                vertical_alignment=ft.CrossAxisAlignment.CENTER,
                                 controls=[
-                                    ft.Icon(
-                                        ft.Icons.TRENDING_UP,
-                                        size=18,
-                                        color=COLOR_AZUL,
+                                    ft.Container(
+                                        width=30,
+                                        height=30,
+                                        alignment=ft.Alignment(0, 0),
+                                        bgcolor="#DCEBFF",
+                                        border_radius=9,
+                                        content=ft.Icon(
+                                            ft.Icons.TRENDING_UP,
+                                            size=18,
+                                            color=COLOR_AZUL,
+                                        ),
                                     ),
                                     ft.Text(
                                         "Indicadores clave",
-                                        size=13,
+                                        size=15,
                                         weight=ft.FontWeight.BOLD,
                                         color=COLOR_BANNER,
                                     ),
                                 ],
                             ),
-                            self._valor_periodo,
-                            self._resumen_periodo,
+                            ft.Container(
+                                padding=ft.Padding(10, 6, 10, 6),
+                                bgcolor="#F8FBFF",
+                                border=ft.Border.all(1, "#D5E5F8"),
+                                border_radius=10,
+                                content=ft.Column(
+                                    spacing=2,
+                                    controls=[
+                                        ft.Text(
+                                            "Total del periodo",
+                                            size=11,
+                                            weight=ft.FontWeight.W_600,
+                                            color=COLOR_GRIS,
+                                        ),
+                                        self._valor_periodo,
+                                        self._resumen_periodo,
+                                    ],
+                                ),
+                            ),
                             ft.Container(
                                 height=1,
                                 bgcolor="#D7E4F4",
-                                margin=ft.Margin(0, 3, 0, 2),
                             ),
                             self._indicadores_clave,
                         ],
                     ),
                 ],
             ),
+            shadow=sombra_suave(),
         )
 
     def _fila_indicador_clave(self, valor, etiqueta, color):
-        return ft.Row(
-            spacing=6,
-            controls=[
-                ft.Container(
-                    width=8,
-                    height=8,
-                    border_radius=4,
-                    bgcolor=color,
-                ),
-                ft.Text(
-                    valor,
-                    size=12,
-                    weight=ft.FontWeight.BOLD,
-                    color=COLOR_BANNER,
-                ),
-                ft.Text(
-                    etiqueta,
-                    size=11,
-                    color=COLOR_GRIS,
-                    expand=True,
-                    max_lines=1,
-                    overflow=ft.TextOverflow.ELLIPSIS,
-                ),
-            ],
+        return ft.Container(
+            padding=ft.Padding(9, 5, 9, 5),
+            bgcolor="#F8FBFF",
+            border=ft.Border.all(1, "#DCE8F5"),
+            border_radius=9,
+            content=ft.Row(
+                spacing=8,
+                vertical_alignment=ft.CrossAxisAlignment.CENTER,
+                controls=[
+                    ft.Container(
+                        width=9,
+                        height=9,
+                        border_radius=5,
+                        bgcolor=color,
+                    ),
+                    ft.Text(
+                        valor,
+                        size=14,
+                        weight=ft.FontWeight.BOLD,
+                        color=COLOR_BANNER,
+                    ),
+                    ft.Text(
+                        etiqueta,
+                        size=12,
+                        color=COLOR_GRIS,
+                        expand=True,
+                        max_lines=1,
+                        overflow=ft.TextOverflow.ELLIPSIS,
+                    ),
+                ],
+            ),
         )
 
     def _botones_metricas(self):
@@ -711,7 +737,24 @@ class PantallaReportes(ft.Container):
                 return f"{int(valor)}%"
             return f"{int(valor)}"
 
-        altura_grafica = 136
+        def formatear_tooltip(mes, valor):
+            detalle = (
+                f"${valor * 1000:,.0f} MXN"
+                if unidad == "miles de MXN"
+                else f"{valor}{'%' if unidad == 'porcentaje' else ''}"
+            )
+            return f"{mes}: {detalle} · muestra"
+
+        altura_grafica = 155
+        altura_trazado = altura_grafica - 14
+        margen_puntos = 8
+        alto_util = altura_trazado - margen_puntos * 2
+        ancho_punto = 12
+        ancho_paso = max(
+            90,
+            (((getattr(self._page, "width", None) or 1510) - 274) * 0.8 - 70)
+            / 6,
+        )
         etiquetas_eje = ft.Column(
             height=altura_grafica,
             alignment=ft.MainAxisAlignment.SPACE_BETWEEN,
@@ -721,29 +764,71 @@ class PantallaReportes(ft.Container):
                 ft.Text("0", size=11, color=COLOR_GRIS),
             ],
         )
-        barras = []
-        for mes, valor in zip(self.MESES, valores):
-            tooltip = (
-                f"{mes}: ${valor * 1000:,.0f} MXN · muestra"
-                if unidad == "miles de MXN"
-                else f"{mes}: {valor}{'%' if unidad == 'porcentaje' else ''} · muestra"
-            )
-            barras.append(
-                ft.Container(
-                    expand=True,
-                    alignment=ft.Alignment(0, 1),
-                    content=ft.Container(
-                        width=32,
-                        height=max(7, 124 * valor / maximo),
-                        bgcolor=color,
-                        border_radius=ft.BorderRadius(8, 8, 2, 2),
-                        tooltip=tooltip,
-                    ),
+        celdas_tramo = []
+        coordenadas = [
+            margen_puntos + alto_util * (1 - valor / maximo)
+            for valor in valores
+        ]
+        for indice, (mes, valor) in enumerate(zip(self.MESES, valores)):
+            tooltip = formatear_tooltip(mes, valor)
+            if indice == 0:
+                continue
+            y_inicio = coordenadas[indice - 1]
+            y_fin = coordenadas[indice]
+            celdas_tramo.append(
+                ft.Stack(
+                    expand=2,
+                    clip_behavior=ft.ClipBehavior.NONE,
+                    controls=[
+                        ft.Container(
+                            left=0,
+                            right=0,
+                            top=(y_inicio + y_fin) / 2 - 1.5,
+                            height=3,
+                            bgcolor=color,
+                            border_radius=2,
+                            rotate=ft.Rotate(
+                                angle=math.atan2(
+                                    y_fin - y_inicio,
+                                    ancho_paso,
+                                )
+                            ),
+                        ),
+                        *(
+                            [
+                                ft.Container(
+                                    left=-ancho_punto / 2,
+                                    top=y_inicio - ancho_punto / 2,
+                                    width=ancho_punto,
+                                    height=ancho_punto,
+                                    bgcolor=COLOR_BLANCO,
+                                    border=ft.Border.all(3, color),
+                                    border_radius=ancho_punto / 2,
+                                    tooltip=formatear_tooltip(
+                                        self.MESES[0],
+                                        valores[0],
+                                    ),
+                                )
+                            ]
+                            if indice == 1
+                            else []
+                        ),
+                        ft.Container(
+                            right=-ancho_punto / 2,
+                            top=y_fin - ancho_punto / 2,
+                            width=ancho_punto,
+                            height=ancho_punto,
+                            bgcolor=COLOR_BLANCO,
+                            border=ft.Border.all(3, color),
+                            border_radius=ancho_punto / 2,
+                            tooltip=tooltip,
+                        ),
+                    ],
                 )
             )
         return ft.Container(
-            height=178,
-            padding=ft.Padding(4, 2, 4, 0),
+            height=188,
+            padding=ft.Padding(4, 0, 4, 0),
             content=ft.Column(
                 spacing=4,
                 controls=[
@@ -755,7 +840,7 @@ class PantallaReportes(ft.Container):
                             ft.Container(width=28, content=etiquetas_eje),
                             ft.Container(
                                 expand=True,
-                                padding=ft.Padding(8, 4, 8, 2),
+                                padding=ft.Padding(8, 10, 8, 4),
                                 bgcolor="#F8FAFD",
                                 border_radius=10,
                                 content=ft.Stack(
@@ -771,9 +856,13 @@ class PantallaReportes(ft.Container):
                                         ),
                                         ft.Row(
                                             expand=True,
-                                            spacing=4,
+                                            spacing=0,
                                             vertical_alignment=ft.CrossAxisAlignment.STRETCH,
-                                            controls=barras,
+                                            controls=[
+                                                ft.Container(expand=1),
+                                                *celdas_tramo,
+                                                ft.Container(expand=1),
+                                            ],
                                         ),
                                     ],
                                 ),
@@ -781,7 +870,7 @@ class PantallaReportes(ft.Container):
                         ],
                     ),
                     ft.Row(
-                        height=22,
+                        height=25,
                         spacing=4,
                         controls=[
                             ft.Container(width=28),
@@ -789,7 +878,7 @@ class PantallaReportes(ft.Container):
                                 ft.Container(
                                     expand=True,
                                     alignment=ft.Alignment(0, 0),
-                                    content=ft.Text(mes, size=11, color=COLOR_GRIS),
+                                    content=ft.Text(mes, size=12, color=COLOR_GRIS),
                                 )
                                 for mes in self.MESES
                             ],
@@ -827,7 +916,7 @@ class PantallaReportes(ft.Container):
     def _crear_panel_recientes(self):
         return card(
             ft.Column(
-                spacing=9,
+                spacing=6,
                 controls=[
                     ft.Row(
                         spacing=8,
@@ -845,11 +934,6 @@ class PantallaReportes(ft.Container):
                                 color=COLOR_BANNER,
                             ),
                             ft.Container(expand=True),
-                            ft.Text(
-                                "Ejemplos",
-                                size=11,
-                                color=COLOR_GRIS,
-                            ),
                             ft.TextButton(
                                 "Ver historial completo",
                                 style=ft.ButtonStyle(color=COLOR_AZUL),
@@ -867,14 +951,9 @@ class PantallaReportes(ft.Container):
                             for informe in self.INFORMES_DEMO
                         ],
                     ),
-                    ft.Text(
-                        "Datos y archivos de ejemplo: no corresponden a informes generados realmente.",
-                        size=11,
-                        color=COLOR_GRIS,
-                    ),
                 ],
             ),
-            padding=12,
+            padding=ft.Padding(8, 6, 8, 12),
             border_color="#E1EAF4",
             radius=12,
             shadow=sombra_suave(),
@@ -890,7 +969,7 @@ class PantallaReportes(ft.Container):
             else ft.Icons.TABLE_VIEW_OUTLINED
         )
         return ft.Container(
-            padding=ft.Padding(10, 8, 10, 8),
+            padding=ft.Padding(10, 5, 10, 5),
             border=ft.Border(
                 top=ft.BorderSide(1, "#E4ECF5"),
                 right=ft.BorderSide(1, "#E4ECF5"),

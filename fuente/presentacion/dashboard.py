@@ -16,7 +16,7 @@ from fuente.utilidades.Componentes import (
     badge_estado,
     banner_modulo,
     card,
-    sombra_suave,
+    tarjeta_indicador,
 )
 
 
@@ -73,36 +73,7 @@ class dashboard(ft.Container):
             controls=[
                 self._encabezado(),
                 self._tarjetas_resumen(),
-                ft.Row(
-                    height=215,
-                    spacing=8,
-                    vertical_alignment=ft.CrossAxisAlignment.STRETCH,
-                    controls=[
-                        ft.Container(
-                            expand=2,
-                            content=self._panel_estado_cotizaciones(),
-                        ),
-                        ft.Container(
-                            expand=3,
-                            content=self._panel_actividad(),
-                        ),
-                    ],
-                ),
-                ft.Row(
-                    height=200,
-                    spacing=8,
-                    vertical_alignment=ft.CrossAxisAlignment.STRETCH,
-                    controls=[
-                        ft.Container(
-                            expand=3,
-                            content=self._panel_cotizaciones(),
-                        ),
-                        ft.Container(
-                            expand=2,
-                            content=self._panel_clientes(),
-                        ),
-                    ],
-                ),
+                self._panel_inferior(),
             ],
         )
 
@@ -130,7 +101,7 @@ class dashboard(ft.Container):
             on_click=lambda e: print("Nueva cotización clic"),
         )
         return ft.Stack(
-            height=118,
+            height=136,
             controls=[
                 banner_modulo(
                     "fondo_puerto.jpg",
@@ -138,12 +109,6 @@ class dashboard(ft.Container):
                     "Bienvenido, Alexis",
                     "Resumen de cotizaciones y actividad · datos ilustrativos.",
                     ft.Icons.HOME_OUTLINED,
-                    altura=118,
-                    padding=ft.Padding(18, 8, 18, 8),
-                    tamano_icono=56,
-                    tamano_grafico=30,
-                    tamano_titulo=25,
-                    tamano_descripcion=13,
                 ),
                 ft.Container(
                     alignment=ft.Alignment(1, 0),
@@ -161,6 +126,7 @@ class dashboard(ft.Container):
                 ft.Icons.DESCRIPTION_OUTLINED,
                 COLOR_AZUL,
                 "#EAF2FF",
+                "#D7E6FF",
             ),
             (
                 "Cotizaciones aprobadas",
@@ -168,6 +134,7 @@ class dashboard(ft.Container):
                 ft.Icons.CHECK_CIRCLE_OUTLINED,
                 COLOR_VERDE,
                 "#EAF8F0",
+                "#D5F0E2",
             ),
             (
                 "Cotizaciones canceladas",
@@ -175,6 +142,7 @@ class dashboard(ft.Container):
                 ft.Icons.CANCEL_OUTLINED,
                 COLOR_ROJO,
                 "#FDECEE",
+                "#F8D9DD",
             ),
             (
                 "Monto cotizado del mes",
@@ -182,6 +150,7 @@ class dashboard(ft.Container):
                 ft.Icons.PAYMENTS_OUTLINED,
                 COLOR_NARANJA,
                 "#FFF2E8",
+                "#FFE1C9",
             ),
         )
         return ft.Row(
@@ -195,62 +164,94 @@ class dashboard(ft.Container):
                         icono,
                         color,
                         fondo,
+                        borde,
                     ),
                 )
-                for titulo, valor, icono, color, fondo in resumenes
+                for titulo, valor, icono, color, fondo, borde in resumenes
             ],
         )
 
     @staticmethod
-    def _tarjeta_resumen(titulo, valor, icono, color, fondo):
+    def _tarjeta_resumen(titulo, valor, icono, color, fondo, borde):
+        tarjeta = tarjeta_indicador(
+            titulo,
+            valor,
+            "Periodo actual · demo",
+            icono,
+            color,
+            fondo,
+            borde,
+        )
+        tarjeta.shadow = dashboard._sombra_dashboard()
+        return tarjeta
+
+    def _panel_inferior(self):
         return card(
-            ft.Row(
-                spacing=10,
-                vertical_alignment=ft.CrossAxisAlignment.CENTER,
+            ft.Column(
+                spacing=8,
                 controls=[
-                    ft.Container(
-                        width=48,
-                        height=48,
-                        alignment=ft.Alignment(0, 0),
-                        bgcolor=fondo,
-                        border_radius=24,
-                        content=ft.Icon(icono, size=25, color=color),
-                    ),
-                    ft.Column(
-                        expand=True,
-                        spacing=2,
+                    ft.Row(
+                        height=22,
+                        vertical_alignment=ft.CrossAxisAlignment.CENTER,
                         controls=[
-                            ft.Text(
-                                titulo,
-                                size=12,
-                                font_family="Roboto",
-                                color=COLOR_BANNER,
-                                weight=ft.FontWeight.W_600,
-                                max_lines=1,
-                                overflow=ft.TextOverflow.ELLIPSIS,
+                            self._titulo_panel(
+                                ft.Icons.DASHBOARD_OUTLINED,
+                                "Actividad y desempeño",
                             ),
+                            ft.Container(expand=True),
                             ft.Text(
-                                valor,
-                                size=22,
-                                color=COLOR_BANNER,
-                                weight=ft.FontWeight.BOLD,
-                                max_lines=1,
-                                overflow=ft.TextOverflow.ELLIPSIS,
-                            ),
-                            ft.Text(
-                                "Periodo actual · demo",
-                                size=10,
+                                "Resumen de ejemplo",
+                                size=11,
                                 color=COLOR_GRIS,
+                            ),
+                        ],
+                    ),
+                    ft.Row(
+                        height=195,
+                        spacing=8,
+                        vertical_alignment=ft.CrossAxisAlignment.STRETCH,
+                        controls=[
+                            ft.Container(
+                                expand=2,
+                                content=self._panel_estado_cotizaciones(),
+                            ),
+                            ft.Container(
+                                expand=3,
+                                content=self._panel_actividad(),
+                            ),
+                        ],
+                    ),
+                    ft.Row(
+                        height=180,
+                        spacing=8,
+                        vertical_alignment=ft.CrossAxisAlignment.STRETCH,
+                        controls=[
+                            ft.Container(
+                                expand=3,
+                                content=self._panel_cotizaciones(),
+                            ),
+                            ft.Container(
+                                expand=2,
+                                content=self._panel_clientes(),
                             ),
                         ],
                     ),
                 ],
             ),
-            padding=12,
-            border_color="#E1EAF4",
-            radius=12,
-            shadow=sombra_suave(),
+            padding=10,
+            bgcolor="#F8FAFD",
+            border_color="#DCE6F1",
+            radius=14,
+            shadow=self._sombra_dashboard(),
             expand=True,
+        )
+
+    @staticmethod
+    def _sombra_dashboard():
+        return ft.BoxShadow(
+            blur_radius=22,
+            color="#263D5A2E",
+            offset=ft.Offset(0, 7),
         )
 
     def _panel_estado_cotizaciones(self):
@@ -338,7 +339,7 @@ class dashboard(ft.Container):
             padding=10,
             border_color="#E1EAF4",
             radius=12,
-            shadow=sombra_suave(),
+            shadow=self._sombra_dashboard(),
             expand=True,
         )
 
@@ -412,7 +413,7 @@ class dashboard(ft.Container):
             padding=10,
             border_color="#E1EAF4",
             radius=12,
-            shadow=sombra_suave(),
+            shadow=self._sombra_dashboard(),
             expand=True,
         )
 
@@ -510,7 +511,7 @@ class dashboard(ft.Container):
             padding=14,
             border_color="#E1EAF4",
             radius=12,
-            shadow=sombra_suave(),
+            shadow=self._sombra_dashboard(),
             expand=True,
         )
 
@@ -624,7 +625,7 @@ class dashboard(ft.Container):
             padding=10,
             border_color="#E1EAF4",
             radius=12,
-            shadow=sombra_suave(),
+            shadow=self._sombra_dashboard(),
             expand=True,
         )
 

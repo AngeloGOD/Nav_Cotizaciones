@@ -8,6 +8,7 @@ from fuente.presentacion.PantallaBuques import PantallaBuques
 from fuente.presentacion.PantallaCotizaciones import PantallaCotizaciones
 from fuente.presentacion.PantallaProductos import PantallaProductos
 from fuente.presentacion.PantallaServicios import PantallaServicios
+from fuente.presentacion.PantallaReportes import PantallaReportes
 from fuente.utilidades.Colores import COLOR_FONDO
 
 
@@ -84,6 +85,8 @@ class PantallaPrincipal(ft.Container):
             self.content_area.content = PantallaServicios(
                 self.main_page
                         )
+        elif ruta == "ruta_reportes":
+            self.content_area.content = PantallaReportes(self.main_page)
 
         if self.page is not None:
             self.content_area.update()

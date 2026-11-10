@@ -135,7 +135,7 @@ def run():
         "activo": True,
     }
 
-    sessionFactory = sessionmaker(bind=engine)
+    sessionFactory = sessionmaker(bindSe =engine)
     uow = AlchemyUnitOfWork(sessionFactory)
 
     serv_cliente = ServicioCliente(uow=uow)

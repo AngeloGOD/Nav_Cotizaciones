@@ -81,7 +81,7 @@ class Concepto(Base):
     }
 
     def calcular_cuota_basica(self, datos: dict[str, Decimal]) -> Decimal:
-        """Calcula la cuota básica del concepto en MXN a partir de las variables de entrada."""
+        """calcula la cuota básica del concepto en MXN a partir de las variables de entrada"""
         raise NotImplementedError(
             "Las subclases de Concepto deben implementar calcular_cuota_basica."
         )

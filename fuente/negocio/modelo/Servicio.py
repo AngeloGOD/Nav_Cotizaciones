@@ -21,7 +21,7 @@ from fuente.negocio.modelo.ENUMs import CaracterServicio
 
 
 class Servicio(Concepto):
-    """Nivel 1 (Rama B): Subtipo intermedio 'servicio'."""
+    """Herencia 1 rama B, subtipo de concepto y padre de todos los servicios"""
     __tablename__ = "servicio"
 
     id: Mapped[int] = mapped_column(
@@ -63,7 +63,7 @@ class Servicio(Concepto):
 
 
 class ServicioCuotaFija(Servicio):
-    """Nivel 2.A: Servicio de Cuota Fija."""
+    """herencia 2 rama A Servicio de Cuota Fija."""
     __tablename__ = "servicio_cuota_fija"
 
     id: Mapped[int] = mapped_column(
@@ -85,7 +85,7 @@ class ServicioCuotaFija(Servicio):
 
 
 class ServicioFactorUnitario(Servicio):
-    """Nivel 2.B: Servicio de Factor Unitario (Padre de Lineal Mixto y Factor Compuesto)."""
+    """herencia 2 rama B servicio de factor unitario (padre de lineal mixto y faactor compuesto)"""
     __tablename__ = "servicio_factor_unitario"
 
     id: Mapped[int] = mapped_column(
@@ -121,7 +121,7 @@ class ServicioFactorUnitario(Servicio):
 
 
 class ServicioLinealMixto(ServicioFactorUnitario):
-    """Nivel 3.B1: Servicio Lineal Mixto."""
+    """herencia 3 rama B1 servicio lineal mixto"""
     __tablename__ = "servicio_lineal_mixto"
 
     id: Mapped[int] = mapped_column(
@@ -143,7 +143,7 @@ class ServicioLinealMixto(ServicioFactorUnitario):
 
 
 class ServicioFactorCompuesto(ServicioFactorUnitario):
-    """Nivel 3.B2: Servicio Factor Compuesto."""
+    """herencia 3 rama B2 Servicio Factor Compuesto"""
     __tablename__ = "servicio_factor_compuesto"
 
     id: Mapped[int] = mapped_column(
@@ -165,7 +165,7 @@ class ServicioFactorCompuesto(ServicioFactorUnitario):
 
 
 class ServicioRango(Servicio):
-    """Nivel 2.C: Servicio por Rango de Escalón Único."""
+    """herencia 2 rama C servicio por rango de wscalón unico"""
     __tablename__ = "servicio_rango"
 
     id: Mapped[int] = mapped_column(
@@ -212,7 +212,7 @@ class ServicioRango(Servicio):
 
 
 class Rango(Base):
-    """Entidad débil de servicio_rango: 'rangos'."""
+    """entidad debil de servicio_rango 'rangos'"""
     __tablename__ = "rangos"
 
     servicio_id: Mapped[int] = mapped_column(
@@ -238,7 +238,7 @@ class Rango(Base):
 
 
 class ServicioIncremental(Servicio):
-    """Nivel 2.D: Servicio Incremental (Progresivo por Tramos de Días)."""
+    """herencia 2 rama D servicio incremental (progresivamente por tramos de días)"""
     __tablename__ = "servicio_incremental"
 
     id: Mapped[int] = mapped_column(
@@ -307,7 +307,7 @@ class ServicioIncremental(Servicio):
 
 
 class Tramo(Base):
-    """Entidad débil de servicio_incremental: 'tramo'."""
+    """entidad debil de servicio_incremental: 'tramo'"""
     __tablename__ = "tramo"
 
     servicio_id: Mapped[int] = mapped_column(

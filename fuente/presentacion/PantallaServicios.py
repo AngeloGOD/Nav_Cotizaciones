@@ -1,4 +1,5 @@
 import flet as ft
+from fuente.presentacion.PantallaNuevoServicio import PantallaNuevoServicio
 from fuente.utilidades.Colores import (
     COLOR_AZUL,
     COLOR_NARANJA,
@@ -418,10 +419,10 @@ class PantallaServicios(ft.Container):
     # =========================================================
     def abrir_nuevo_servicio(self, e):
         # Guardar la vista de la tabla actual en memoria
-        self.vista_catalogo = self.content 
-        
-
-
+        self.vista_catalogo = self.content
+        self.padding = 0
+        self.content = PantallaNuevoServicio(self.main_page, vista_anterior=self)
+        self.update()
     # --- LÓGICA DE EVENTOS ---
     def alternar_menu_exportacion(self, e=None):
         self._menu_exportacion_abierto = not self._menu_exportacion_abierto

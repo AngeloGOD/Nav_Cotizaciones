@@ -984,6 +984,18 @@ def tarjeta_catalogo(
         controls=controles,
     )
 
+    tarjeta = card(
+        contenido,
+        padding=10,
+        radius=11,
+        shadow=sombra_suave(),
+        border_color="#E3EAF2",
+        expand=True,
+    )
+    return _hacer_tarjeta_catalogo_interactiva(tarjeta, on_click)
+
+
+def _hacer_tarjeta_catalogo_interactiva(tarjeta, on_click):
     def actualizar_hover(e):
         esta_sobre_tarjeta = str(e.data).lower() in {
             "true",
@@ -1007,17 +1019,8 @@ def tarjeta_catalogo(
         )
         tarjeta.update()
 
-    tarjeta = card(
-        contenido,
-        padding=10,
-        radius=11,
-        shadow=sombra_suave(),
-        border_color="#E3EAF2",
-        expand=True,
-    )
     tarjeta.border = ft.Border.all(1.5, ft.Colors.TRANSPARENT)
     tarjeta.on_hover = actualizar_hover
-
     return ft.GestureDetector(
         expand=True,
         mouse_cursor=ft.MouseCursor.CLICK,
@@ -1032,12 +1035,10 @@ def fila_catalogo(
     etiqueta,
     detalle,
     ruta_imagen=None,
-    icono_detalle=ft.Icons.INFO_OUTLINE,
     icono_secundario=ft.Icons.INVENTORY_2_OUTLINED,
-    tooltip="Ver información",
     on_info=None,
 ):
-    """Fila compacta reutilizable para catálogos en vista de lista."""
+    """Tarjeta compacta interactiva para catálogos en vista de lista."""
 
     if ruta_imagen:
         imagen_control = ft.Image(
@@ -1060,7 +1061,7 @@ def fila_catalogo(
             ),
         )
 
-    return card(
+    tarjeta = card(
         ft.Row(
             spacing=14,
             vertical_alignment=ft.CrossAxisAlignment.CENTER,
@@ -1089,7 +1090,7 @@ def fila_catalogo(
                     ],
                 ),
                 ft.Row(
-                    width=150,
+                    width=120,
                     spacing=6,
                     controls=[
                         ft.Icon(
@@ -1106,18 +1107,15 @@ def fila_catalogo(
                         ),
                     ],
                 ),
-                ft.IconButton(
-                    icon=icono_detalle,
-                    tooltip=tooltip,
-                    icon_color=COLOR_AZUL,
-                    on_click=on_info,
-                ),
             ],
         ),
         padding=10,
         radius=10,
         shadow=sombra_suave(),
+        border_color="#E3EAF2",
+        expand=True,
     )
+    return _hacer_tarjeta_catalogo_interactiva(tarjeta, on_info)
 
 
 def tarjeta_producto(producto, on_info=None):

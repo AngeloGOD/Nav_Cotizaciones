@@ -15,6 +15,7 @@ from fuente.utilidades.Componentes import (
     boton,
     boton_vista,
     card,
+    estado_vacio,
     fila_catalogo,
     sombra_suave,
     tarjeta_catalogo,
@@ -379,27 +380,53 @@ class PantallaServicios(ft.Container):
 
     def _crear_vista_servicios(self):
         servicios = self.servicios_demo[:self.registros_por_pagina]
+        if not servicios:
+            return estado_vacio(
+                ft.Icons.WORK_OUTLINE,
+                "No se encontraron servicios",
+                "Prueba cambiando la búsqueda o los filtros.",
+            )
+
         if self._vista_servicios == "lista":
-            return ft.ListView(
-                expand=True,
-                spacing=8,
-                padding=ft.Padding(2, 2, 2, 2),
-                controls=[
-                    fila_catalogo(
-                        titulo=servicio["nombre"],
-                        descripcion=servicio["descripcion"],
-                        etiqueta=self._crear_etiqueta_servicio(
-                            servicio["categoria"]
-                        ),
-                        detalle=servicio["detalle"],
-                        ruta_imagen=(
-                            "https://images.unsplash.com/"
-                            f"{servicio['imagen']}?auto=format&fit=crop&w=700&q=80"
-                        ),
-                        icono_secundario=ft.Icons.ATTACH_MONEY,
+            tarjetas = [
+                fila_catalogo(
+                    titulo=servicio["nombre"],
+                    descripcion=servicio["descripcion"],
+                    etiqueta=self._crear_etiqueta_servicio(
+                        servicio["categoria"]
+                    ),
+                    detalle=servicio["detalle"],
+                    ruta_imagen=(
+                        "https://images.unsplash.com/"
+                        f"{servicio['imagen']}?auto=format&fit=crop&w=700&q=80"
+                    ),
+                    icono_secundario=ft.Icons.ATTACH_MONEY,
+                    on_info=lambda e, s=servicio: self.ver_servicio(s),
+                )
+                for servicio in servicios
+            ]
+            filas = []
+            for inicio in range(0, len(tarjetas), 2):
+                controles_fila = tarjetas[inicio:inicio + 2]
+                if len(controles_fila) == 1:
+                    controles_fila.append(ft.Container(expand=True))
+                filas.append(
+                    ft.Row(
+                        height=120,
+                        spacing=8,
+                        vertical_alignment=ft.CrossAxisAlignment.STRETCH,
+                        controls=controles_fila,
                     )
-                    for servicio in servicios
-                ],
+                )
+            return ft.Container(
+                expand=True,
+                padding=ft.Padding(2, 2, 2, 2),
+                content=ft.Column(
+                    expand=True,
+                    spacing=8,
+                    scroll=ft.ScrollMode.AUTO,
+                    controls=filas,
+                ),
             )
 
         tarjetas = [
@@ -415,6 +442,7 @@ class PantallaServicios(ft.Container):
                     f"{servicio['imagen']}?auto=format&fit=crop&w=700&q=80"
                 ),
                 icono_secundario=ft.Icons.ATTACH_MONEY,
+                on_click=lambda e, s=servicio: self.ver_servicio(s),
             )
             for servicio in servicios
         ]
@@ -446,10 +474,46 @@ class PantallaServicios(ft.Container):
 
     def cambiar_vista_servicios(self, vista):
         self._vista_servicios = vista
+        self.registros_por_pagina = 16 if vista == "lista" else 8
+        self.pagina_actual = 1
         self._contenido_servicios.content = self._crear_vista_servicios()
         self._botones_vista.controls = self._crear_botones_vista()
         if self.main_page is not None:
             self.main_page.update()
+
+    def ver_servicio(self, servicio):
+        self.main_page.show_dialog(
+            ft.AlertDialog(
+                modal=True,
+                title=ft.Text(
+                    servicio["nombre"],
+                    color=COLOR_BANNER,
+                    weight=ft.FontWeight.BOLD,
+                ),
+                content=ft.Column(
+                    tight=True,
+                    spacing=8,
+                    controls=[
+                        ft.Text(servicio["descripcion"], color=COLOR_GRIS),
+                        ft.Text(
+                            f"Categoría: {servicio['categoria']}",
+                            color=COLOR_NEGRO,
+                        ),
+                        ft.Text(
+                            f"Tipo de cobro: {servicio['detalle']}",
+                            color=COLOR_NEGRO,
+                        ),
+                    ],
+                ),
+                actions=[
+                    ft.TextButton(
+                        "Cerrar",
+                        on_click=lambda e: self.main_page.pop_dialog(),
+                    )
+                ],
+                actions_alignment=ft.MainAxisAlignment.END,
+            )
+        )
 
     # =========================================================
     # 2. CAMBIO: Función para hacer el cambio de pantalla

@@ -4,7 +4,6 @@ from fuente.negocio.controlador.ControladorDashboard import ControladorDashboard
 from fuente.utilidades.Colores import (
     COLOR_AZUL,
     COLOR_BANNER,
-    COLOR_BLANCO,
     COLOR_FONDO,
     COLOR_GRIS,
     COLOR_NARANJA,
@@ -79,44 +78,12 @@ class dashboard(ft.Container):
         )
 
     def _encabezado(self):
-        boton_nueva_cotizacion = ft.FilledButton(
-            content=ft.Row(
-                tight=True,
-                spacing=7,
-                controls=[
-                    ft.Icon(ft.Icons.ADD, size=17, color=COLOR_BLANCO),
-                    ft.Text(
-                        "Nueva cotización",
-                        size=13,
-                        weight=ft.FontWeight.BOLD,
-                        color=COLOR_BLANCO,
-                    ),
-                ],
-            ),
-            height=42,
-            style=ft.ButtonStyle(
-                bgcolor=COLOR_NARANJA,
-                shape=ft.RoundedRectangleBorder(radius=9),
-                padding=ft.Padding(14, 0, 14, 0),
-            ),
-            on_click=lambda e: print("Nueva cotización clic"),
-        )
-        return ft.Stack(
-            height=138,
-            controls=[
-                banner_modulo(
-                    "fondo_puerto.jpg",
-                    "OPL Pacífico Sur",
-                    "Bienvenido, Alexis",
-                    "Resumen de cotizaciones y actividad · datos ilustrativos.",
-                    ft.Icons.HOME_OUTLINED,
-                ),
-                ft.Container(
-                    alignment=ft.Alignment(1, 0),
-                    padding=ft.Padding(0, 0, 18, 0),
-                    content=boton_nueva_cotizacion,
-                ),
-            ],
+        return banner_modulo(
+            "fondo_puerto.jpg",
+            "OPL Pacífico Sur",
+            "Bienvenido, Alexis",
+            "Resumen de cotizaciones y actividad · datos ilustrativos.",
+            ft.Icons.HOME_OUTLINED,
         )
 
     def _tarjetas_resumen(self):

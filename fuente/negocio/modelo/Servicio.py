@@ -9,6 +9,7 @@ from sqlalchemy import (
     Numeric,
     text,
 )
+from sqlalchemy.dialects.postgresql import JSONB
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 from fuente.negocio.modelo.Base import Base
 from fuente.negocio.modelo.CategoriaBuque import CategoriaBuque
@@ -32,6 +33,8 @@ class Servicio(Concepto):
 
     requiere_entrada_salida: Mapped[bool] = mapped_column(nullable=False,)
 
+    regla_obligatoriedad: Mapped[dict] = mapped_column(JSONB, nullable=True,) 
+
     categoria_buque_id: Mapped[int | None] = mapped_column(
         ForeignKey("categoria_buque.id", ondelete="RESTRICT"),
         nullable=True,
@@ -39,6 +42,11 @@ class Servicio(Concepto):
 
     categoria_buque: Mapped["CategoriaBuque | None"] = relationship(
         back_populates="servicios"
+    )
+
+    __table_args__ = (
+        CheckConstraint("(caracter != 'CONDICIONAL') OR (regla_obligatoriedad IS NOT NULL)",
+            name="chk_reglas_si_condicional"),
     )
 
 

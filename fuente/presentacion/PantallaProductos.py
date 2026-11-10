@@ -1,7 +1,6 @@
 ﻿
 import flet as ft
 from fuente.utilidades.Colores import *
-
 from fuente.utilidades.Componentes import (
     banner_modulo,
     agregar_panel_flotante,

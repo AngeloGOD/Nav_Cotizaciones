@@ -63,3 +63,7 @@ class Producto(Concepto):
     __mapper_args__ = {
         "polymorphic_identity": TipoConcepto.PRODUCTO,
     }
+
+    def calcular_cuota_basica(self, datos: dict[str, Decimal]) -> Decimal:
+        cantidad = Decimal(str(datos.get("CANTIDAD", Decimal("1.00"))))
+        return cantidad * Decimal(str(self.precio_venta))

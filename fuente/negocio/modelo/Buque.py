@@ -4,9 +4,9 @@ from typing import TYPE_CHECKING
 from sqlalchemy import Boolean, CheckConstraint, ForeignKey, Numeric, String, text
 from sqlalchemy.orm import Mapped, mapped_column, relationship, synonym
 from fuente.negocio.modelo.Base import Base
+from fuente.negocio.modelo.CategoriaBuque import CategoriaBuque
 
 if TYPE_CHECKING:
-    from fuente.negocio.modelo.CategoriaBuque import CategoriaBuque
     from fuente.negocio.modelo.Cliente import Cliente
 
 

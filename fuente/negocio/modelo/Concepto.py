@@ -16,9 +16,7 @@ from sqlalchemy.orm import Mapped, mapped_column, relationship
 from fuente.negocio.modelo.Base import Base
 from fuente.negocio.modelo.CategoriaPDA import CategoriaPDA
 from fuente.negocio.modelo.ENUMs import TipoConcepto
-
-if TYPE_CHECKING:
-    from fuente.negocio.modelo.Proveedor import Proveedor
+from fuente.negocio.modelo.Proveedor import Proveedor
 
 
 concepto_proveedor = Table(
@@ -81,3 +79,9 @@ class Concepto(Base):
     __mapper_args__ = {
         "polymorphic_on": "tipo_concepto",
     }
+
+    def calcular_cuota_basica(self, datos: dict[str, Decimal]) -> Decimal:
+        """Calcula la cuota básica del concepto en MXN a partir de las variables de entrada."""
+        raise NotImplementedError(
+            "Las subclases de Concepto deben implementar calcular_cuota_basica."
+        )

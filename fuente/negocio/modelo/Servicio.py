@@ -1,11 +1,13 @@
 from __future__ import annotations
 from decimal import Decimal
+import math
 from typing import TYPE_CHECKING
 from sqlalchemy import (
     CheckConstraint,
     Enum as SqlEnum,
     ForeignKey,
     Integer,
+    JSON,
     Numeric,
     text,
 )
@@ -17,6 +19,7 @@ from fuente.negocio.modelo.Concepto import Concepto
 from fuente.negocio.modelo.ENUMs import TipoConcepto, VariableMedida
 from fuente.negocio.modelo.ENUMs import CaracterServicio
 
+
 class Servicio(Concepto):
     """Nivel 1 (Rama B): Subtipo intermedio 'servicio'."""
     __tablename__ = "servicio"
@@ -27,13 +30,16 @@ class Servicio(Concepto):
     )
 
     caracter: Mapped[CaracterServicio] = mapped_column(
-         SqlEnum(CaracterServicio, name="caracter_servicio_enum", native_enum=True),
+        SqlEnum(CaracterServicio, name="caracter_servicio_enum", native_enum=True),
         nullable=False,
     )
 
-    requiere_entrada_salida: Mapped[bool] = mapped_column(nullable=False,)
+    requiere_entrada_salida: Mapped[bool] = mapped_column(nullable=False)
 
-    regla_obligatoriedad: Mapped[dict] = mapped_column(JSONB, nullable=True,) 
+    regla_obligatoriedad: Mapped[dict | None] = mapped_column(
+        JSON().with_variant(JSONB(), "postgresql"),
+        nullable=True,
+    )
 
     categoria_buque_id: Mapped[int | None] = mapped_column(
         ForeignKey("categoria_buque.id", ondelete="RESTRICT"),
@@ -45,9 +51,15 @@ class Servicio(Concepto):
     )
 
     __table_args__ = (
-        CheckConstraint("(caracter != 'CONDICIONAL') OR (regla_obligatoriedad IS NOT NULL)",
-            name="chk_reglas_si_condicional"),
+        CheckConstraint(
+            "(caracter != 'CONDICIONAL') OR (regla_obligatoriedad IS NOT NULL)",
+            name="chk_reglas_si_condicional",
+        ),
     )
+
+    __mapper_args__ = {
+        "polymorphic_abstract": True,
+    }
 
 
 class ServicioCuotaFija(Servicio):
@@ -67,6 +79,9 @@ class ServicioCuotaFija(Servicio):
     __mapper_args__ = {
         "polymorphic_identity": TipoConcepto.SERVICIO_CUOTA_FIJA,
     }
+
+    def calcular_cuota_basica(self, datos: dict[str, Decimal]) -> Decimal:
+        return Decimal(str(self.cuota))
 
 
 class ServicioFactorUnitario(Servicio):
@@ -98,6 +113,12 @@ class ServicioFactorUnitario(Servicio):
         "polymorphic_identity": TipoConcepto.SERVICIO_FACTOR_UNITARIO,
     }
 
+    def calcular_cuota_basica(self, datos: dict[str, Decimal]) -> Decimal:
+        valor_bruto = Decimal(str(datos[self.variable_primaria.value]))
+        minimo = Decimal(str(self.unidades_minimas if self.unidades_minimas is not None else "0.00"))
+        u1 = max(valor_bruto, minimo)
+        return u1 * Decimal(str(self.factor_mxn))
+
 
 class ServicioLinealMixto(ServicioFactorUnitario):
     """Nivel 3.B1: Servicio Lineal Mixto."""
@@ -117,6 +138,9 @@ class ServicioLinealMixto(ServicioFactorUnitario):
         "polymorphic_identity": TipoConcepto.SERVICIO_LINEAL_MIXTO,
     }
 
+    def calcular_cuota_basica(self, datos: dict[str, Decimal]) -> Decimal:
+        return Decimal(str(self.cuota_base)) + super().calcular_cuota_basica(datos)
+
 
 class ServicioFactorCompuesto(ServicioFactorUnitario):
     """Nivel 3.B2: Servicio Factor Compuesto."""
@@ -134,6 +158,10 @@ class ServicioFactorCompuesto(ServicioFactorUnitario):
     __mapper_args__ = {
         "polymorphic_identity": TipoConcepto.SERVICIO_FACTOR_COMPUESTO,
     }
+
+    def calcular_cuota_basica(self, datos: dict[str, Decimal]) -> Decimal:
+        u2 = Decimal(str(datos[self.variable_secundaria.value]))
+        return super().calcular_cuota_basica(datos) * u2
 
 
 class ServicioRango(Servicio):
@@ -158,6 +186,29 @@ class ServicioRango(Servicio):
     __mapper_args__ = {
         "polymorphic_identity": TipoConcepto.SERVICIO_RANGO,
     }
+
+    def calcular_cuota_basica(self, datos: dict[str, Decimal]) -> Decimal:
+        valor = Decimal(str(datos[self.variable_rangos.value]))
+        rangos_ordenados = sorted(
+            self.rangos,
+            key=lambda r: (
+                r.disc if r.disc is not None else 0,
+                Decimal(str(r.limite_inferior)),
+            ),
+        )
+        for rango in rangos_ordenados:
+            lim_inf = Decimal(str(rango.limite_inferior))
+            lim_sup = (
+                Decimal(str(rango.limite_superior))
+                if rango.limite_superior is not None
+                else None
+            )
+            if valor >= lim_inf and (lim_sup is None or valor <= lim_sup):
+                return Decimal(str(rango.cuota_mxn))
+        raise ValueError(
+            f"El valor {valor} para la variable '{self.variable_rangos.value}' "
+            f"no coincide con ningún rango del servicio '{self.nombre_es}'."
+        )
 
 
 class Rango(Base):
@@ -222,6 +273,37 @@ class ServicioIncremental(Servicio):
     __mapper_args__ = {
         "polymorphic_identity": TipoConcepto.SERVICIO_INCREMENTAL,
     }
+
+    def calcular_cuota_basica(self, datos: dict[str, Decimal]) -> Decimal:
+        cantidad = Decimal(str(datos[self.variable_cantidad.value]))
+        dias_cobrables = Decimal(str(datos[self.variable_dias.value]))
+
+        if dias_cobrables <= Decimal("0") or cantidad <= Decimal("0"):
+            return Decimal("0.00")
+
+        bloque = Decimal(str(self.bloque_redondeo if self.bloque_redondeo is not None else "1.00"))
+        bloques = Decimal(math.ceil(cantidad / bloque))
+
+        tramos_ordenados = sorted(
+            self.tramos,
+            key=lambda t: (t.disc if t.disc is not None else 0, t.dia_inicio),
+        )
+
+        acumulado_por_bloque = Decimal("0.00")
+        for tramo in tramos_ordenados:
+            inicio = Decimal(tramo.dia_inicio)
+            if dias_cobrables < inicio:
+                continue
+            fin_efectivo = (
+                min(dias_cobrables, Decimal(tramo.dia_fin))
+                if tramo.dia_fin is not None
+                else dias_cobrables
+            )
+            dias_en_tramo = fin_efectivo - inicio + Decimal("1")
+            if dias_en_tramo > Decimal("0"):
+                acumulado_por_bloque += dias_en_tramo * Decimal(str(tramo.cuota_diaria_mxn))
+
+        return bloques * acumulado_por_bloque
 
 
 class Tramo(Base):

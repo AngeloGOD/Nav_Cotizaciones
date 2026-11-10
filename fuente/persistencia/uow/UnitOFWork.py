@@ -3,6 +3,7 @@ from fuente.persistencia.repositorio.RepositorioCliente import RepositorioClient
 from fuente.persistencia.repositorio.RepositorioBuque import RepositorioBuque
 from fuente.persistencia.repositorio.RepositorioCategoriaBuque import RepositorioCategoriaBuque
 from fuente.persistencia.repositorio.RepositorioProducto import RepositorioProducto
+from fuente.persistencia.repositorio.RepositorioServicio import RepositorioServicio
 
 class AlchemyUnitOfWork(AbstractUnitOfWork):
 
@@ -17,6 +18,7 @@ class AlchemyUnitOfWork(AbstractUnitOfWork):
         self.buque = RepositorioBuque(self.session)
         self.categoria_buque = RepositorioCategoriaBuque(self.session)
         self.producto = RepositorioProducto(self.session)
+        self.servicio = RepositorioServicio(self.session)
         return super().__enter__()
 
     def commit(self):

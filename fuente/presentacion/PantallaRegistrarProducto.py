@@ -8,6 +8,13 @@ from fuente.utilidades.Componentes import (
     card,
     banner_imagen_desvanecida,
     sombra_suave,
+    campo_con_mensaje_error,
+    crear_mensaje_validacion,
+    validar_campo,
+    validar_campos,
+    validador_numero,
+    validador_requerido,
+    vincular_validacion_campo,
 )
 from fuente.negocio.controlador.ControladorProductos import ControladorProductos
 from fuente.utilidades.ExportacionArchivos import obtener_selector_archivos
@@ -115,6 +122,91 @@ class PantallaRegistrarProducto(ft.Container):
             active_color=COLOR_NARANJA,
         )
 
+        self._errores_validacion = {
+            campo: crear_mensaje_validacion()
+            for campo in (
+                "nombre",
+                "categoria",
+                "unidad",
+                "factor",
+                "costo",
+                "margen",
+                "precio",
+                "descripcion_es",
+            )
+        }
+        self._validaciones = {
+            "nombre": (
+                self.nombre,
+                self._errores_validacion["nombre"],
+                validador_requerido("el nombre del producto"),
+            ),
+            "categoria": (
+                self.categoria,
+                self._errores_validacion["categoria"],
+                self._validar_categoria,
+                (self.categoria_personalizada,),
+            ),
+            "unidad": (
+                self.unidad,
+                self._errores_validacion["unidad"],
+                validador_requerido("la unidad de medida"),
+            ),
+            "factor": (
+                self.factor,
+                self._errores_validacion["factor"],
+                validador_numero(
+                    "El factor de conversión",
+                    minimo=0,
+                    minimo_exclusivo=True,
+                ),
+            ),
+            "costo": (
+                self.costo,
+                self._errores_validacion["costo"],
+                validador_numero("El costo", minimo=0),
+            ),
+            "margen": (
+                self.margen,
+                self._errores_validacion["margen"],
+                validador_numero("El margen", minimo=0),
+            ),
+            "precio": (
+                self.precio,
+                self._errores_validacion["precio"],
+                validador_numero("El precio", minimo=0),
+            ),
+            "descripcion_es": (
+                self.descripcion_es,
+                self._errores_validacion["descripcion_es"],
+                validador_requerido("la descripción en español"),
+            ),
+        }
+        for clave, (control, mensaje_error, validador, *relacionados) in (
+            self._validaciones.items()
+        ):
+            vincular_validacion_campo(
+                control,
+                mensaje_error,
+                validador,
+                page=self._page,
+                evento=(
+                    "on_select"
+                    if control is self.categoria or control is self.unidad
+                    else "on_change"
+                ),
+                controles_relacionados=(
+                    relacionados[0] if relacionados else ()
+                ),
+            )
+        vincular_validacion_campo(
+            self.categoria_personalizada,
+            self._errores_validacion["categoria"],
+            self._validar_categoria,
+            page=self._page,
+            controles_relacionados=(self.categoria,),
+        )
+
         self.content = ft.Container(
             expand=True,
             padding=ft.Padding(14, 8, 14, 10),
@@ -158,7 +250,9 @@ class PantallaRegistrarProducto(ft.Container):
             border_radius=9,
         )
 
-    def campo_etiquetado(self, titulo, icono, control, expand=True):
+    def campo_etiquetado(
+        self, titulo, icono, control, expand=True, mensaje_error=None
+    ):
         return ft.Container(
             expand=expand,
             content=ft.Column(
@@ -182,7 +276,11 @@ class PantallaRegistrarProducto(ft.Container):
                             ),
                         ],
                     ),
-                    control,
+                    (
+                        campo_con_mensaje_error(control, mensaje_error)
+                        if mensaje_error is not None
+                        else control
+                    ),
                 ],
             ),
         )
@@ -214,8 +312,21 @@ class PantallaRegistrarProducto(ft.Container):
         self.categoria.value = None
         self.categoria_personalizada.value = ""
         self.campo_categoria.content = self.categoria
+        validar_campo(
+            self.categoria,
+            self._errores_validacion["categoria"],
+            self._validar_categoria,
+            controles_relacionados=(self.categoria_personalizada,),
+        )
         if self._page is not None:
             self._page.update()
+
+    def _validar_categoria(self, valor=None):
+        if self.categoria.value == "agregar":
+            return validador_requerido("el nombre de la categoría")(
+                self.categoria_personalizada.value
+            )
+        return validador_requerido("una categoría")(self.categoria.value)
 
     def contenido_boton_imagen(self):
         if self._archivo_imagen is None:
@@ -393,12 +504,14 @@ class PantallaRegistrarProducto(ft.Container):
                         ft.Icons.SHOPPING_BAG_OUTLINED,
                         self.nombre,
                         expand=21,
+                        mensaje_error=self._errores_validacion["nombre"],
                     ),
                     self.campo_etiquetado(
                         "Categoría / Subtipo *",
                         ft.Icons.CATEGORY_OUTLINED,
                         self.campo_categoria,
                         expand=18,
+                        mensaje_error=self._errores_validacion["categoria"],
                     ),
                     self.campo_etiquetado(
                         "SKU / Código interno",
@@ -409,7 +522,7 @@ class PantallaRegistrarProducto(ft.Container):
                     self.boton_imagen,
                 ],
             ),
-            altura=126,
+            altura=142,
         )
 
         presentacion = self.seccion(
@@ -422,6 +535,7 @@ class PantallaRegistrarProducto(ft.Container):
                         "Unidad de medida base *",
                         ft.Icons.SCALE_OUTLINED,
                         self.unidad,
+                        mensaje_error=self._errores_validacion["unidad"],
                     ),
                     self.campo_etiquetado(
                         "Presentación estándar",
@@ -432,6 +546,7 @@ class PantallaRegistrarProducto(ft.Container):
                         "Factor de conversión *",
                         ft.Icons.SWAP_HORIZ,
                         self.factor,
+                        mensaje_error=self._errores_validacion["factor"],
                     ),
                 ],
             ),
@@ -451,16 +566,19 @@ class PantallaRegistrarProducto(ft.Container):
                                 "Costo de compra (MXN) *",
                                 ft.Icons.ATTACH_MONEY,
                                 self.costo,
+                                mensaje_error=self._errores_validacion["costo"],
                             ),
                             self.campo_etiquetado(
                                 "Margen de agencia (%) *",
                                 ft.Icons.PERCENT,
                                 self.margen,
+                                mensaje_error=self._errores_validacion["margen"],
                             ),
                             self.campo_etiquetado(
                                 "Precio de venta (MXN) *",
                                 ft.Icons.SELL_OUTLINED,
                                 self.precio,
+                                mensaje_error=self._errores_validacion["precio"],
                             ),
                         ],
                     ),
@@ -534,6 +652,7 @@ class PantallaRegistrarProducto(ft.Container):
                                 "Descripción en español *",
                                 ft.Icons.TRANSLATE_OUTLINED,
                                 self.descripcion_es,
+                                mensaje_error=self._errores_validacion["descripcion_es"],
                             ),
                             self.campo_etiquetado(
                                 "Descripción en inglés",
@@ -549,7 +668,7 @@ class PantallaRegistrarProducto(ft.Container):
             border_color="#E2EDF9",
             shadow=sombra_suave(),
         )
-        descripciones.height = 157
+        descripciones.height = 172
         logistica = self.seccion(
             ft.Icons.ROUTE_OUTLINED,
             "Logística, conservación y estado",
@@ -792,6 +911,10 @@ class PantallaRegistrarProducto(ft.Container):
             self._page.update()
 
     def guardar(self, e=None):
+        if not validar_campos(self._validaciones):
+            self._page.update()
+            return
+
         self._page.show_dialog(
             ft.AlertDialog(
                 modal=True,

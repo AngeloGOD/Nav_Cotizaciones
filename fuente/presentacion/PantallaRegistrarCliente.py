@@ -62,6 +62,58 @@ class PantallaRegistrarCliente(ft.Container):
         self.direccion_fiscal.content_padding = ft.Padding(12, 8, 12, 8)
         self.direccion_fiscal.text_size = 14
 
+        self._errores_validacion = {
+            campo: crear_mensaje_validacion()
+            for campo in (
+                "nombre",
+                "rfc",
+                "tipo_persona",
+                "telefono",
+                "correo",
+                "direccion",
+            )
+        }
+        self._validaciones = {
+            "nombre": (
+                self.nombre,
+                self._errores_validacion["nombre"],
+                validador_requerido("el nombre o razón social"),
+            ),
+            "rfc": (
+                self.rfc,
+                self._errores_validacion["rfc"],
+                validador_requerido("el RFC"),
+            ),
+            "tipo_persona": (
+                self.tipo_persona,
+                self._errores_validacion["tipo_persona"],
+                validador_requerido("un tipo de persona"),
+            ),
+            "telefono": (
+                self.telefono,
+                self._errores_validacion["telefono"],
+                validador_telefono(),
+            ),
+            "correo": (
+                self.correo,
+                self._errores_validacion["correo"],
+                validador_correo(),
+            ),
+            "direccion": (
+                self.direccion_fiscal,
+                self._errores_validacion["direccion"],
+                validador_requerido("la dirección fiscal"),
+            ),
+        }
+        for clave, (control, mensaje_error, validador) in self._validaciones.items():
+            vincular_validacion_campo(
+                control,
+                mensaje_error,
+                validador,
+                page=self._page,
+                evento="on_select" if clave == "tipo_persona" else "on_change",
+            )
+
         # El encabezado permanece arriba y la zona de campos puede desplazarse.
         # Los botones están fuera de esa zona para permanecer siempre visibles.
         self.content = ft.Container(
@@ -145,13 +197,19 @@ class PantallaRegistrarCliente(ft.Container):
                         ft.Container(
                             expand=1,
                             content=self.campo_etiquetado(
-                                "Nombre o razón social *", ft.Icons.PERSON_OUTLINED, self.nombre
+                                "Nombre o razón social *",
+                                ft.Icons.PERSON_OUTLINED,
+                                self.nombre,
+                                self._errores_validacion["nombre"],
                             ),
                         ),
                         ft.Container(
                             expand=1,
                             content=self.campo_etiquetado(
-                                "RFC *", ft.Icons.BADGE_OUTLINED, self.rfc
+                                "RFC *",
+                                ft.Icons.BADGE_OUTLINED,
+                                self.rfc,
+                                self._errores_validacion["rfc"],
                             ),
                         ),
                     ],
@@ -163,7 +221,10 @@ class PantallaRegistrarCliente(ft.Container):
                         ft.Container(
                             expand=4,
                             content=self.campo_etiquetado(
-                                "Tipo de persona *", ft.Icons.PERSON_OUTLINE, self.tipo_persona
+                                "Tipo de persona *",
+                                ft.Icons.PERSON_OUTLINE,
+                                self.tipo_persona,
+                                self._errores_validacion["tipo_persona"],
                             ),
                         ),
                         ft.Container(expand=7, content=self.panel_estados()),
@@ -178,20 +239,29 @@ class PantallaRegistrarCliente(ft.Container):
                 ft.Container(
                     expand=1,
                     content=self.campo_etiquetado(
-                        "Número telefónico *", ft.Icons.PHONE_OUTLINED, self.telefono
+                        "Número telefónico *",
+                        ft.Icons.PHONE_OUTLINED,
+                        self.telefono,
+                        self._errores_validacion["telefono"],
                     ),
                 ),
                 ft.Container(
                     expand=1,
                     content=self.campo_etiquetado(
-                        "Correo electrónico *", ft.Icons.MAIL_OUTLINE, self.correo
+                        "Correo electrónico *",
+                        ft.Icons.MAIL_OUTLINE,
+                        self.correo,
+                        self._errores_validacion["correo"],
                     ),
                 ),
             ],
         )
 
         domicilio = self.campo_etiquetado(
-            "Dirección fiscal completa *", ft.Icons.LOCATION_ON_OUTLINED, self.direccion_fiscal
+            "Dirección fiscal completa *",
+            ft.Icons.LOCATION_ON_OUTLINED,
+            self.direccion_fiscal,
+            self._errores_validacion["direccion"],
         )
 
         contenido_desplazable = ft.Column(
@@ -250,7 +320,7 @@ class PantallaRegistrarCliente(ft.Container):
             expand=True,
         )
 
-    def campo_etiquetado(self, titulo, icono, control):
+    def campo_etiquetado(self, titulo, icono, control, mensaje_error=None):
         return ft.Column(
             width=float("inf"),
             spacing=5,
@@ -269,7 +339,11 @@ class PantallaRegistrarCliente(ft.Container):
                         ),
                     ],
                 ),
-                control,
+                (
+                    campo_con_mensaje_error(control, mensaje_error)
+                    if mensaje_error is not None
+                    else control
+                ),
             ],
         )
 
@@ -359,6 +433,10 @@ class PantallaRegistrarCliente(ft.Container):
             self._page.update()
 
     def guardar(self, e):
+        if not validar_campos(self._validaciones):
+            self._page.update()
+            return
+
         razon_social = self.nombre.value
         rfc = self.rfc.value
         direccion = self.direccion_fiscal.value

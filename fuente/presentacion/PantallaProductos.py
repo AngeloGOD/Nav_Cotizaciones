@@ -18,6 +18,7 @@ from fuente.utilidades.Componentes import (
     seccion_opciones_filtro,
     sombra_suave,
     tarjeta_producto,
+    validar_registros_exportacion,
 )
 from fuente.utilidades.ExportacionExcel import exportar_excel
 from fuente.utilidades.ExportacionPDF import exportar_pdf
@@ -631,6 +632,10 @@ class PantallaProductos(ft.Container):
             productos, columnas = self.controlador.obtener_datos_exportacion(
                 self._filtrar_productos()
             )
+            if not validar_registros_exportacion(
+                self._page, productos, "productos"
+            ):
+                return
             guardado = await exportar_excel(
                 self._page,
                 productos,
@@ -657,6 +662,10 @@ class PantallaProductos(ft.Container):
             filas, _ = self.controlador.obtener_datos_exportacion(
                 self._filtrar_productos()
             )
+            if not validar_registros_exportacion(
+                self._page, filas, "productos"
+            ):
+                return
             activos = sum(fila["estado"] == "Activo" for fila in filas)
             guardado = await exportar_pdf(
                 self._page,

@@ -41,7 +41,11 @@ from fuente.utilidades.ExportacionArchivos import obtener_selector_archivos
 ValorColumna = str | Callable[[Any], object]
 COLOR_AZUL_MARINO = colors.HexColor(COLOR_SIDEBAR)
 TAMANO_PAGINA_REGISTROS = 10
-LOGO_OPL = Path(__file__).resolve().parents[2] / "assets" / "logo_opl.png"
+LOGO_OPL = (
+    Path(__file__).resolve().parents[2]
+    / "assets"
+    / "logoOPL_parareportes.png"
+)
 
 
 def _aclarar_color(color_hex, proporcion_blanco=0.82):
@@ -493,7 +497,7 @@ def crear_pdf(
     proporciones_columnas: Sequence[float] | None = None,
     columnas_centradas: Iterable[str] = (),
     nombre_registro: str = "registros",
-    envolver_texto_celdas: bool = False,
+    envolver_texto_celdas: bool = True,
 ) -> bytes:
     if not columnas:
         raise ValueError("Debe especificarse al menos una columna.")

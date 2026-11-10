@@ -1,3 +1,7 @@
+from datetime import date as _date, datetime as _datetime
+from decimal import Decimal as _Decimal, InvalidOperation as _InvalidOperation
+import re as _re
+
 import flet as ft
 from .Colores import *
 
@@ -26,6 +30,220 @@ class Herramientas:
             if valores_iniciales is not None:
                 valor = valores_iniciales[indice]
             control.value = valor
+
+
+def crear_mensaje_validacion():
+    return ft.Text(
+        "",
+        size=11,
+        color=COLOR_ROJO,
+        visible=False,
+    )
+
+
+def campo_con_mensaje_error(control, mensaje_error):
+    return ft.Column(
+        spacing=2,
+        controls=[control, mensaje_error],
+    )
+
+
+def validar_campo(
+    control,
+    mensaje_error,
+    validador,
+    controles_relacionados=(),
+    marco=None,
+):
+    error = validador(control.value)
+    mensaje_error.value = error or ""
+    mensaje_error.visible = bool(error)
+    color = COLOR_ROJO if error else COLOR_GRIS_CLARO
+    if marco is not None:
+        marco.border = ft.Border.all(1, color if error else "#C9DDF7")
+    for campo_control in (control, *controles_relacionados):
+        campo_control.border_color = color
+        if hasattr(campo_control, "focused_border_color"):
+            campo_control.focused_border_color = (
+                COLOR_ROJO if error else COLOR_NARANJA
+            )
+    return not error
+
+
+def limpiar_error_campo(
+    control,
+    mensaje_error,
+    controles_relacionados=(),
+    marco=None,
+):
+    if not mensaje_error.visible:
+        return False
+    mensaje_error.value = ""
+    mensaje_error.visible = False
+    if marco is not None:
+        marco.border = ft.Border.all(1, "#C9DDF7")
+    for campo_control in (control, *controles_relacionados):
+        campo_control.border_color = COLOR_GRIS_CLARO
+        if hasattr(campo_control, "focused_border_color"):
+            campo_control.focused_border_color = COLOR_NARANJA
+    return True
+
+
+def vincular_validacion_campo(
+    control,
+    mensaje_error,
+    validador,
+    page=None,
+    evento="on_change",
+    controles_relacionados=(),
+    marco=None,
+):
+    manejador_anterior = getattr(control, evento, None)
+    manejador_blur_anterior = getattr(control, "on_blur", None)
+
+    def cambio(e=None):
+        if manejador_anterior:
+            manejador_anterior(e)
+        cambio_error = limpiar_error_campo(
+            control,
+            mensaje_error,
+            controles_relacionados=controles_relacionados,
+            marco=marco,
+        )
+        if cambio_error and page is not None:
+            page.update()
+
+    def validar_al_salir(e=None):
+        if manejador_blur_anterior:
+            manejador_blur_anterior(e)
+        valido = validar_campo(
+            control,
+            mensaje_error,
+            validador,
+            controles_relacionados=controles_relacionados,
+            marco=marco,
+        )
+        if page is not None:
+            page.update()
+        return valido
+
+    setattr(control, evento, cambio)
+    control.on_blur = validar_al_salir
+    return validar_al_salir
+
+
+def validar_campos(campos):
+    valido = True
+    for campo in campos.values():
+        control, mensaje_error, validador, *relacionados = campo
+        if not validar_campo(
+            control,
+            mensaje_error,
+            validador,
+            controles_relacionados=relacionados[0] if relacionados else (),
+        ):
+            valido = False
+    return valido
+
+
+def validador_requerido(etiqueta):
+    def validar(valor):
+        if valor is None or not str(valor).strip():
+            return f"Completa {etiqueta}."
+        return None
+
+    return validar
+
+
+def validador_correo():
+    patron = _re.compile(r"^[^@\s]+@[^@\s]+\.[^@\s]+$")
+
+    def validar(valor):
+        if valor is None or not str(valor).strip():
+            return "El correo electrónico es obligatorio."
+        if not patron.fullmatch(str(valor).strip()):
+            return "Escribe un correo válido, por ejemplo nombre@empresa.com."
+        return None
+
+    return validar
+
+
+def validador_telefono():
+    def validar(valor):
+        if valor is None or not str(valor).strip():
+            return "El número telefónico es obligatorio."
+        if not _re.fullmatch(r"\+?[\d\s().-]+", str(valor).strip()):
+            return "Usa solo dígitos, espacios, paréntesis, guiones y el signo +."
+        digitos = _re.sub(r"\D", "", str(valor))
+        if not 7 <= len(digitos) <= 15:
+            return "El teléfono debe contener entre 7 y 15 dígitos."
+        return None
+
+    return validar
+
+
+def validador_numero(etiqueta, minimo=0, minimo_exclusivo=False):
+    def validar(valor):
+        if valor is None or not str(valor).strip():
+            return f"{etiqueta} es obligatorio."
+        try:
+            numero = _Decimal(str(valor).strip())
+        except _InvalidOperation:
+            return f"{etiqueta} debe ser un número válido."
+        if not numero.is_finite():
+            return f"{etiqueta} debe ser un número válido."
+        if numero < minimo or (minimo_exclusivo and numero == minimo):
+            condicion = "mayor que" if minimo_exclusivo else "igual o mayor que"
+            return f"{etiqueta} debe ser {condicion} {minimo}."
+        return None
+
+    return validar
+
+
+def validar_rango_fechas(
+    fecha_desde,
+    fecha_hasta,
+    formato="%d/%m/%Y",
+    fecha_actual=None,
+):
+    fecha_actual = fecha_actual or _date.today()
+    errores = {"fecha_desde": None, "fecha_hasta": None}
+    fechas = {}
+
+    for clave, valor in (
+        ("fecha_desde", fecha_desde),
+        ("fecha_hasta", fecha_hasta),
+    ):
+        if valor is None or not str(valor).strip():
+            continue
+        try:
+            fecha = _datetime.strptime(str(valor).strip(), formato).date()
+        except ValueError:
+            formato_visible = (
+                formato.replace("%d", "dd")
+                .replace("%m", "mm")
+                .replace("%Y", "aaaa")
+            )
+            errores[clave] = (
+                f"Usa una fecha válida con formato {formato_visible}."
+            )
+            continue
+        fechas[clave] = fecha
+        if fecha < _date(1900, 1, 1):
+            errores[clave] = "La fecha debe ser igual o posterior al 01/01/1900."
+        if fecha > fecha_actual:
+            errores[clave] = "La fecha no puede ser posterior a hoy."
+
+    desde = fechas.get("fecha_desde")
+    hasta = fechas.get("fecha_hasta")
+    if desde and hasta and desde > hasta:
+        errores["fecha_desde"] = (
+            "La fecha inicial no puede ser posterior a la fecha final."
+        )
+        errores["fecha_hasta"] = (
+            "La fecha final debe ser igual o posterior a la fecha inicial."
+        )
+    return errores
 
 
 def campo(

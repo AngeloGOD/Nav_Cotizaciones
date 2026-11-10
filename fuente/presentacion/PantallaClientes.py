@@ -5,6 +5,22 @@ import flet as ft
 
 from fuente.utilidades.Colores import COLOR_AZUL as COLOR_AZUL, COLOR_AZUL_ACERO as COLOR_AZUL_ACERO, COLOR_AZUL_INTENSO as COLOR_AZUL_INTENSO, COLOR_AZUL_MARINO_MEDIO as COLOR_AZUL_MARINO_MEDIO, COLOR_AZUL_MARINO_OSCURO as COLOR_AZUL_MARINO_OSCURO, COLOR_AZUL_PETROLEO as COLOR_AZUL_PETROLEO, COLOR_BANNER as COLOR_BANNER, COLOR_BLANCO as COLOR_BLANCO, COLOR_FONDO as COLOR_FONDO, COLOR_GRIS as COLOR_GRIS, COLOR_GRIS_CLARO as COLOR_GRIS_CLARO, COLOR_NARANJA as COLOR_NARANJA, COLOR_NARANJA_OSCURO as COLOR_NARANJA_OSCURO, COLOR_NARANJA_SUAVE as COLOR_NARANJA_SUAVE, COLOR_NEGRO as COLOR_NEGRO, COLOR_ROJO as COLOR_ROJO, COLOR_SIDEBAR as COLOR_SIDEBAR, COLOR_VERDE as COLOR_VERDE
 from fuente.utilidades.Componentes import COLOR_AZUL as COLOR_AZUL, COLOR_AZUL_ACERO as COLOR_AZUL_ACERO, COLOR_AZUL_INTENSO as COLOR_AZUL_INTENSO, COLOR_AZUL_MARINO_MEDIO as COLOR_AZUL_MARINO_MEDIO, COLOR_AZUL_MARINO_OSCURO as COLOR_AZUL_MARINO_OSCURO, COLOR_AZUL_PETROLEO as COLOR_AZUL_PETROLEO, COLOR_BANNER as COLOR_BANNER, COLOR_BLANCO as COLOR_BLANCO, COLOR_FONDO as COLOR_FONDO, COLOR_GRIS as COLOR_GRIS, COLOR_GRIS_CLARO as COLOR_GRIS_CLARO, COLOR_NARANJA as COLOR_NARANJA, COLOR_NARANJA_OSCURO as COLOR_NARANJA_OSCURO, COLOR_NARANJA_SUAVE as COLOR_NARANJA_SUAVE, COLOR_NEGRO as COLOR_NEGRO, COLOR_ROJO as COLOR_ROJO, COLOR_SIDEBAR as COLOR_SIDEBAR, COLOR_VERDE as COLOR_VERDE, Herramientas as Herramientas, agregar_panel_flotante as agregar_panel_flotante, avatar_inicial as avatar_inicial, badge_estado as badge_estado, banner_imagen_desvanecida as banner_imagen_desvanecida, banner_modulo as banner_modulo, barra_busqueda as barra_busqueda, boton as boton, boton_exportacion as boton_exportacion, boton_icono_enmarcado as boton_icono_enmarcado, boton_vista as boton_vista, campo as campo, campo_detalle as campo_detalle, card as card, dialogo_confirmacion as dialogo_confirmacion, estado_vacio as estado_vacio, etiqueta_categoria as etiqueta_categoria, fila_catalogo as fila_catalogo, fila_producto as fila_producto, ft as ft, ftd as ftd, menu_exportacion as menu_exportacion, mostrar_notificacion as mostrar_notificacion, paginacion as paginacion, panel_filtros as panel_filtros, quitar_panel_flotante as quitar_panel_flotante, seccion_opciones_filtro as seccion_opciones_filtro, selector_catalogo as selector_catalogo, sombra_suave as sombra_suave, tabla as tabla, tarjeta_catalogo as tarjeta_catalogo, tarjeta_detalle as tarjeta_detalle, tarjeta_producto as tarjeta_producto
+from fuente.utilidades.Componentes import (
+    campo_con_mensaje_error,
+    crear_feedback_dialogo,
+    crear_mensaje_validacion,
+    limpiar_error_campo,
+    mostrar_feedback_dialogo,
+    ocultar_feedback_dialogo,
+    validar_campos,
+    validar_campo,
+    validar_rango_fechas,
+    validar_registros_exportacion,
+    validador_correo,
+    validador_requerido,
+    validador_telefono,
+    vincular_validacion_campo,
+)
 from fuente.utilidades.ExportacionExcel import exportar_excel
 from fuente.utilidades.ExportacionPDF import exportar_pdf
 from fuente.negocio.controlador.ControladorClientes import ControladorClientes
@@ -203,6 +219,7 @@ class PantallaClientes(ft.Container):
             border_radius=8,
             keyboard_type=ft.KeyboardType.DATETIME,
             on_change=self._cambio_fecha_filtro,
+            on_blur=self._salir_campo_fecha_filtro,
         )
         self._campo_fecha_hasta = ft.TextField(
             value=self._formatear_fecha_filtro(self.filtros_seleccionados["fecha_hasta"]),
@@ -216,7 +233,13 @@ class PantallaClientes(ft.Container):
             border_radius=8,
             keyboard_type=ft.KeyboardType.DATETIME,
             on_change=self._cambio_fecha_filtro,
+            on_blur=self._salir_campo_fecha_filtro,
         )
+        self._errores_fecha_filtro = {
+            "fecha_desde": crear_mensaje_validacion(),
+            "fecha_hasta": crear_mensaje_validacion(),
+        }
+        self._marcos_fecha_filtro = {}
         self._panel_filtros = self._crear_panel_filtros()
         self._panel_filtros.top = 218
         self._panel_filtros.right = 167
@@ -318,7 +341,7 @@ class PantallaClientes(ft.Container):
             top=210,
             right=153,
             width=360,
-            height=452,
+            height=472,
         )
         return self._panel_filtros
 
@@ -388,7 +411,7 @@ class PantallaClientes(ft.Container):
         )
 
     def _envoltura_campo_fecha(self, campo_fecha, campo):
-        return ft.Container(
+        marco = ft.Container(
             height=42,
             padding=ft.Padding(4, 1, 4, 1),
             border=ft.Border.all(1, "#C9DDF7"),
@@ -401,6 +424,11 @@ class PantallaClientes(ft.Container):
                     self._boton_calendario_filtro(campo),
                 ],
             ),
+        )
+        self._marcos_fecha_filtro[campo] = marco
+        return ft.Column(
+            spacing=2,
+            controls=[marco, self._errores_fecha_filtro[campo]],
         )
 
     def abrir_calendario_filtro(self, campo):
@@ -427,8 +455,9 @@ class PantallaClientes(ft.Container):
                 self._date_picker_filtros.value.strftime("%d/%m/%Y")
             )
             self._campo_fecha_filtro_activo.update()
+            self._validar_fechas_filtro()
             self._actualizar_resumen_filtros()
-            self._texto_resumen_filtros.update()
+            self._panel_filtros.update()
 
     def limpiar_filtros(self, e=None):
         Herramientas.limpiar_controles(
@@ -440,6 +469,7 @@ class PantallaClientes(ft.Container):
             ]
         )
         self.filtros_seleccionados = self.controlador.crear_filtros_vacios()
+        self._validar_fechas_filtro()
         if self._date_picker_filtros in self._page.overlay:
             self._date_picker_filtros.update()
         self._actualizar_indicador_filtros()
@@ -453,9 +483,43 @@ class PantallaClientes(ft.Container):
         self._actualizar_resumen_filtros()
         self._texto_resumen_filtros.update()
 
-    def _cambio_fecha_filtro(self, e):
+    def _cambio_fecha_filtro(self, e=None):
+        if e is not None:
+            limpiar_error_campo(
+                self._campo_fecha_desde,
+                self._errores_fecha_filtro["fecha_desde"],
+                marco=self._marcos_fecha_filtro["fecha_desde"],
+            )
+            limpiar_error_campo(
+                self._campo_fecha_hasta,
+                self._errores_fecha_filtro["fecha_hasta"],
+                marco=self._marcos_fecha_filtro["fecha_hasta"],
+            )
         self._actualizar_resumen_filtros()
-        self._texto_resumen_filtros.update()
+        self._panel_filtros.update()
+
+    def _salir_campo_fecha_filtro(self, e=None):
+        self._validar_fechas_filtro()
+        self._panel_filtros.update()
+
+    def _validar_fechas_filtro(self):
+        errores = validar_rango_fechas(
+            self._campo_fecha_desde.value,
+            self._campo_fecha_hasta.value,
+        )
+        valido = True
+        for clave, control in (
+            ("fecha_desde", self._campo_fecha_desde),
+            ("fecha_hasta", self._campo_fecha_hasta),
+        ):
+            campo_valido = validar_campo(
+                control,
+                self._errores_fecha_filtro[clave],
+                lambda valor, error=errores[clave]: error,
+                marco=self._marcos_fecha_filtro[clave],
+            )
+            valido = campo_valido and valido
+        return valido
 
     def _actualizar_resumen_filtros(self):
         cantidad = sum(bool(checkbox.value) for checkbox in self._checks_filtros.values())
@@ -468,6 +532,9 @@ class PantallaClientes(ft.Container):
         )
 
     def aplicar_filtros(self, e=None):
+        if not self._validar_fechas_filtro():
+            self._panel_filtros.update()
+            return
         filtros = self.controlador.crear_filtros_vacios()
         filtros["fecha_desde"] = (
             (self._campo_fecha_desde.value or "").strip() or None
@@ -588,6 +655,7 @@ class PantallaClientes(ft.Container):
     def ver_cliente(self, cliente):
         self.cliente_seleccionado = cliente
         self.modo_edicion = False
+        self._feedback_ficha = crear_feedback_dialogo(self._page)
         self.dialogo_cliente = self._crear_dialogo_cliente()
         self._page.show_dialog(self.dialogo_cliente)
 
@@ -600,7 +668,13 @@ class PantallaClientes(ft.Container):
             title_padding=ft.Padding(22, 18, 22, 10),
             content=ft.Container(
                 width=650,
-                content=self._contenido_ficha_cliente(),
+                content=ft.Column(
+                    spacing=10,
+                    controls=[
+                        self._feedback_ficha,
+                        self._contenido_ficha_cliente(),
+                    ],
+                ),
             ),
             content_padding=ft.Padding(18, 0, 18, 0),
             actions=self._acciones_ficha_cliente(),
@@ -658,6 +732,8 @@ class PantallaClientes(ft.Container):
     def _contenido_ficha_cliente(self):
         cliente = self.cliente_seleccionado
         self.campos_ficha = {}
+        self._errores_ficha = {}
+        self._validaciones_ficha = {}
 
         tipo_persona = (
             cliente.tipo_persona.value
@@ -797,6 +873,8 @@ class PantallaClientes(ft.Container):
                     border_radius=9,
                 )
                 self.campos_ficha[nombre] = control
+                validador = validador_requerido("un tipo de persona")
+                evento = "on_select"
             elif switch:
                 control = ft.Switch(
                     value=bool(valor),
@@ -817,6 +895,35 @@ class PantallaClientes(ft.Container):
                     border_radius=9,
                 )
                 self.campos_ficha[nombre] = control
+                validadores = {
+                    "razon_social": validador_requerido(
+                        "el nombre o razón social"
+                    ),
+                    "rfc": validador_requerido("el RFC"),
+                    "telefono": validador_telefono(),
+                    "correo_elect": validador_correo(),
+                    "direccion": validador_requerido("la dirección fiscal"),
+                }
+                validador = validadores.get(nombre)
+                evento = "on_change"
+
+            if not switch:
+                mensaje_error = crear_mensaje_validacion()
+                self._errores_ficha[nombre] = mensaje_error
+                self._validaciones_ficha[nombre] = (
+                    control,
+                    mensaje_error,
+                    validador,
+                )
+                vincular_validacion_campo(
+                    control,
+                    mensaje_error,
+                    validador,
+                    page=self._page,
+                    evento=evento,
+                )
+                campo = campo_con_mensaje_error(control, mensaje_error)
+                return campo_detalle(etiqueta, campo, expand=expand)
         elif switch:
             color = COLOR_VERDE if valor else COLOR_ROJO
             control = ft.Container(
@@ -990,20 +1097,32 @@ class PantallaClientes(ft.Container):
         self.dialogo_cliente.title = self._encabezado_ficha()
         self.dialogo_cliente.content = ft.Container(
             width=650,
-            content=self._contenido_ficha_cliente(),
+            content=ft.Column(
+                spacing=10,
+                controls=[
+                    self._feedback_ficha,
+                    self._contenido_ficha_cliente(),
+                ],
+            ),
         )
         self.dialogo_cliente.actions = self._acciones_ficha_cliente()
         self._page.update()
 
     def activar_edicion(self, e):
         self.modo_edicion = True
+        ocultar_feedback_dialogo(self._feedback_ficha, self._page)
         self._actualizar_ficha()
 
     def cancelar_edicion(self, e):
         self.modo_edicion = False
+        ocultar_feedback_dialogo(self._feedback_ficha, self._page)
         self._actualizar_ficha()
 
-    def guardar_cambios_cliente(self, e):
+    def guardar_cambios_cliente(self, e=None):
+        if not validar_campos(self._validaciones_ficha):
+            self._page.update()
+            return
+
         campos = self.campos_ficha
         razon_social = (campos["razon_social"].value or "").strip()
         tipo_persona = (campos["tipo_persona"].value or "").strip()
@@ -1020,19 +1139,21 @@ class PantallaClientes(ft.Container):
                 activo=campos["activo"].value,
             )
         except Exception as error:
-            mostrar_notificacion(
-                self._page,
+            mostrar_feedback_dialogo(
+                self._feedback_ficha,
                 f"No se pudieron guardar los cambios: {error}",
                 COLOR_ROJO,
+                page=self._page,
             )
             return
         self.modo_edicion = False
         self.actualizar_directorio()
         self._actualizar_ficha()
-        mostrar_notificacion(
-            self._page,
+        mostrar_feedback_dialogo(
+            self._feedback_ficha,
             "Cambios guardados correctamente.",
             COLOR_VERDE,
+            page=self._page,
         )
 
     def pedir_confirmacion_eliminacion(self, e):
@@ -1760,6 +1881,10 @@ class PantallaClientes(ft.Container):
                 texto=self.busqueda,
                 filtros=self.filtros_seleccionados,
             )
+            if not validar_registros_exportacion(
+                self._page, filas, "clientes"
+            ):
+                return
             nombre_archivo = (
                 "clientes_seleccionados.xlsx"
                 if seleccionados is not None
@@ -1799,6 +1924,10 @@ class PantallaClientes(ft.Container):
                 texto=self.busqueda,
                 filtros=self.filtros_seleccionados,
             )
+            if not validar_registros_exportacion(
+                self._page, filas, "clientes"
+            ):
+                return
             if seleccionados is not None:
                 etiqueta_registros = f"Clientes seleccionados: {len(filas)}"
                 nombre_archivo = "clientes_seleccionados.pdf"

@@ -174,7 +174,8 @@ class PantallaReportes(ft.Container):
         self._selector_periodo = ft.Dropdown(
             value=self._periodo,
             width=225,
-            height=42,
+            height=44,
+            dense=True,
             text_size=14,
             color=COLOR_BANNER,
             bgcolor=COLOR_BLANCO,
@@ -204,7 +205,8 @@ class PantallaReportes(ft.Container):
         self._selector_modulo = ft.Dropdown(
             value=self._modulo,
             width=260,
-            height=42,
+            height=44,
+            dense=True,
             text_size=14,
             color=COLOR_BANNER,
             bgcolor=COLOR_BLANCO,
@@ -243,9 +245,9 @@ class PantallaReportes(ft.Container):
             scroll=ft.ScrollMode.AUTO,
             controls=[
                 ft.Container(
-                    padding=ft.Padding(14, 2, 14, 4),
+                    padding=ft.Padding(14, 8, 14, 16),
                     content=ft.Column(
-                        spacing=5,
+                        spacing=8,
                         controls=[
                             banner_modulo(
                                 "fondo_puerto.jpg",
@@ -255,8 +257,13 @@ class PantallaReportes(ft.Container):
                                 ft.Icons.INSERT_CHART_OUTLINED,
                             ),
                             self._barra_filtros(),
-                            self._tarjetas_metricas(),
-                            self._panel_inferior(),
+                            ft.Column(
+                                spacing=8,
+                                controls=[
+                                    self._tarjetas_metricas(),
+                                    self._panel_inferior(),
+                                ],
+                            ),
                         ],
                     ),
                 )
@@ -269,7 +276,7 @@ class PantallaReportes(ft.Container):
                 spacing=6,
                 controls=[
                     ft.Row(
-                        height=294,
+                        height=270,
                         spacing=10,
                         vertical_alignment=ft.CrossAxisAlignment.STRETCH,
                         controls=[
@@ -306,32 +313,12 @@ class PantallaReportes(ft.Container):
 
     def _barra_filtros(self):
         return ft.Row(
+            height=44,
             spacing=9,
+            vertical_alignment=ft.CrossAxisAlignment.CENTER,
             controls=[
                 self._selector_periodo,
                 self._selector_modulo,
-                ft.Container(
-                    padding=ft.Padding(9, 6, 9, 6),
-                    bgcolor="#FFF2E8",
-                    border_radius=8,
-                    content=ft.Row(
-                        tight=True,
-                        spacing=5,
-                        controls=[
-                            ft.Icon(
-                                ft.Icons.INFO_OUTLINE,
-                                size=14,
-                                color=COLOR_NARANJA,
-                            ),
-                            ft.Text(
-                                "Datos ilustrativos",
-                                size=11,
-                                weight=ft.FontWeight.BOLD,
-                                color=COLOR_BANNER,
-                            ),
-                        ],
-                    ),
-                ),
                 ft.Container(expand=True),
                 self._mensaje_generacion,
                 ft.FilledButton(
@@ -352,7 +339,7 @@ class PantallaReportes(ft.Container):
                             ),
                         ],
                     ),
-                    height=42,
+                    height=38,
                     style=ft.ButtonStyle(
                         bgcolor=COLOR_NARANJA,
                         shape=ft.RoundedRectangleBorder(radius=9),
@@ -745,9 +732,9 @@ class PantallaReportes(ft.Container):
             )
             return f"{mes}: {detalle} · muestra"
 
-        altura_grafica = 155
-        altura_trazado = altura_grafica - 14
-        margen_puntos = 8
+        altura_grafica = 165
+        altura_trazado = altura_grafica - 6
+        margen_puntos = 5
         alto_util = altura_trazado - margen_puntos * 2
         ancho_punto = 12
         ancho_paso = max(
@@ -830,7 +817,7 @@ class PantallaReportes(ft.Container):
             height=188,
             padding=ft.Padding(4, 0, 4, 0),
             content=ft.Column(
-                spacing=4,
+                spacing=3,
                 controls=[
                     ft.Row(
                         height=altura_grafica,
@@ -840,7 +827,7 @@ class PantallaReportes(ft.Container):
                             ft.Container(width=28, content=etiquetas_eje),
                             ft.Container(
                                 expand=True,
-                                padding=ft.Padding(8, 10, 8, 4),
+                                padding=ft.Padding(8, 4, 8, 2),
                                 bgcolor="#F8FAFD",
                                 border_radius=10,
                                 content=ft.Stack(
@@ -870,7 +857,7 @@ class PantallaReportes(ft.Container):
                         ],
                     ),
                     ft.Row(
-                        height=25,
+                        height=20,
                         spacing=4,
                         controls=[
                             ft.Container(width=28),
@@ -953,7 +940,7 @@ class PantallaReportes(ft.Container):
                     ),
                 ],
             ),
-            padding=ft.Padding(8, 6, 8, 12),
+            padding=ft.Padding(8, 6, 8, 11),
             border_color="#E1EAF4",
             radius=12,
             shadow=sombra_suave(),

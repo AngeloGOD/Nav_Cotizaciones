@@ -157,19 +157,24 @@ class PantallaNuevaCotizacion(ft.Container):
         )
 
     def seccion_servicios(self):
-        boton_agregar_menu = ft.PopupMenuButton(
-            content=ft.Container(
-                content=ft.Row([
-                    ft.Icon(ft.Icons.ADD, color=COLOR_NARANJA, size=16), 
-                    ft.Text("Agregar...", color=COLOR_NARANJA, weight=ft.FontWeight.W_600, size=13),
-                    ft.Icon(ft.Icons.ARROW_DROP_DOWN, color=COLOR_NARANJA, size=18)
-                ], spacing=5), 
-                border=self.crear_borde_completo(1, COLOR_NARANJA), padding=ft.Padding(15, 5, 10, 5), border_radius=6, ink=True
+        boton_agregar_concepto = ft.Container(
+            content=ft.Row(
+                [
+                    ft.Icon(ft.Icons.ADD, color=COLOR_NARANJA, size=16),
+                    ft.Text(
+                        "Agregar Concepto",
+                        color=COLOR_NARANJA,
+                        weight=ft.FontWeight.W_600,
+                        size=13,
+                    ),
+                ],
+                spacing=5,
             ),
-            items=[
-                ft.PopupMenuItem(content=ft.Row([ft.Icon(ft.Icons.TABLE_ROWS_OUTLINED, color=COLOR_GRIS, size=18), ft.Text("Agregar Producto (Nueva Fila)", color=COLOR_AZUL_OSCURO)]), on_click=self.agregar_fila),
-                ft.PopupMenuItem(content=ft.Row([ft.Icon(ft.Icons.VIEW_COLUMN_OUTLINED, color=COLOR_GRIS, size=18), ft.Text("Agregar Campo (Nueva Columna)", color=COLOR_AZUL_OSCURO)]), on_click=self.mostrar_dialogo_columna)
-            ]
+            border=self.crear_borde_completo(1, COLOR_NARANJA),
+            padding=ft.Padding(15, 5, 15, 5),
+            border_radius=6,
+            ink=True,
+            on_click=self.agregar_fila,
         )
         
         boton_calcular = ft.Container(
@@ -206,7 +211,7 @@ class PantallaNuevaCotizacion(ft.Container):
                     bgcolor=COLOR_BLANCO, padding=ft.Padding(20, 15, 20, 15), border=ft.Border(bottom=ft.BorderSide(1, ft.Colors.GREY_100)),
                     content=ft.Row([
                         ft.Row([self.crear_indicador_numero("2", ft.Colors.BLUE_600), ft.Column([ft.Text("Productos y servicios cotizados", weight=ft.FontWeight.BOLD, size=15, color=COLOR_AZUL_OSCURO), ft.Text("Agrega los productos y servicios que serán incluidos en esta cotización.", size=11, color=COLOR_GRIS)], spacing=0)], spacing=15),
-                        ft.Row([boton_agregar_menu, boton_calcular], alignment=ft.MainAxisAlignment.END, spacing=10)
+                        ft.Row([boton_agregar_concepto, boton_calcular], alignment=ft.MainAxisAlignment.END, spacing=10)
                     ], alignment=ft.MainAxisAlignment.SPACE_BETWEEN)
                 ),
                 ft.Container(
@@ -249,9 +254,6 @@ class PantallaNuevaCotizacion(ft.Container):
         for index, fila in enumerate(self.lista_filas.controls):
             fila.content.controls[0].content.value = str(index + 1)
         self.update()
-
-    def mostrar_dialogo_columna(self, e):
-        print("¡Clic en agregar nueva columna.")
 
     def toggle_vista_cliente(self, e):
         es_vista = e.control.value

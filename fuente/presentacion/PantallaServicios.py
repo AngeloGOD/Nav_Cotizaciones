@@ -2,11 +2,17 @@ import flet as ft
 from fuente.presentacion.PantallaNuevoServicio import PantallaNuevoServicio
 from fuente.utilidades.Colores import (
     COLOR_AZUL,
+    COLOR_BANNER,
+    COLOR_FONDO,
     COLOR_NARANJA,
     COLOR_BLANCO,
     COLOR_GRIS,
+    COLOR_NEGRO,
 )
 from fuente.utilidades.Componentes import (
+    banner_modulo,
+    barra_busqueda,
+    boton,
     boton_vista,
     card,
     fila_catalogo,
@@ -19,10 +25,8 @@ COLOR_AZUL_OSCURO = "#0d1b2a"
 class PantallaServicios(ft.Container):
     
     def __init__(self, main_page):
-        super().__init__()
+        super().__init__(expand=True, bgcolor=COLOR_FONDO, padding=0)
         self.main_page = main_page 
-        self.expand = True
-        self.padding = ft.Padding(20, 20, 20, 20)
         
         self._menu_exportacion_abierto = False
         self._vista_servicios = "catalogo"
@@ -87,65 +91,84 @@ class PantallaServicios(ft.Container):
             },
         ]
         
-        banner = ft.Container(
-            height=174,
-            border_radius=10,
-            clip_behavior=ft.ClipBehavior.HARD_EDGE,
-            border=self.crear_borde_completo(1, ft.Colors.GREY_200),
-            content=ft.Stack([
-                ft.Container(
-                    expand=True,
-                    image=ft.DecorationImage(src="fondo_servicios.jpg", fit="cover", alignment=ft.alignment.Alignment(1, 0))
-                ),
-                ft.Container(
-                    expand=True,
-                    gradient=ft.LinearGradient(
-                        begin=ft.alignment.Alignment(-1, 0), end=ft.alignment.Alignment(1, 0),
-                        colors=[COLOR_BLANCO, COLOR_BLANCO, ft.Colors.with_opacity(0.6, COLOR_BLANCO), ft.Colors.TRANSPARENT],
-                        stops=[0.0, 0.45, 0.7, 1.0]
-                    )
-                ),
-                ft.Container(
-                    padding=ft.Padding(30, 25, 30, 25),
-                    content=ft.Column([
-                        ft.Text("Catálogo de Servicios", size=28, weight=ft.FontWeight.BOLD, color=COLOR_AZUL_OSCURO),
-                        ft.Text("Administra y configura las tarifas y tipos de cobro para la agencia.", size=14, color=COLOR_GRIS),
-                    ], spacing=5)
-                )
-            ])
+        banner = banner_modulo(
+            src="fondo_puerto.jpg",
+            categoria="Catálogo de servicios",
+            titulo="Servicios",
+            descripcion="Administra las tarifas y tipos de cobro de la agencia.",
+            icono=ft.Icons.WORK_OUTLINE,
         )
 
-        boton_nuevo_servicio = ft.Container(
-            content=ft.Row([
-                ft.Icon(ft.Icons.ADD, color=COLOR_BLANCO, size=18),
-                ft.Text("Nuevo Servicio", color=COLOR_BLANCO, weight=ft.FontWeight.W_600, size=14)
-            ], alignment=ft.MainAxisAlignment.CENTER, spacing=5),
-            bgcolor=COLOR_NARANJA, padding=ft.Padding(20, 5, 20, 5), border_radius=6, height=44, ink=True, 
-            # 1. CAMBIO: Se conecta el botón a la función de navegación
-            on_click=self.abrir_nuevo_servicio 
+        buscador_servicios = barra_busqueda(
+            hint="Buscar servicio por nombre o categoría...",
         )
+        buscador_servicios.height = 44
 
-        # --- BARRA DE BÚSQUEDA Y FILTROS ---
-        barra_herramientas = ft.Row([
-            ft.Container(
-                expand=True,
-                content=ft.TextField(hint_text="Buscar por ID, nombre o categoría...", prefix_icon=ft.Icons.SEARCH, border_color=ft.Colors.GREY_300, border_radius=6, height=44, content_padding=10, text_size=14)
+        barra_herramientas = card(
+            ft.Row(
+                spacing=10,
+                vertical_alignment=ft.CrossAxisAlignment.CENTER,
+                controls=[
+                    buscador_servicios,
+                    boton(
+                        texto="Filtros",
+                        icono=ft.Icons.TUNE,
+                        tipo="secundario",
+                        width=160,
+                        height=44,
+                        border_color="#C9DDF7",
+                        on_click=lambda e: print("Abrir filtros"),
+                    ),
+                    boton(
+                        texto="Agregar servicio",
+                        icono=ft.Icons.ADD,
+                        tipo="principal",
+                        width=210,
+                        height=44,
+                        on_click=self.abrir_nuevo_servicio,
+                    ),
+                ],
             ),
-            ft.Container(
-                content=ft.Row([ft.Icon(ft.Icons.FILTER_LIST, size=18, color=ft.Colors.BLUE_600), ft.Text("Filtros", size=14, color=ft.Colors.BLUE_600, weight=ft.FontWeight.W_500)]),
-                padding=ft.Padding(15, 5, 15, 5), border=self.crear_borde_completo(1, ft.Colors.GREY_300), border_radius=6, height=44, ink=True,
-                on_click=lambda e: print("Abrir filtros")
-            ),
-            boton_nuevo_servicio 
-        ], spacing=15, alignment=ft.MainAxisAlignment.SPACE_BETWEEN)
+            padding=10,
+            radius=10,
+            shadow=sombra_suave(),
+        )
 
         # --- TARJETAS RESUMEN ---
         tarjetas_resumen = ft.Row([
-            self.crear_tarjeta_resumen("Total Servicios", "24", ft.Icons.FORMAT_LIST_BULLETED, ft.Colors.GREY_700, ft.Colors.GREY_100, borde_negro=True),
-            self.crear_tarjeta_resumen("Cuota Fija", "10", ft.Icons.ATTACH_MONEY, ft.Colors.GREEN_500, ft.Colors.GREEN_50),
-            self.crear_tarjeta_resumen("Factor Unitario", "8", ft.Icons.CALCULATE_OUTLINED, ft.Colors.BLUE_500, ft.Colors.BLUE_50),
-            self.crear_tarjeta_resumen("Por Rangos/Días", "6", ft.Icons.LAYERS_OUTLINED, ft.Colors.PURPLE_500, ft.Colors.PURPLE_50),
-        ], spacing=15)
+            self.crear_tarjeta_resumen(
+                "Total Servicios",
+                "24",
+                ft.Icons.FORMAT_LIST_BULLETED,
+                COLOR_AZUL,
+                "#EAF2FF",
+                "#D7E6FF",
+            ),
+            self.crear_tarjeta_resumen(
+                "Cuota Fija",
+                "10",
+                ft.Icons.ATTACH_MONEY,
+                "#16A765",
+                "#EAF8F0",
+                "#D5F0E2",
+            ),
+            self.crear_tarjeta_resumen(
+                "Factor Unitario",
+                "8",
+                ft.Icons.CALCULATE_OUTLINED,
+                "#168BDE",
+                "#EAF4FF",
+                "#D4E8FA",
+            ),
+            self.crear_tarjeta_resumen(
+                "Por Rangos/Días",
+                "6",
+                ft.Icons.LAYERS_OUTLINED,
+                "#8B35D3",
+                "#F4ECFF",
+                "#E5D4F5",
+            ),
+        ], spacing=10)
 
         # =========================================================
         # COMPONENTES MANUALES CLONADOS DE CARLOS (Sin importar nada)
@@ -304,14 +327,28 @@ class PantallaServicios(ft.Container):
 
         self.content = ft.Column(
             expand=True,
-            spacing=12,
             scroll=ft.ScrollMode.AUTO,
+            horizontal_alignment=ft.CrossAxisAlignment.STRETCH,
             controls=[
-                banner,
-                barra_herramientas,
-                tarjetas_resumen,
-                catalogo_servicios,
-                pie_catalogo,
+                ft.Container(
+                    expand=True,
+                    padding=ft.Padding(14, 8, 14, 16),
+                    content=ft.Column(
+                        expand=True,
+                        spacing=12,
+                        horizontal_alignment=ft.CrossAxisAlignment.STRETCH,
+                        controls=[
+                            ft.Column(
+                                spacing=10,
+                                horizontal_alignment=ft.CrossAxisAlignment.STRETCH,
+                                controls=[banner, barra_herramientas],
+                            ),
+                            tarjetas_resumen,
+                            catalogo_servicios,
+                            pie_catalogo,
+                        ],
+                    ),
+                )
             ],
         )
 
@@ -438,14 +475,60 @@ class PantallaServicios(ft.Container):
     def crear_borde_completo(self, ancho, color):
         return ft.Border(top=ft.BorderSide(ancho, color), right=ft.BorderSide(ancho, color), bottom=ft.BorderSide(ancho, color), left=ft.BorderSide(ancho, color))
 
-    def crear_tarjeta_resumen(self, titulo, cantidad, icono, color_icono, bg_icono, borde_negro=False):
-        color_borde = COLOR_AZUL_OSCURO if borde_negro else ft.Colors.GREY_200
-        ancho_borde = 1.5 if borde_negro else 1
-        return ft.Container(
-            expand=True, padding=15, border=self.crear_borde_completo(ancho_borde, color_borde), border_radius=8, bgcolor=COLOR_BLANCO,
-            content=ft.Row([
-                ft.Container(padding=10, bgcolor=bg_icono, border_radius=6, content=ft.Icon(icono, color=color_icono, size=22)),
-                ft.Column([ft.Text(titulo, size=12, color=COLOR_GRIS, weight=ft.FontWeight.W_500), ft.Text(cantidad, size=18, weight=ft.FontWeight.BOLD, color=COLOR_AZUL_OSCURO)], spacing=0, alignment=ft.MainAxisAlignment.CENTER),
-                ft.Container(expand=True), ft.Icon(ft.Icons.CHEVRON_RIGHT, color=ft.Colors.GREY_400, size=18)
-            ])
+    def crear_tarjeta_resumen(
+        self,
+        titulo,
+        cantidad,
+        icono,
+        color_icono,
+        bg_icono,
+        color_borde,
+    ):
+        return card(
+            ft.Row(
+                spacing=10,
+                vertical_alignment=ft.CrossAxisAlignment.CENTER,
+                controls=[
+                    ft.Container(
+                        width=48,
+                        height=48,
+                        alignment=ft.Alignment(0, 0),
+                        bgcolor=bg_icono,
+                        border_radius=24,
+                        content=ft.Icon(icono, size=25, color=color_icono),
+                    ),
+                    ft.Column(
+                        expand=True,
+                        spacing=2,
+                        controls=[
+                            ft.Text(
+                                titulo,
+                                size=13,
+                                color=COLOR_NEGRO,
+                                weight=ft.FontWeight.W_600,
+                                max_lines=1,
+                                overflow=ft.TextOverflow.ELLIPSIS,
+                            ),
+                            ft.Text(
+                                cantidad,
+                                size=22,
+                                color=COLOR_BANNER,
+                                weight=ft.FontWeight.BOLD,
+                                max_lines=1,
+                                overflow=ft.TextOverflow.ELLIPSIS,
+                            ),
+                        ],
+                    ),
+                    ft.Icon(
+                        ft.Icons.CHEVRON_RIGHT,
+                        size=18,
+                        color="#9AAABD",
+                    ),
+                ],
+            ),
+            padding=12,
+            border_color=color_borde,
+            radius=12,
+            shadow=sombra_suave(),
+            expand=True,
         )

@@ -61,7 +61,7 @@ class dashboard(ft.Container):
         super().__init__(
             expand=True,
             bgcolor=COLOR_FONDO,
-            padding=ft.Padding(14, 6, 14, 8),
+            padding=ft.Padding(14, 8, 14, 16),
         )
         self.controlador = ControladorDashboard()
         self.metricas = self.controlador.obtener_metricas()
@@ -70,6 +70,7 @@ class dashboard(ft.Container):
         self.content = ft.Column(
             expand=True,
             spacing=8,
+            horizontal_alignment=ft.CrossAxisAlignment.STRETCH,
             controls=[
                 self._encabezado(),
                 self._tarjetas_resumen(),
@@ -101,7 +102,7 @@ class dashboard(ft.Container):
             on_click=lambda e: print("Nueva cotización clic"),
         )
         return ft.Stack(
-            height=136,
+            height=138,
             controls=[
                 banner_modulo(
                     "fondo_puerto.jpg",

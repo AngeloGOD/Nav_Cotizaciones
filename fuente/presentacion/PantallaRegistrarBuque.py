@@ -2,17 +2,28 @@ import flet as ft
 
 from fuente.utilidades.Colores import *
 from fuente.utilidades.Componentes import *
-from fuente.negocio.controlador.ControladorRegistrarBuques import ControladorRegistrarBuques
+from fuente.negocio.controlador.ControladorBuque import ControladorBuque
+from fuente.negocio.controlador.ControladorClientes import ControladorClientes
+from fuente.negocio.controlador.ControladorRegistrarBuques import (
+    ControladorRegistrarBuques,
+)
+from fuente.negocio.controlador.ControladorRegistrarCliente import (
+    ErrorRegistroCliente,
+)
 from fuente.negocio.servicio.ServicioCategoriaBuque import ServicioCategoriaBuque
-from fuente.infraestructura.servicios_externos.ServicioPaises import ServicioPaises
 from fuente.presentacion.SelectorCliente import SelectorCliente
-from fuente.presentacion.SelectorCategoriaBuque import SelectorCategoriaBuque
+from fuente.presentacion.SelectorPais import SelectorPais
 
 
 class PantallaRegistrarBuque(ft.Container):
     def __init__(
-        self, page: ft.Page, servicio_buque, servicio_cliente,
-        vista_anterior=None, buque_a_editar=None, servicio_categoria_buque=None
+        self,
+        page: ft.Page,
+        servicio_buque,
+        servicio_cliente,
+        vista_anterior=None,
+        buque_a_editar=None,
+        servicio_categoria_buque=None,
     ):
         super().__init__(
             expand=True,
@@ -45,59 +56,45 @@ class PantallaRegistrarBuque(ft.Container):
             icono=ft.Icons.NUMBERS_OUTLINED,
         )
         self.cliente_busqueda = SelectorCliente(self.servicio_cliente)
-        self.paises = []
-        try:
-            self.paises = ServicioPaises.obtener_paises()
-        except RuntimeError:
-            self.paises = []
-
-        self._opciones_paises_bandera = [
-            ft.DropdownOption(key=pais["nombre"], text=f'{pais["emoji"]}  {pais["nombre"]}')
-            for pais in self.paises
-        ]
-        self._busqueda_pais_registro = ft.TextField(
-            hint_text="Buscar país...",
-            prefix_icon=ft.Icons.SEARCH,
-            height=38,
-            text_size=12,
-            content_padding=ft.Padding(9, 5, 9, 5),
-            border=ft.InputBorder.OUTLINE,
-            border_color=COLOR_GRIS_CLARO,
-            focused_border_color=COLOR_NARANJA,
-            border_radius=8,
-            on_change=self._filtrar_paises_registro,
-        )
-        # Campo de bandera modificado con expand y height
-        self.bandera_pais = ft.TextField(
-            expand=True,
-            height=58,
-            label="Bandera / país",
-            hint_text="Ej. México",
-            prefix_icon=ft.Icons.FLAG_OUTLINED,
-            suffix_icon=ft.Icons.ARROW_DROP_DOWN,
-            read_only=True,
-            border=ft.InputBorder.OUTLINE,
-            border_color=COLOR_GRIS_CLARO,
-            focused_border_color=COLOR_NARANJA,
+        self._boton_nuevo_cliente = ft.Container(
+            width=52,
+            height=52,
+            bgcolor="#FFF0E5",
+            border=ft.Border.all(1, COLOR_NARANJA),
             border_radius=9,
-            text_size=14,
-            content_padding=ft.Padding(14, 12, 14, 12),
-            on_click=self._abrir_selector_pais,
+            alignment=ft.Alignment(0, 0),
+            tooltip="Registrar nuevo cliente",
+            content=ft.IconButton(
+                icon=ft.Icons.PERSON_ADD_ALT_1_OUTLINED,
+                icon_color=COLOR_NARANJA,
+                icon_size=22,
+                tooltip="Registrar nuevo cliente",
+                width=52,
+                height=52,
+                on_click=self._abrir_dialogo_nuevo_cliente,
+            ),
         )
-        self._lista_paises_registro = ft.Column(
-            spacing=2,
-            scroll=ft.ScrollMode.AUTO,
-            height=250,
-            controls=[],
-        )
-        self._dialogo_selector_pais = None
+        self.bandera_pais = SelectorPais()
         self.subtipo_descripcion = self._crear_campo_etiquetado(
             etiqueta="Subtipo o descripción",
             ejemplo="Ej. Portacontenedores, carga general...",
             icono=ft.Icons.DESCRIPTION_OUTLINED,
         )
 
-        self.categoria_buque = SelectorCategoriaBuque(self.servicio_categoria_buque)
+        self.categoria_buque = ft.Dropdown(
+            expand=True,
+            height=58,
+            label="Tipo / categoría del buque *",
+            hint_text="Selecciona un tipo de buque",
+            leading_icon=ft.Icons.CATEGORY_OUTLINED,
+            options=self._obtener_opciones_categoria(),
+            text_size=14,
+            content_padding=ft.Padding(14, 12, 14, 12),
+            border=ft.InputBorder.OUTLINE,
+            border_color=COLOR_GRIS_CLARO,
+            focused_border_color=COLOR_NARANJA,
+            border_radius=9,
+        )
 
         # Campos numéricos para especificaciones técnicas
         self.trb_arqueo_bruto = self._crear_campo_etiquetado(
@@ -143,19 +140,17 @@ class PantallaRegistrarBuque(ft.Container):
             cliente_obj = getattr(self.buque_a_editar, "cliente", None)
             self.cliente_busqueda.establecer_cliente(cliente_obj)
             pais_actual = self.buque_a_editar.bandera_pais or ""
-            nombres_paises = {p["nombre"] for p in self.paises}
-            if pais_actual and pais_actual not in nombres_paises:
-                opcion_anterior = ft.DropdownOption(
-                    key=pais_actual, text=f"🌐  {pais_actual} (valor anterior)"
-                )
-                self._opciones_paises_bandera.append(opcion_anterior)
-            self.bandera_pais.value = pais_actual or ""
+            self.bandera_pais.establecer_pais(pais_actual)
             self.subtipo_descripcion.value = (
                 self.buque_a_editar.subtipo_descripcion or ""
             )
 
             categoria_obj = getattr(self.buque_a_editar, "categoria_buque", None)
-            self.categoria_buque.establecer_categoria(categoria_obj)
+            categoria_id = getattr(
+                self.buque_a_editar, "categoria_buque_id", None
+            ) or getattr(categoria_obj, "id", None)
+            if categoria_id is not None:
+                self.categoria_buque.value = str(categoria_id)
 
             self.trb_arqueo_bruto.value = str(
                 self.buque_a_editar.trb_arqueo_bruto or ""
@@ -165,7 +160,8 @@ class PantallaRegistrarBuque(ft.Container):
             )
             self.calado_metros.value = (
                 str(self.buque_a_editar.calado_metros)
-                if self.buque_a_editar.calado_metros is not None else ""
+                if self.buque_a_editar.calado_metros is not None
+                else ""
             )
 
             self.es_autopropulsado.value = bool(
@@ -178,70 +174,362 @@ class PantallaRegistrarBuque(ft.Container):
 
         self.build_ui()
 
-    def _abrir_selector_pais(self, e=None):
-        self._busqueda_pais_registro.value = ""
-        self._construir_lista_paises_registro()
-        self._dialogo_selector_pais = ft.AlertDialog(
+    def _obtener_opciones_categoria(self):
+        try:
+            if hasattr(self.servicio_categoria_buque, "obtener_todas"):
+                categorias = self.servicio_categoria_buque.obtener_todas()
+            else:
+                categorias = self.servicio_categoria_buque.obtener_pagina(
+                    1, limite=100
+                )
+        except Exception:
+            categorias = []
+
+        opciones = []
+        for cat in categorias or []:
+            etiqueta_legible = ControladorBuque.etiqueta_categoria(cat)
+            opciones.append(
+                ft.DropdownOption(key=str(cat.id), text=etiqueta_legible)
+            )
+        return opciones
+
+    def _campo_dialogo_cliente(
+        self,
+        titulo,
+        icono,
+        control,
+        expand=True,
+    ):
+        return ft.Container(
+            expand=expand,
+            content=ft.Column(
+                spacing=4,
+                horizontal_alignment=ft.CrossAxisAlignment.STRETCH,
+                controls=[
+                    ft.Row(
+                        spacing=6,
+                        vertical_alignment=ft.CrossAxisAlignment.CENTER,
+                        controls=[
+                            ft.Icon(icono, size=16, color=COLOR_BANNER),
+                            ft.Text(
+                                titulo,
+                                size=13,
+                                weight=ft.FontWeight.BOLD,
+                                color=COLOR_BANNER,
+                            ),
+                        ],
+                    ),
+                    control,
+                ],
+            ),
+        )
+
+    def _abrir_dialogo_nuevo_cliente(self, e=None):
+        self._cliente_rapido_nombre = ft.TextField(
+            hint_text="Ej. ABC Logistics S.A. de C.V.",
+            height=42,
+            text_size=13,
+            content_padding=ft.Padding(12, 8, 12, 8),
+            border=ft.InputBorder.OUTLINE,
+            border_color=COLOR_GRIS_CLARO,
+            focused_border_color=COLOR_NARANJA,
+            border_radius=9,
+        )
+        self._cliente_rapido_rfc = ft.TextField(
+            hint_text="Ej. ABC010203XYZ",
+            height=42,
+            text_size=13,
+            content_padding=ft.Padding(12, 8, 12, 8),
+            border=ft.InputBorder.OUTLINE,
+            border_color=COLOR_GRIS_CLARO,
+            focused_border_color=COLOR_NARANJA,
+            border_radius=9,
+        )
+        self._cliente_rapido_tipo_persona = ft.Dropdown(
+            hint_text="Selecciona un tipo de persona",
+            options=[
+                ft.DropdownOption(key="FISICA", text="Persona Física"),
+                ft.DropdownOption(key="MORAL", text="Persona Moral"),
+                ft.DropdownOption(key="EXTRANJERO", text="Extranjero"),
+            ],
+            expand=True,
+            height=42,
+            text_size=13,
+            content_padding=ft.Padding(12, 8, 12, 8),
+            border=ft.InputBorder.OUTLINE,
+            border_color=COLOR_GRIS_CLARO,
+            focused_border_color=COLOR_NARANJA,
+            border_radius=9,
+        )
+        self._cliente_rapido_es_nuevo = ft.Switch(
+            value=True,
+            active_color=COLOR_NARANJA,
+        )
+        self._cliente_rapido_activo = ft.Switch(
+            value=True,
+            active_color=COLOR_NARANJA,
+        )
+        self._cliente_rapido_telefono = ft.TextField(
+            hint_text="Ej. +52 962 123 4567",
+            height=42,
+            text_size=13,
+            content_padding=ft.Padding(12, 8, 12, 8),
+            border=ft.InputBorder.OUTLINE,
+            border_color=COLOR_GRIS_CLARO,
+            focused_border_color=COLOR_NARANJA,
+            border_radius=9,
+        )
+        self._cliente_rapido_correo = ft.TextField(
+            hint_text="Ej. cliente@empresa.com",
+            height=42,
+            text_size=13,
+            content_padding=ft.Padding(12, 8, 12, 8),
+            border=ft.InputBorder.OUTLINE,
+            border_color=COLOR_GRIS_CLARO,
+            focused_border_color=COLOR_NARANJA,
+            border_radius=9,
+        )
+        self._cliente_rapido_direccion = ft.TextField(
+            hint_text="Ej. Calle, número, colonia, ciudad, estado, código postal, país.",
+            multiline=True,
+            min_lines=2,
+            max_lines=2,
+            height=64,
+            text_size=13,
+            content_padding=ft.Padding(12, 8, 12, 8),
+            border=ft.InputBorder.OUTLINE,
+            border_color=COLOR_GRIS_CLARO,
+            focused_border_color=COLOR_NARANJA,
+            border_radius=9,
+        )
+
+        panel_switches = ft.Container(
+            bgcolor="#F7FAFD",
+            border=ft.Border.all(1, "#E4ECF5"),
+            border_radius=9,
+            padding=ft.Padding(10, 6, 10, 6),
+            content=ft.Row(
+                spacing=10,
+                vertical_alignment=ft.CrossAxisAlignment.CENTER,
+                controls=[
+                    ft.Row(
+                        expand=True,
+                        spacing=6,
+                        vertical_alignment=ft.CrossAxisAlignment.CENTER,
+                        controls=[
+                            self._cliente_rapido_es_nuevo,
+                            ft.Text(
+                                "Es nuevo cliente",
+                                size=12,
+                                weight=ft.FontWeight.BOLD,
+                                color=COLOR_BANNER,
+                            ),
+                        ],
+                    ),
+                    ft.Container(width=1, height=28, bgcolor=COLOR_GRIS_CLARO),
+                    ft.Row(
+                        expand=True,
+                        spacing=6,
+                        vertical_alignment=ft.CrossAxisAlignment.CENTER,
+                        controls=[
+                            self._cliente_rapido_activo,
+                            ft.Text(
+                                "Cliente activo",
+                                size=12,
+                                weight=ft.FontWeight.BOLD,
+                                color=COLOR_BANNER,
+                            ),
+                        ],
+                    ),
+                ],
+            ),
+        )
+
+        encabezado_dialogo = ft.Row(
+            spacing=12,
+            vertical_alignment=ft.CrossAxisAlignment.CENTER,
+            controls=[
+                ft.Container(
+                    width=48,
+                    height=48,
+                    border_radius=24,
+                    bgcolor="#FFF0E5",
+                    alignment=ft.Alignment(0, 0),
+                    content=ft.Icon(
+                        ft.Icons.PERSON_ADD_ALT_1_OUTLINED,
+                        size=24,
+                        color=COLOR_NARANJA,
+                    ),
+                ),
+                ft.Column(
+                    expand=True,
+                    spacing=2,
+                    controls=[
+                        ft.Text(
+                            "Registrar nuevo cliente",
+                            size=20,
+                            weight=ft.FontWeight.BOLD,
+                            color=COLOR_BANNER,
+                        ),
+                        ft.Text(
+                            "Completa la información fiscal y de contacto del cliente.",
+                            size=12,
+                            color=COLOR_GRIS,
+                        ),
+                    ],
+                ),
+                ft.IconButton(
+                    icon=ft.Icons.CLOSE,
+                    tooltip="Cerrar",
+                    icon_color=COLOR_BANNER,
+                    on_click=self._cerrar_dialogo_nuevo_cliente,
+                ),
+            ],
+        )
+
+        contenido_dialogo = ft.Column(
+            tight=True,
+            spacing=10,
+            controls=[
+                tarjeta_detalle(
+                    "Datos generales",
+                    ft.Icons.ASSIGNMENT_OUTLINED,
+                    ft.Column(
+                        spacing=10,
+                        controls=[
+                            ft.Row(
+                                spacing=12,
+                                controls=[
+                                    self._campo_dialogo_cliente(
+                                        "Nombre o razón social *",
+                                        ft.Icons.PERSON_OUTLINED,
+                                        self._cliente_rapido_nombre,
+                                    ),
+                                    self._campo_dialogo_cliente(
+                                        "RFC *",
+                                        ft.Icons.BADGE_OUTLINED,
+                                        self._cliente_rapido_rfc,
+                                    ),
+                                ],
+                            ),
+                            ft.Row(
+                                spacing=12,
+                                vertical_alignment=ft.CrossAxisAlignment.END,
+                                controls=[
+                                    self._campo_dialogo_cliente(
+                                        "Tipo de persona *",
+                                        ft.Icons.PERSON_OUTLINE,
+                                        self._cliente_rapido_tipo_persona,
+                                        expand=4,
+                                    ),
+                                    ft.Container(
+                                        expand=6,
+                                        content=panel_switches,
+                                    ),
+                                ],
+                            ),
+                        ],
+                    ),
+                ),
+                tarjeta_detalle(
+                    "Información de contacto",
+                    ft.Icons.PHONE_OUTLINED,
+                    ft.Row(
+                        spacing=12,
+                        controls=[
+                            self._campo_dialogo_cliente(
+                                "Número telefónico *",
+                                ft.Icons.PHONE_OUTLINED,
+                                self._cliente_rapido_telefono,
+                            ),
+                            self._campo_dialogo_cliente(
+                                "Correo electrónico *",
+                                ft.Icons.MAIL_OUTLINE,
+                                self._cliente_rapido_correo,
+                            ),
+                        ],
+                    ),
+                ),
+                tarjeta_detalle(
+                    "Domicilio fiscal",
+                    ft.Icons.LOCATION_ON_OUTLINED,
+                    self._campo_dialogo_cliente(
+                        "Dirección fiscal completa *",
+                        ft.Icons.LOCATION_ON_OUTLINED,
+                        self._cliente_rapido_direccion,
+                    ),
+                ),
+            ],
+        )
+
+        self._dialogo_nuevo_cliente = ft.AlertDialog(
             modal=True,
             bgcolor="#F4F8FC",
             shape=ft.RoundedRectangleBorder(radius=16),
-            title=ft.Text("Seleccionar bandera / país", size=17, weight=ft.FontWeight.BOLD),
+            scrollable=True,
+            title=encabezado_dialogo,
             title_padding=ft.Padding(18, 14, 18, 8),
             content=ft.Container(
-                width=420,
-                content=ft.Column(
-                    tight=True,
-                    spacing=10,
-                    controls=[self._busqueda_pais_registro, self._lista_paises_registro],
-                ),
+                width=620,
+                content=contenido_dialogo,
             ),
-            content_padding=ft.Padding(16, 4, 16, 0),
-            actions=[ft.TextButton("Cancelar", on_click=self._cerrar_selector_pais)],
-            actions_alignment=ft.MainAxisAlignment.END,
-            actions_padding=ft.Padding(12, 6, 12, 10),
-        )
-        self._page.show_dialog(self._dialogo_selector_pais)
-
-    def _cerrar_selector_pais(self, e=None):
-        if self._dialogo_selector_pais is not None:
-            self._page.pop_dialog()
-            self._dialogo_selector_pais = None
-
-    def _construir_lista_paises_registro(self):
-        termino = (self._busqueda_pais_registro.value or "").strip().casefold()
-        opciones = [
-            opcion for opcion in self._opciones_paises_bandera
-            if termino in str(opcion.text).casefold()
-        ]
-        self._lista_paises_registro.controls = [
-            ft.Container(
-                border_radius=7,
-                padding=ft.Padding(8, 7, 8, 7),
-                bgcolor="#FFF0E5" if str(opcion.key) == str(self.bandera_pais.value) else None,
-                content=ft.Row(
-                    spacing=8,
+            content_padding=ft.Padding(16, 4, 16, 4),
+            actions=[
+                ft.Row(
+                    expand=True,
+                    alignment=ft.MainAxisAlignment.SPACE_BETWEEN,
                     controls=[
-                        ft.Icon(ft.Icons.CHECK_CIRCLE if str(opcion.key) == str(self.bandera_pais.value) else ft.Icons.CIRCLE_OUTLINED,
-                                color=COLOR_NARANJA if str(opcion.key) == str(self.bandera_pais.value) else COLOR_GRIS_CLARO, size=17),
-                        ft.Text(str(opcion.text), size=12, color=COLOR_NEGRO, expand=True),
+                        boton(
+                            texto="Cancelar",
+                            icono=ft.Icons.CLOSE,
+                            tipo="secundario",
+                            color=COLOR_BANNER,
+                            height=40,
+                            width=120,
+                            on_click=self._cerrar_dialogo_nuevo_cliente,
+                        ),
+                        boton(
+                            texto="Guardar cliente",
+                            icono=ft.Icons.SAVE_OUTLINED,
+                            tipo="principal",
+                            height=40,
+                            width=165,
+                            on_click=self._guardar_nuevo_cliente_rapido,
+                        ),
                     ],
-                ),
-                on_click=lambda e, valor=opcion.key: self._seleccionar_pais_registro(valor),
+                )
+            ],
+            actions_alignment=ft.MainAxisAlignment.END,
+            actions_padding=ft.Padding(16, 8, 16, 14),
+        )
+        self._page.show_dialog(self._dialogo_nuevo_cliente)
+
+    def _cerrar_dialogo_nuevo_cliente(self, e=None):
+        self._page.pop_dialog()
+
+    def _guardar_nuevo_cliente_rapido(self, e=None):
+        controlador_clientes = ControladorClientes(self.servicio_cliente)
+        try:
+            controlador_clientes.registrar_cliente(
+                razon_social=self._cliente_rapido_nombre.value,
+                tipo_persona=self._cliente_rapido_tipo_persona.value,
+                direccion=self._cliente_rapido_direccion.value,
+                rfc=self._cliente_rapido_rfc.value,
+                telefono=self._cliente_rapido_telefono.value,
+                correo_elect=self._cliente_rapido_correo.value,
+                es_nuevo_cliente=bool(self._cliente_rapido_es_nuevo.value),
+                activo=bool(self._cliente_rapido_activo.value),
             )
-            for opcion in opciones
-        ]
-        if not opciones:
-            self._lista_paises_registro.controls = [
-                ft.Container(padding=10, content=ft.Text("No se encontraron países", size=12, color=COLOR_GRIS_CLARO))
-            ]
+        except (ValueError, ErrorRegistroCliente) as error:
+            mostrar_notificacion(self._page, str(error), COLOR_ROJO)
+            return
 
-    def _filtrar_paises_registro(self, e=None):
-        self._construir_lista_paises_registro()
-
-    def _seleccionar_pais_registro(self, valor):
-        self.bandera_pais.value = str(valor)
-        self.bandera_pais.update()
-        self._cerrar_selector_pais()
+        self._page.pop_dialog()
+        mostrar_notificacion(
+            self._page,
+            "Cliente registrado correctamente.",
+            COLOR_VERDE,
+        )
 
     def _crear_campo_texto(self, hint, icono):
         return ft.TextField(
@@ -254,7 +542,7 @@ class PantallaRegistrarBuque(ft.Container):
             text_size=14,
             content_padding=14,
         )
-    
+
     def _crear_campo_etiquetado(self, etiqueta, ejemplo, icono=None, numerico=False):
         return ft.TextField(
             label=etiqueta,
@@ -273,7 +561,8 @@ class PantallaRegistrarBuque(ft.Container):
                     regex_string=r"^[0-9.]*$",
                     replacement_string="",
                 )
-                if numerico else None
+                if numerico
+                else None
             ),
         )
 
@@ -287,7 +576,9 @@ class PantallaRegistrarBuque(ft.Container):
             border_radius=9,
             text_size=14,
             content_padding=14,
-            input_filter=ft.InputFilter(allow=True, regex_string=r"^[0-9.]*$", replacement_string="")
+            input_filter=ft.InputFilter(
+                allow=True, regex_string=r"^[0-9.]*$", replacement_string=""
+            ),
         )
 
     def _crear_campo_entero(self, hint, icono):
@@ -300,7 +591,9 @@ class PantallaRegistrarBuque(ft.Container):
             border_radius=9,
             text_size=14,
             content_padding=14,
-            input_filter=ft.InputFilter(allow=True, regex_string=r"^[0-9]*$", replacement_string="")
+            input_filter=ft.InputFilter(
+                allow=True, regex_string=r"^[0-9]*$", replacement_string=""
+            ),
         )
 
     # Nuevo método integrado para manejar el Stack y resultados superpuestos
@@ -313,20 +606,32 @@ class PantallaRegistrarBuque(ft.Container):
                     controls=[
                         ft.Container(expand=True, content=self.nombre),
                         ft.Container(expand=True, content=self.numero_imo),
-                        ft.Container(expand=True, content=self.cliente_busqueda),
+                        ft.Row(
+                            expand=True,
+                            spacing=8,
+                            vertical_alignment=ft.CrossAxisAlignment.CENTER,
+                            controls=[
+                                ft.Container(
+                                    expand=True,
+                                    content=self.cliente_busqueda,
+                                ),
+                                self._boton_nuevo_cliente,
+                            ],
+                        ),
                     ],
                 ),
                 ft.Row(
                     spacing=14,
                     controls=[
                         ft.Container(expand=True, content=self.categoria_buque),
-                        ft.Container(expand=True, content=self.subtipo_descripcion),
+                        ft.Container(
+                            expand=True, content=self.subtipo_descripcion
+                        ),
                         ft.Container(expand=True, content=self.bandera_pais),
                     ],
                 ),
             ],
         )
-
 
     def build_ui(self):
         formulario = card(
@@ -344,7 +649,6 @@ class PantallaRegistrarBuque(ft.Container):
                                 "Datos generales",
                                 self.crear_datos_generales(),
                             ),
-
                             self.seccion(
                                 ft.Icons.SQUARE_FOOT_OUTLINED,
                                 "Especificaciones físicas, arqueo y propulsión",
@@ -372,20 +676,24 @@ class PantallaRegistrarBuque(ft.Container):
                                             spacing=24,
                                             vertical_alignment=ft.CrossAxisAlignment.CENTER,
                                             controls=[
-                                                ft.Container(content=self.es_autopropulsado),
-                                                ft.Container(content=self.propulsores_proa_popa),
-                                                ft.Container(content=self.activo),
+                                                ft.Container(
+                                                    content=self.es_autopropulsado
+                                                ),
+                                                ft.Container(
+                                                    content=self.propulsores_proa_popa
+                                                ),
+                                                ft.Container(
+                                                    content=self.activo
+                                                ),
                                             ],
                                         ),
                                     ],
                                 ),
                             ),
-
                             ft.Divider(
                                 height=1,
                                 color=COLOR_GRIS_CLARO,
                             ),
-
                             ft.Row(
                                 alignment=ft.MainAxisAlignment.SPACE_BETWEEN,
                                 vertical_alignment=ft.CrossAxisAlignment.CENTER,
@@ -425,7 +733,6 @@ class PantallaRegistrarBuque(ft.Container):
                                         ),
                                         on_click=self.cancelar,
                                     ),
-
                                     ft.FilledButton(
                                         content=ft.Row(
                                             tight=True,
@@ -437,7 +744,9 @@ class PantallaRegistrarBuque(ft.Container):
                                                     color=COLOR_BLANCO,
                                                 ),
                                                 ft.Text(
-                                                    "Guardar cambios" if self.modo_edicion else "Guardar buque",
+                                                    "Guardar cambios"
+                                                    if self.modo_edicion
+                                                    else "Guardar buque",
                                                     size=14,
                                                     weight=ft.FontWeight.BOLD,
                                                     color=COLOR_BLANCO,
@@ -463,7 +772,6 @@ class PantallaRegistrarBuque(ft.Container):
                             ),
                         ],
                     ),
-
                     # Desplegable de clientes por encima de todo el formulario
                     ft.Container(
                         top=96,
@@ -481,8 +789,7 @@ class PantallaRegistrarBuque(ft.Container):
                             ],
                         ),
                     ),
-
-                    # Desplegable de categorías de buque por encima del formulario
+                    # Desplegable de bandera / país por encima del formulario
                     ft.Container(
                         top=166,
                         left=0,
@@ -490,12 +797,12 @@ class PantallaRegistrarBuque(ft.Container):
                         content=ft.Row(
                             spacing=14,
                             controls=[
+                                ft.Container(expand=True),
+                                ft.Container(expand=True),
                                 ft.Container(
                                     expand=True,
-                                    content=self.categoria_buque.contenido_resultados,
+                                    content=self.bandera_pais.contenido_resultados,
                                 ),
-                                ft.Container(expand=True),
-                                ft.Container(expand=True),
                             ],
                         ),
                     ),
@@ -535,13 +842,14 @@ class PantallaRegistrarBuque(ft.Container):
                         size=48,
                         color=COLOR_NARANJA,
                     ),
-
                     ft.Column(
                         expand=True,
                         spacing=5,
                         controls=[
                             ft.Text(
-                                "Editar buque" if self.modo_edicion else "Registrar nuevo buque",
+                                "Editar buque"
+                                if self.modo_edicion
+                                else "Registrar nuevo buque",
                                 size=28,
                                 weight=ft.FontWeight.BOLD,
                                 color=COLOR_BANNER,
@@ -553,7 +861,6 @@ class PantallaRegistrarBuque(ft.Container):
                             ),
                         ],
                     ),
-
                     ft.Container(
                         width=330,
                         height=105,
@@ -588,7 +895,6 @@ class PantallaRegistrarBuque(ft.Container):
                 ],
             ),
         )
-
 
     def seccion(self, icono, titulo, contenido):
         return ft.Column(

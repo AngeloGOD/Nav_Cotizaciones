@@ -1,13 +1,21 @@
-
 import flet as ft
 
 from fuente.utilidades.Colores import *
 from fuente.utilidades.Componentes import *
+from fuente.utilidades.Componentes import (
+    agregar_panel_flotante,
+    boton_exportacion,
+    estado_vacio,
+    menu_exportacion,
+    mostrar_notificacion,
+    quitar_panel_flotante,
+)
+from fuente.utilidades.ExportacionExcel import exportar_excel
+from fuente.utilidades.ExportacionPDF import exportar_pdf
 from fuente.negocio.controlador.ControladorBuque import ControladorBuque
 from fuente.negocio.servicio.ServicioCategoriaBuque import ServicioCategoriaBuque
 from fuente.presentacion.PantallaRegistrarBuque import PantallaRegistrarBuque
 from fuente.presentacion.SelectorCliente import SelectorCliente
-from fuente.presentacion.SelectorCategoriaBuque import SelectorCategoriaBuque
 from fuente.infraestructura.servicios_externos.ServicioPaises import ServicioPaises
 
 
@@ -53,6 +61,8 @@ class PantallaBuques(ft.Container):
         }
         self._checks_filtros = {}
         self._panel_filtros_abierto = False
+        self._menu_exportacion_abierto = False
+        self._clic_en_boton_menu = False
 
         self.buque_seleccionado = None
         self.dialogo_confirmacion = None
@@ -73,7 +83,11 @@ class PantallaBuques(ft.Container):
             expand=True,
             clip_behavior=ft.ClipBehavior.NONE,
             controls=[
-                self._columna_contenido,
+                ft.GestureDetector(
+                    expand=True,
+                    on_tap_down=self._clic_fondo_filtros,
+                    content=self._columna_contenido,
+                ),
             ],
         )
 
@@ -102,9 +116,10 @@ class PantallaBuques(ft.Container):
     def cabecera_buques(self):
         buscador = barra_busqueda(
             hint="Buscar por nombre, IMO, categoría, subtipo o bandera...",
-            on_change=self.buscar,
+            on_change=self._con_cierre_de_menus(self.buscar),
         )
         buscador.height = 44
+        buscador.on_focus = self.cerrar_menus
 
         self._boton_filtros = boton(
             texto="Filtros",
@@ -116,7 +131,13 @@ class PantallaBuques(ft.Container):
             on_click=self.abrir_filtros,
         )
 
-        boton_filtros = self._boton_filtros
+        boton_filtros = ft.GestureDetector(
+            on_tap_down=self._marcar_clic_en_boton_menu,
+            on_tap_up=self._limpiar_clic_en_boton_menu,
+            on_tap_cancel=self._limpiar_clic_en_boton_menu,
+            content=self._boton_filtros,
+        )
+        self._actualizar_indicador_filtros()
 
         boton_registrar_buque = boton(
             texto="Registrar buque",
@@ -124,7 +145,7 @@ class PantallaBuques(ft.Container):
             tipo="principal",
             width=210,
             height=44,
-            on_click=self.ir_a_registro,
+            on_click=self._con_cierre_de_menus(self.ir_a_registro),
         )
 
         barra_herramientas = card(
@@ -154,13 +175,16 @@ class PantallaBuques(ft.Container):
             icono=ft.Icons.DIRECTIONS_BOAT_OUTLINED,
         )
 
-        return ft.Column(
-            spacing=10,
-            horizontal_alignment=ft.CrossAxisAlignment.STRETCH,
-            controls=[
-                banner,
-                barra_herramientas,
-            ],
+        return ft.GestureDetector(
+            on_tap_down=self._clic_fondo_exportacion,
+            content=ft.Column(
+                spacing=10,
+                horizontal_alignment=ft.CrossAxisAlignment.STRETCH,
+                controls=[
+                    banner,
+                    barra_herramientas,
+                ],
+            ),
         )
 
     def buscar(self, e):
@@ -187,6 +211,8 @@ class PantallaBuques(ft.Container):
         return self._boton_filtros
 
     def abrir_filtros(self, e=None):
+        self._clic_en_boton_menu = False
+        self.cerrar_menu_exportacion()
         if self._panel_filtros_abierto:
             self.cerrar_filtros()
             return
@@ -194,8 +220,7 @@ class PantallaBuques(ft.Container):
         self._checks_filtros = {}
         self._campos_rango_filtros = {}
         self._panel_filtros = self._crear_panel_filtros()
-        # Se agrega como capa del Stack, no como elemento de la columna.
-        self._layout_principal.controls.append(self._panel_filtros)
+        agregar_panel_flotante(self._layout_principal, self._panel_filtros)
         self._panel_filtros_abierto = True
         self.update()
 
@@ -220,11 +245,7 @@ class PantallaBuques(ft.Container):
         )
 
     def _contar_filtros(self):
-        f = self.filtros_seleccionados
-        return (
-            sum(len(f[k]) for k in ("categorias", "banderas", "autopropulsion", "propulsores", "estados"))
-            + sum(bool(f[k]) for k in ("trb_min", "trb_max", "eslora_min", "eslora_max", "calado_min", "calado_max"))
-        )
+        return self.controlador.contar_filtros(self.filtros_seleccionados)
 
     def _seccion_checks_filtro(self, titulo, clave, opciones, columnas=2):
         seleccionados = self.filtros_seleccionados[clave]
@@ -279,9 +300,9 @@ class PantallaBuques(ft.Container):
 
     def _seccion_filtro_banderas(self):
         try:
-            paises = ServicioPaises.obtener_paises()
-        except RuntimeError:
-            paises = []
+            banderas_registradas = self.controlador.obtener_banderas_registradas()
+        except Exception:
+            banderas_registradas = []
 
         seleccionados = self.filtros_seleccionados.get("banderas", set())
         self._busqueda_banderas_filtro = ft.TextField(
@@ -298,10 +319,9 @@ class PantallaBuques(ft.Container):
         )
         self._checks_banderas_filtro = {}
         self._opciones_banderas_filtro = []
-        for pais in paises:
-            nombre = pais["nombre"]
+        for nombre in banderas_registradas:
             cb = ft.Checkbox(
-                label=f'{pais["emoji"]}  {nombre}',
+                label=nombre,
                 value=nombre in seleccionados,
                 active_color=COLOR_AZUL,
                 label_style=ft.TextStyle(size=12, color=COLOR_NEGRO),
@@ -312,25 +332,28 @@ class PantallaBuques(ft.Container):
                 ft.Container(content=cb, visible=True)
             )
 
-        # Mantiene visibles valores guardados previamente que no estén en la API.
-        for nombre in seleccionados:
-            if nombre not in self._checks_banderas_filtro:
-                cb = ft.Checkbox(
-                    label=f"🌐  {nombre} (valor anterior)",
-                    value=True,
-                    active_color=COLOR_AZUL,
-                    label_style=ft.TextStyle(size=12, color=COLOR_NEGRO),
-                    on_change=self._cambio_filtro_visual,
-                )
-                self._checks_banderas_filtro[nombre] = cb
-                self._opciones_banderas_filtro.append(ft.Container(content=cb, visible=True))
-
-        self._lista_banderas_filtro = ft.Column(
-            spacing=2,
-            scroll=ft.ScrollMode.AUTO,
-            height=150,
-            controls=self._opciones_banderas_filtro,
-        )
+        if self._opciones_banderas_filtro:
+            self._lista_banderas_filtro = ft.Column(
+                spacing=2,
+                scroll=ft.ScrollMode.AUTO,
+                height=150,
+                controls=self._opciones_banderas_filtro,
+            )
+        else:
+            self._lista_banderas_filtro = ft.Column(
+                spacing=2,
+                tight=True,
+                controls=[
+                    ft.Container(
+                        padding=ft.Padding(4, 6, 4, 6),
+                        content=ft.Text(
+                            "No hay banderas registradas",
+                            size=12,
+                            color=COLOR_GRIS,
+                        ),
+                    )
+                ],
+            )
         return ft.Container(
             padding=ft.Padding(14, 8, 14, 8),
             content=ft.Column(spacing=6, controls=[
@@ -350,9 +373,12 @@ class PantallaBuques(ft.Container):
 
     def _obtener_opciones_categorias_filtro(self):
         try:
-            categorias = self.controlador.obtener_categorias_buque(1, limite=50)
+            categorias = self.controlador.obtener_todas_categorias_buque()
             if categorias:
-                return [(int(c.id), c.categoria) for c in categorias]
+                return [
+                    (int(c.id), ControladorBuque.etiqueta_categoria(c))
+                    for c in categorias
+                ]
         except Exception:
             pass
         return [
@@ -406,8 +432,25 @@ class PantallaBuques(ft.Container):
         return self._panel_filtros
 
     def _texto_resumen_filtros(self):
-        n = self._contar_filtros()
-        return "Sin filtros seleccionados" if n == 0 else ("1 filtro seleccionado" if n == 1 else f"{n} filtros seleccionados")
+        if self._checks_filtros or getattr(self, "_campos_rango_filtros", None):
+            n = (
+                sum(bool(cb.value) for cb in self._checks_filtros.values())
+                + sum(
+                    bool(cb.value)
+                    for cb in getattr(self, "_checks_banderas_filtro", {}).values()
+                )
+                + sum(
+                    bool((campo.value or "").strip())
+                    for campo in getattr(self, "_campos_rango_filtros", {}).values()
+                )
+            )
+        else:
+            n = self._contar_filtros()
+        return (
+            "Sin filtros seleccionados"
+            if n == 0
+            else ("1 filtro seleccionado" if n == 1 else f"{n} filtros seleccionados")
+        )
 
     def _cambio_filtro_visual(self, e=None):
         if hasattr(self, "_texto_resumen_filtros_control"):
@@ -429,6 +472,8 @@ class PantallaBuques(ft.Container):
         }
         self._actualizar_indicador_filtros()
         self._cambio_filtro_visual()
+        if hasattr(self, "_panel_filtros") and self._panel_filtros_abierto:
+            self._panel_filtros.update()
         self.pagina_actual = 1
         self.buques_seleccionados.clear()
         self.actualizar_directorio()
@@ -454,11 +499,13 @@ class PantallaBuques(ft.Container):
 
     def cerrar_filtros(self, e=None):
         if self._panel_filtros_abierto:
-            self._layout_principal.controls = self._layout_principal.controls[:1]
+            quitar_panel_flotante(self._layout_principal, self._panel_filtros)
             self._panel_filtros_abierto = False
             self.update()
 
     def ir_a_registro(self, e):
+        if self._panel_filtros_abierto:
+            self.cerrar_filtros()
         self.content = PantallaRegistrarBuque(
             self._page,
             self.servicio_buque,
@@ -476,7 +523,6 @@ class PantallaBuques(ft.Container):
     def actualizar_directorio(self):
         self._columna_contenido.controls[1] = self.directorio()
         self.update()
-
 
     def ver_buque(self, buque):
         """Abre la ficha del buque; la edición se realiza dentro del mismo diálogo."""
@@ -562,8 +608,6 @@ class PantallaBuques(ft.Container):
                 ),
             ],
         )
-
-
 
     def _contenido_ficha_buque(self):
         buque = self.buque_en_detalle
@@ -735,7 +779,6 @@ class PantallaBuques(ft.Container):
 
         if self.modo_edicion_buque:
             selector_cliente = self.campos_ficha_buque.get("cliente_id")
-            selector_categoria = self.campos_ficha_buque.get("categoria_buque")
 
             capas = [contenido]
             if selector_cliente:
@@ -745,15 +788,6 @@ class PantallaBuques(ft.Container):
                         left=14,
                         width=330,
                         content=selector_cliente.contenido_resultados,
-                    )
-                )
-            if selector_categoria and hasattr(selector_categoria, "contenido_resultados"):
-                capas.append(
-                    ft.Container(
-                        top=332,
-                        left=14,
-                        width=330,
-                        content=selector_categoria.contenido_resultados,
                     )
                 )
             if len(capas) > 1:
@@ -781,9 +815,41 @@ class PantallaBuques(ft.Container):
                 self.campos_ficha_buque[nombre] = control
                 return campo_detalle(etiqueta, control, expand=expand)
             elif tipo_categoria:
-                control = SelectorCategoriaBuque(self.servicio_categoria_buque, height=44)
-                categoria_obj = getattr(self.buque_en_detalle, "categoria_buque", None)
-                control.establecer_categoria(categoria_obj)
+                try:
+                    categorias = self.controlador.obtener_todas_categorias_buque()
+                except Exception:
+                    categorias = []
+                opciones = [
+                    ft.DropdownOption(
+                        key=str(c.id),
+                        text=ControladorBuque.etiqueta_categoria(c),
+                    )
+                    for c in (categorias or [])
+                ]
+                categoria_obj = getattr(
+                    self.buque_en_detalle, "categoria_buque", None
+                )
+                categoria_id_actual = getattr(
+                    self.buque_en_detalle, "categoria_buque_id", None
+                ) or getattr(categoria_obj, "id", None)
+                valor_actual = (
+                    str(categoria_id_actual)
+                    if categoria_id_actual is not None
+                    else None
+                )
+                control = ft.Dropdown(
+                    value=valor_actual,
+                    options=opciones,
+                    hint_text="Selecciona un tipo de buque",
+                    leading_icon=ft.Icons.CATEGORY_OUTLINED,
+                    height=44,
+                    text_size=14,
+                    content_padding=ft.Padding(12, 8, 12, 8),
+                    border=ft.InputBorder.OUTLINE,
+                    border_color=COLOR_GRIS_CLARO,
+                    focused_border_color=COLOR_NARANJA,
+                    border_radius=9,
+                )
                 self.campos_ficha_buque[nombre] = control
                 return campo_detalle(etiqueta, control, expand=expand)
             elif nombre == "bandera_pais":
@@ -865,17 +931,11 @@ class PantallaBuques(ft.Container):
                     or (f"ID {valor}" if valor is not None else "Sin cliente asignado")
                 )
             elif nombre == "categoria_buque":
-                etiquetas = {
-                    "COMERCIAL": "Comercial",
-                    "TURISTICO": "Turístico",
-                    "PESQUERO": "Pesquero",
-                    "PETROLERO": "Petrolero",
-                    "RO_RO": "Ro-Ro",
-                    "RECREO_MENOR": "Recreo / Menor",
-                }
                 categoria_obj = getattr(self.buque_en_detalle, "categoria_buque", None)
-                nombre_cat = getattr(categoria_obj, "categoria", None) or valor
-                texto = etiquetas.get(str(nombre_cat or "").upper(), nombre_cat or "—")
+                texto = (
+                    ControladorBuque.etiqueta_categoria(categoria_obj or valor)
+                    or "—"
+                )
             else:
                 texto = valor if valor not in (None, "") else "—"
             control = ft.Text(
@@ -1031,11 +1091,16 @@ class PantallaBuques(ft.Container):
             "categoria_buque_id_seleccionada",
             None,
         )
+        if categoria_buque_id is None:
+            categoria_buque_id = (
+                (campos["categoria_buque"].value or "").strip() or None
+            )
         trb = (campos["trb_arqueo_bruto"].value or "").strip()
         eslora = (campos["eslora_metros"].value or "").strip()
 
         if not nombre or not categoria_buque_id or not trb or not eslora:
-            self._mostrar_notificacion(
+            mostrar_notificacion(
+                self._page,
                 "El nombre, la categoría, el arqueo bruto y la eslora son obligatorios.",
                 COLOR_ROJO,
             )
@@ -1060,13 +1125,21 @@ class PantallaBuques(ft.Container):
                 activo=bool(campos["activo"].value),
             )
         except Exception as error:
-            self._mostrar_notificacion(f"No se pudieron guardar los cambios: {error}", COLOR_ROJO)
+            mostrar_notificacion(
+                self._page,
+                f"No se pudieron guardar los cambios: {error}",
+                COLOR_ROJO,
+            )
             return
 
         self.modo_edicion_buque = False
         self.actualizar_directorio()
         self._actualizar_ficha_buque()
-        self._mostrar_notificacion("Cambios guardados correctamente.", COLOR_VERDE)
+        mostrar_notificacion(
+            self._page,
+            "Cambios guardados correctamente.",
+            COLOR_VERDE,
+        )
 
     def pedir_confirmacion_eliminacion_ficha_buque(self, e):
         buque = self.buque_en_detalle
@@ -1086,7 +1159,11 @@ class PantallaBuques(ft.Container):
         try:
             self.controlador.servicio_buque.eliminar_buque(buque)
         except Exception as error:
-            self._mostrar_notificacion(f"No se pudo eliminar el buque: {error}", COLOR_ROJO)
+            mostrar_notificacion(
+                self._page,
+                f"No se pudo eliminar el buque: {error}",
+                COLOR_ROJO,
+            )
             return
 
         self._page.pop_dialog()  # cierra la ficha que queda debajo de la confirmación
@@ -1101,7 +1178,11 @@ class PantallaBuques(ft.Container):
             if not registros:
                 self.pagina_actual -= 1
         self.actualizar_directorio()
-        self._mostrar_notificacion(f"Buque '{buque.nombre}' eliminado correctamente.", COLOR_VERDE)
+        mostrar_notificacion(
+            self._page,
+            f"Buque '{buque.nombre}' eliminado correctamente.",
+            COLOR_VERDE,
+        )
 
     def cerrar_ficha_buque(self, e):
         self._page.pop_dialog()
@@ -1162,7 +1243,8 @@ class PantallaBuques(ft.Container):
             self.controlador.servicio_buque.eliminar_buque(buque)
             self.buques_seleccionados.pop(self._clave_buque(buque), None)
 
-            self._mostrar_notificacion(
+            mostrar_notificacion(
+                self._page,
                 f"Buque '{buque.nombre}' eliminado correctamente.",
                 COLOR_VERDE,
             )
@@ -1186,22 +1268,14 @@ class PantallaBuques(ft.Container):
             self.actualizar_directorio()
 
         except Exception as error:
-            self._mostrar_notificacion(
+            mostrar_notificacion(
+                self._page,
                 f"No se pudo eliminar el buque: {error}",
                 COLOR_ROJO,
             )
 
     def _mostrar_notificacion(self, mensaje, color):
-        snack = ft.SnackBar(
-            content=ft.Text(
-                mensaje,
-                color=COLOR_BLANCO,
-            ),
-            bgcolor=color,
-        )
-
-        self._page.show_dialog(snack)
-        self._page.update()
+        mostrar_notificacion(self._page, mensaje, color)
 
     # ---------------------------------------------------------
 
@@ -1261,7 +1335,8 @@ class PantallaBuques(ft.Container):
             for buque in seleccionados[:eliminados]:
                 self.buques_seleccionados.pop(self._clave_buque(buque), None)
             self.actualizar_directorio()
-            self._mostrar_notificacion(
+            mostrar_notificacion(
+                self._page,
                 f"Se eliminaron {eliminados}; ocurrió un error: {error}",
                 COLOR_ROJO,
             )
@@ -1275,22 +1350,13 @@ class PantallaBuques(ft.Container):
         )
         self.pagina_actual = min(self.pagina_actual, paginas)
         self.actualizar_directorio()
-        self._mostrar_notificacion(
+        mostrar_notificacion(
+            self._page,
             f"Se eliminaron {eliminados} buque(s).",
             COLOR_VERDE,
         )
 
-
     def crear_tabla_buques(self, buques):
-        etiquetas_categoria = {
-            "COMERCIAL": "Comercial",
-            "TURISTICO": "Turístico",
-            "PESQUERO": "Pesquero",
-            "PETROLERO": "Petrolero",
-            "RO_RO": "Ro-Ro",
-            "RECREO_MENOR": "Recreo / Menor",
-        }
-
         claves_pagina = [self._clave_buque(b) for b in buques]
         pagina_completa_seleccionada = bool(buques) and all(
             clave in self.buques_seleccionados for clave in claves_pagina
@@ -1305,8 +1371,10 @@ class PantallaBuques(ft.Container):
                 check_color=COLOR_BLANCO,
                 border_side=ft.BorderSide(1.5, "#7186A0"),
                 shape=ft.RoundedRectangleBorder(radius=3),
-                on_change=lambda e, bs=list(buques): self.seleccionar_pagina_buques(
-                    bs, bool(e.control.value)
+                on_change=self._con_cierre_de_menus(
+                    lambda e, bs=list(buques): self.seleccionar_pagina_buques(
+                        bs, bool(e.control.value)
+                    )
                 ),
             ),
         )
@@ -1409,18 +1477,9 @@ class PantallaBuques(ft.Container):
             )
 
             categoria_obj = getattr(buque, "categoria_buque", None)
-            valor_cat = (
-                getattr(categoria_obj, "categoria", None)
-                or (
-                    categoria_obj.value
-                    if hasattr(categoria_obj, "value")
-                    else str(categoria_obj or "")
-                )
-            )
-
-            texto_cat = etiquetas_categoria.get(
-                str(valor_cat).upper(),
-                valor_cat or "N/A",
+            texto_cat = (
+                ControladorBuque.etiqueta_categoria(categoria_obj)
+                or "N/A"
             )
 
             categoria_y_subtipo = ft.Column(
@@ -1541,7 +1600,9 @@ class PantallaBuques(ft.Container):
                         icono=ft.Icons.VISIBILITY_OUTLINED,
                         tooltip="Ver detalles del buque",
                         tipo="accion",
-                        on_click=lambda e, b=buque: self.ver_buque(b),
+                        on_click=self._con_cierre_de_menus(
+                            lambda e, b=buque: self.ver_buque(b)
+                        ),
                     ),
                 ],
             )
@@ -1552,8 +1613,10 @@ class PantallaBuques(ft.Container):
                 check_color=COLOR_BLANCO,
                 border_side=ft.BorderSide(1.5, "#7186A0"),
                 shape=ft.RoundedRectangleBorder(radius=3),
-                on_change=lambda e, b=buque: self.seleccionar_buque(
-                    b, bool(e.control.value)
+                on_change=self._con_cierre_de_menus(
+                    lambda e, b=buque: self.seleccionar_buque(
+                        b, bool(e.control.value)
+                    )
                 ),
             )
 
@@ -1645,7 +1708,6 @@ class PantallaBuques(ft.Container):
             columnas_compactas=True,
         )
 
-
     def directorio(self):
         offset = (self.pagina_actual - 1) * self.registros_por_pagina
 
@@ -1658,49 +1720,77 @@ class PantallaBuques(ft.Container):
 
         tabla_buques = self.crear_tabla_buques(buques)
 
-        controles_seleccion = []
+        cantidad = len(self.buques_seleccionados)
+        self._texto_seleccionados = ft.Text(
+            (
+                f"{cantidad} buque seleccionado"
+                if cantidad == 1
+                else f"{cantidad} buques seleccionados"
+            ),
+            size=12,
+            color=COLOR_NEGRO,
+            weight=ft.FontWeight.BOLD,
+            max_lines=1,
+        )
+        self._barra_seleccion = ft.Row(
+            visible=bool(self.buques_seleccionados),
+            spacing=7,
+            vertical_alignment=ft.CrossAxisAlignment.CENTER,
+            controls=[
+                ft.Icon(
+                    ft.Icons.CHECK_CIRCLE_OUTLINED,
+                    size=18,
+                    color=COLOR_AZUL,
+                ),
+                self._texto_seleccionados,
+                boton(
+                    texto="Eliminar",
+                    icono=ft.Icons.DELETE_OUTLINE,
+                    tipo="secundario",
+                    color=COLOR_ROJO,
+                    border_color="#FFC8CF",
+                    height=36,
+                    on_click=self._con_cierre_de_menus(
+                        self.confirmar_eliminar_buques_seleccionados
+                    ),
+                ),
+                ft.TextButton(
+                    "Cancelar",
+                    on_click=self._con_cierre_de_menus(
+                        self.cancelar_seleccion_buques
+                    ),
+                    style=ft.ButtonStyle(color=COLOR_BANNER),
+                ),
+            ],
+        )
 
-        if self.buques_seleccionados:
-            cantidad = len(self.buques_seleccionados)
-
-            controles_seleccion = [
-                ft.Row(
-                    spacing=7,
-                    vertical_alignment=ft.CrossAxisAlignment.CENTER,
-                    controls=[
-                        ft.Icon(
-                            ft.Icons.CHECK_CIRCLE_OUTLINED,
-                            size=18,
-                            color=COLOR_AZUL,
-                        ),
-                        ft.Text(
-                            (
-                                f"{cantidad} buque seleccionado"
-                                if cantidad == 1
-                                else f"{cantidad} buques seleccionados"
-                            ),
-                            size=12,
-                            color=COLOR_NEGRO,
-                            weight=ft.FontWeight.BOLD,
-                            max_lines=1,
-                        ),
-                        boton(
-                            texto="Eliminar",
-                            icono=ft.Icons.DELETE_OUTLINE,
-                            tipo="secundario",
-                            color=COLOR_ROJO,
-                            border_color="#FFC8CF",
-                            height=36,
-                            on_click=self.confirmar_eliminar_buques_seleccionados,
-                        ),
-                        ft.TextButton(
-                            "Cancelar",
-                            on_click=self.cancelar_seleccion_buques,
-                            style=ft.ButtonStyle(color=COLOR_BANNER),
-                        ),
-                    ],
-                )
-            ]
+        self._boton_exportar = boton_exportacion(
+            texto=self._texto_boton_exportar(),
+            on_click=self.alternar_menu_exportacion,
+            width=(
+                230
+                if self.buques_seleccionados
+                else 190
+                if self._hay_filtros_exportacion()
+                else 150
+            ),
+        )
+        self._texto_resumen_exportacion = ft.Text(
+            self._descripcion_exportacion(),
+            size=11,
+            color=COLOR_GRIS,
+        )
+        self._menu_exportacion = menu_exportacion(
+            descripcion=self._texto_resumen_exportacion,
+            on_pdf=self._exportar_buques_pdf,
+            on_excel=self._exportar_buques_excel,
+            descripcion_pdf="Genera un archivo PDF en el directorio de buques.",
+            descripcion_excel="Descarga un archivo Excel con los datos de buques.",
+            top=52,
+            right=0,
+            width=280,
+        )
+        self._menu_exportacion.visible = False
 
         cabecera_directorio = ft.Row(
             spacing=12,
@@ -1738,19 +1828,12 @@ class PantallaBuques(ft.Container):
                         ],
                     ),
                 ),
-                *controles_seleccion,
-                boton(
-                    texto=(
-                        f"Exportar seleccionados ({len(self.buques_seleccionados)})"
-                        if self.buques_seleccionados
-                        else "Exportar"
-                    ),
-                    icono=ft.Icons.DOWNLOAD_OUTLINED,
-                    tipo="secundario",
-                    width=230 if self.buques_seleccionados else 150,
-                    height=44,
-                    border_color="#C9DDF7",
-                    on_click=self.exportar_buques,
+                self._barra_seleccion,
+                ft.GestureDetector(
+                    on_tap_down=self._marcar_clic_en_boton_menu,
+                    on_tap_up=self._limpiar_clic_en_boton_menu,
+                    on_tap_cancel=self._limpiar_clic_en_boton_menu,
+                    content=self._boton_exportar,
                 ),
             ],
         )
@@ -1761,7 +1844,15 @@ class PantallaBuques(ft.Container):
             border_radius=12,
             bgcolor=COLOR_BLANCO,
             clip_behavior=ft.ClipBehavior.HARD_EDGE,
-            content=tabla_buques,
+            content=(
+                tabla_buques
+                if buques
+                else estado_vacio(
+                    ft.Icons.DIRECTIONS_BOAT_OUTLINED,
+                    "No se encontraron buques",
+                    "Prueba cambiando la búsqueda o los filtros.",
+                )
+            ),
         )
 
         pie_directorio = ft.Row(
@@ -1777,7 +1868,7 @@ class PantallaBuques(ft.Container):
                     total_registros=self.total_buques,
                     registros_por_pagina=self.registros_por_pagina,
                     pagina_actual=self.pagina_actual,
-                    on_change=self.cambiar_pagina,
+                    on_change=self._con_cierre_de_menus(self.cambiar_pagina),
                 ),
             ],
         )
@@ -1789,21 +1880,26 @@ class PantallaBuques(ft.Container):
             pie_directorio,
         ]
 
-        contenido_directorio = ft.Stack(
+        self._contenido_directorio = ft.Stack(
             expand=True,
             clip_behavior=ft.ClipBehavior.NONE,
             controls=[
-                ft.Column(
+                ft.GestureDetector(
                     expand=True,
-                    spacing=12,
-                    horizontal_alignment=ft.CrossAxisAlignment.STRETCH,
-                    controls=controles,
+                    on_tap_down=self._clic_fondo_exportacion,
+                    content=ft.Column(
+                        expand=True,
+                        spacing=12,
+                        horizontal_alignment=ft.CrossAxisAlignment.STRETCH,
+                        controls=controles,
+                    ),
                 ),
+                self._menu_exportacion,
             ],
         )
 
         return card(
-            contenido_directorio,
+            self._contenido_directorio,
             padding=ft.Padding(12, 11, 12, 11),
             radius=12,
             border_color="#E0ECF9",
@@ -1830,5 +1926,185 @@ class PantallaBuques(ft.Container):
             ],
         )
 
-    def exportar_buques(self, e):
-        pass
+    def alternar_menu_exportacion(self, e=None):
+        self._clic_en_boton_menu = False
+        self.cerrar_filtros()
+        self._menu_exportacion_abierto = not self._menu_exportacion_abierto
+        self._actualizar_menu_exportacion()
+
+    def exportar_buques(self, e=None):
+        self.alternar_menu_exportacion(e)
+
+    def cerrar_menus(self, e=None):
+        self.cerrar_menu_exportacion()
+        self.cerrar_filtros()
+
+    def cerrar_menu_exportacion(self, e=None):
+        if not self._menu_exportacion_abierto:
+            return
+        self._menu_exportacion_abierto = False
+        self._actualizar_menu_exportacion()
+
+    def _actualizar_menu_exportacion(self):
+        if self._menu_exportacion_abierto:
+            self._texto_resumen_exportacion.value = self._descripcion_exportacion()
+        self._menu_exportacion.visible = self._menu_exportacion_abierto
+        self._menu_exportacion.update()
+
+    def _clic_fondo_filtros(self, e=None):
+        if self._clic_en_boton_menu or self._menu_exportacion_abierto:
+            return
+        self.cerrar_menus()
+
+    def _clic_fondo_exportacion(self, e=None):
+        if not self._clic_en_boton_menu:
+            self.cerrar_menus()
+
+    def _marcar_clic_en_boton_menu(self, e=None):
+        self._clic_en_boton_menu = True
+
+    def _limpiar_clic_en_boton_menu(self, e=None):
+        self._clic_en_boton_menu = False
+
+    def _con_cierre_de_menus(self, accion):
+        def ejecutar(*args, **kwargs):
+            try:
+                return accion(*args, **kwargs)
+            finally:
+                self.cerrar_menus()
+
+        return ejecutar
+
+    def _descripcion_exportacion(self):
+        if self.buques_seleccionados:
+            return "Elige un formato para exportar los buques seleccionados."
+        if self._hay_filtros_exportacion():
+            return "Elige un formato para exportar los buques filtrados."
+        return "Elige un formato para exportar los buques encontrados."
+
+    def _hay_filtros_exportacion(self):
+        return bool(
+            self.busqueda.strip()
+            or self.controlador.contar_filtros(self.filtros_seleccionados)
+        )
+
+    def _texto_boton_exportar(self):
+        if self.buques_seleccionados:
+            cantidad = len(self.buques_seleccionados)
+            return f"Exportar seleccionados ({cantidad})"
+        if self._hay_filtros_exportacion():
+            return "Exportar filtrados"
+        return "Exportar"
+
+    async def _exportar_buques_excel(self, e=None):
+        self.cerrar_menu_exportacion()
+        try:
+            seleccionados = (
+                list(self.buques_seleccionados.values())
+                if self.buques_seleccionados
+                else None
+            )
+            filas, columnas = self.controlador.obtener_datos_exportacion(
+                buques_seleccionados=seleccionados,
+                texto=self.busqueda,
+                filtros=self.filtros_seleccionados,
+            )
+            nombre_archivo = (
+                "buques_seleccionados.xlsx"
+                if seleccionados is not None
+                else "buques.xlsx"
+            )
+
+            guardado = await exportar_excel(
+                self._page,
+                filas,
+                columnas,
+                nombre_archivo,
+                nombre_hoja="Buques",
+            )
+            if guardado:
+                mostrar_notificacion(
+                    self._page,
+                    f"Se exportaron {len(filas)} buques a Excel.",
+                    COLOR_VERDE,
+                )
+        except Exception as error:
+            mostrar_notificacion(
+                self._page,
+                f"No se pudieron exportar los buques: {error}",
+                COLOR_ROJO,
+            )
+
+    async def _exportar_buques_pdf(self, e=None):
+        self.cerrar_menu_exportacion()
+        try:
+            seleccionados = (
+                list(self.buques_seleccionados.values())
+                if self.buques_seleccionados
+                else None
+            )
+            filas, _ = self.controlador.obtener_datos_exportacion(
+                buques_seleccionados=seleccionados,
+                texto=self.busqueda,
+                filtros=self.filtros_seleccionados,
+            )
+            if seleccionados is not None:
+                etiqueta_registros = f"Buques seleccionados: {len(filas)}"
+                nombre_archivo = "buques_seleccionados.pdf"
+            elif self._hay_filtros_exportacion():
+                etiqueta_registros = f"Buques filtrados: {len(filas)}"
+                nombre_archivo = "buques_filtrados.pdf"
+            else:
+                etiqueta_registros = f"Buques registrados: {len(filas)}"
+                nombre_archivo = "buques.pdf"
+
+            activos = sum(fila["estado"] == "Activo" for fila in filas)
+            metricas = {
+                "Buques incluidos": len(filas),
+                "Activos": activos,
+                "Inactivos": len(filas) - activos,
+            }
+            guardado = await exportar_pdf(
+                self._page,
+                filas,
+                self.controlador.COLUMNAS_PDF,
+                nombre_archivo,
+                titulo="Directorio de buques",
+                subtitulo="Gestión de buques",
+                etiqueta_registros=etiqueta_registros,
+                metricas=metricas,
+                orientacion="landscape",
+                proporciones_columnas=(
+                    0.12,
+                    0.08,
+                    0.13,
+                    0.09,
+                    0.09,
+                    0.11,
+                    0.07,
+                    0.06,
+                    0.06,
+                    0.07,
+                    0.06,
+                    0.06,
+                ),
+                columnas_centradas=(
+                    "Categoría",
+                    "Autopropulsado",
+                    "Propulsores P/P",
+                    "Estado",
+                ),
+                nombre_registro="buques",
+            )
+            if guardado:
+                mostrar_notificacion(
+                    self._page,
+                    f"Se exportaron {len(filas)} buques a PDF.",
+                    COLOR_VERDE,
+                )
+        except Exception as error:
+            mostrar_notificacion(
+                self._page,
+                f"No se pudieron exportar los buques a PDF: {error}",
+                COLOR_ROJO,
+            )

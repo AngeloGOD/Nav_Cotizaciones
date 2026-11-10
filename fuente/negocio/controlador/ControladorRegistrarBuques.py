@@ -10,11 +10,21 @@ class ControladorRegistrarBuques:
         )
 
     def obtener_datos(self, pantalla):
+        categoria_buque_id = getattr(
+            pantalla.categoria_buque,
+            "categoria_buque_id_seleccionada",
+            None,
+        )
+        if categoria_buque_id is None:
+            categoria_buque_id = getattr(pantalla.categoria_buque, "value", None)
+        if isinstance(categoria_buque_id, str):
+            categoria_buque_id = categoria_buque_id.strip() or None
+
         return {
             "nombre": (pantalla.nombre.value or "").strip(),
             "numero_imo": (pantalla.numero_imo.value or "").strip(),
             "cliente_id": pantalla.cliente_busqueda.cliente_id_seleccionado,
-            "categoria_buque_id": pantalla.categoria_buque.categoria_buque_id_seleccionada,
+            "categoria_buque_id": categoria_buque_id,
             "subtipo_descripcion": (pantalla.subtipo_descripcion.value or "").strip(),
             "bandera_pais": (pantalla.bandera_pais.value or "").strip(),
             "trb_arqueo_bruto": (pantalla.trb_arqueo_bruto.value or "").strip(),

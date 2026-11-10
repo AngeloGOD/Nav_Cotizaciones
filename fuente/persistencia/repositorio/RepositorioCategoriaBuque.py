@@ -28,6 +28,10 @@ class RepositorioCategoriaBuque(Repositorio):
         )
         return self.sesion.scalars(stmt).all()
 
+    def obtener_todas(self):
+        stmt = select(CategoriaBuque).order_by(CategoriaBuque.id)
+        return self.sesion.scalars(stmt).all()
+
     def modificar(self, objeto):
         pass
 

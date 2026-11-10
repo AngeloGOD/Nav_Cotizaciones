@@ -46,3 +46,7 @@ class ServicioBuque:
     def buscar_por_nombre(self, nombre: str):
         with self.uow:
             return self.uow.buque.buscar_por_nombre(nombre)
+
+    def obtener_banderas_registradas(self):
+        with self.uow:
+            return self.uow.buque.obtener_banderas_registradas()

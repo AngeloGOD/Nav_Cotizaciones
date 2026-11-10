@@ -160,3 +160,14 @@ class RepositorioBuque(Repositorio):
             .limit(10)
         )
         return self.sesion.scalars(stmt).all()
+
+    def obtener_banderas_registradas(self) -> list[str]:
+        stmt = (
+            select(func.distinct(Buque.bandera_pais))
+            .where(
+                Buque.bandera_pais.is_not(None),
+                func.trim(Buque.bandera_pais) != "",
+            )
+            .order_by(Buque.bandera_pais)
+        )
+        return [b for b in self.sesion.scalars(stmt).all() if b]

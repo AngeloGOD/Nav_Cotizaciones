@@ -30,6 +30,10 @@ class ServicioCategoriaBuque:
                 )
         return resultado
 
+    def obtener_todas(self):
+        with self.uow:
+            return self.uow.categoria_buque.obtener_todas()
+
     def buscar_por_id(self, id: int):
         with self.uow:
             return self.uow.categoria_buque.buscar_por_id(id)

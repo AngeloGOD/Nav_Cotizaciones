@@ -1,5 +1,11 @@
 from decimal import Decimal
 
+from sqlalchemy.exc import SQLAlchemyError
+
+from fuente.negocio.controlador.ControladorRegistrarBuques import (
+    ControladorRegistrarBuques,
+    ErrorRegistroBuque,
+)
 from fuente.negocio.modelo.Buque import Buque
 from fuente.negocio.servicio.ServicioCategoriaBuque import ServicioCategoriaBuque
 
@@ -64,6 +70,10 @@ class ControladorBuque:
             if servicio_categoria_buque is not None
             else ServicioCategoriaBuque(servicio_buque.uow)
         )
+        self.controlador_registro = ControladorRegistrarBuques(
+            servicio_buque,
+            servicio_categoria_buque=self.servicio_categoria_buque,
+        )
 
     @classmethod
     def contar_filtros(cls, filtros):
@@ -120,29 +130,35 @@ class ControladorBuque:
             1, limite=limite, filtros=filtros
         )
 
-    def registrar_buque(self, nombre, categoria_buque_id, trb_arqueo_bruto,
-                        eslora_metros, cliente_id=None, numero_imo=None,
-                        subtipo_descripcion=None, calado_metros=None,
-                        propulsores_proa_popa=False, es_autopropulsado=True,
-                        bandera_pais=None, activo=True):
-        cliente_id_val = int(str(cliente_id).strip()) if self._texto_o_none(cliente_id) else None
-        categoria_id_val = int(str(categoria_buque_id).strip())
-        buque = Buque(
-            cliente_id=cliente_id_val,
-            nombre=str(nombre).strip(),
-            numero_imo=self._texto_o_none(numero_imo),
-            categoria_buque_id=categoria_id_val,
-            subtipo_descripcion=self._texto_o_none(subtipo_descripcion),
-            trb=Decimal(str(trb_arqueo_bruto).strip()),
-            eslora=Decimal(str(eslora_metros).strip()),
-            calado=self._decimal_o_none(calado_metros),
-            propulsores_proa_popa=bool(propulsores_proa_popa),
-            es_autopropulsado=bool(es_autopropulsado),
-            bandera_pais=self._texto_o_none(bandera_pais),
-            activo=bool(activo),
+    def registrar_buque(
+        self,
+        nombre,
+        categoria_buque_id,
+        trb_arqueo_bruto,
+        eslora_metros,
+        cliente_id=None,
+        numero_imo=None,
+        subtipo_descripcion=None,
+        calado_metros=None,
+        propulsores_proa_popa=False,
+        es_autopropulsado=True,
+        bandera_pais=None,
+        activo=True,
+    ):
+        return self.controlador_registro.registrar_buque(
+            nombre=nombre,
+            categoria_buque_id=categoria_buque_id,
+            trb_arqueo_bruto=trb_arqueo_bruto,
+            eslora_metros=eslora_metros,
+            cliente_id=cliente_id,
+            numero_imo=numero_imo,
+            subtipo_descripcion=subtipo_descripcion,
+            calado_metros=calado_metros,
+            propulsores_proa_popa=propulsores_proa_popa,
+            es_autopropulsado=es_autopropulsado,
+            bandera_pais=bandera_pais,
+            activo=activo,
         )
-        self.servicio_buque.registrar_buque(buque)
-        return buque
 
     def obtener_buques(self, texto="", limit=10, offset=0, filtros=None):
         pagina = (offset // limit) + 1 if limit else 1
@@ -228,25 +244,49 @@ class ControladorBuque:
             no_pagina=pagina, limite=limite, filtros=filtros or {}, texto=texto or ""
         )
 
-    def modificar_buque(self, buque, nombre, categoria_buque_id, trb_arqueo_bruto,
-                        eslora_metros, cliente_id=None, numero_imo=None,
-                        subtipo_descripcion=None, calado_metros=None,
-                        propulsores_proa_popa=False, es_autopropulsado=True,
-                        bandera_pais=None, activo=True):
-        categoria_id_val = int(str(categoria_buque_id).strip())
-        buque.cliente_id = int(str(cliente_id).strip()) if self._texto_o_none(cliente_id) else None
-        buque.nombre = str(nombre).strip()
-        buque.numero_imo = self._texto_o_none(numero_imo)
-        buque.categoria_buque_id = categoria_id_val
+    def modificar_buque(
+        self,
+        buque,
+        nombre,
+        categoria_buque_id,
+        trb_arqueo_bruto,
+        eslora_metros,
+        cliente_id=None,
+        numero_imo=None,
+        subtipo_descripcion=None,
+        calado_metros=None,
+        propulsores_proa_popa=False,
+        es_autopropulsado=True,
+        bandera_pais=None,
+        activo=True,
+    ):
+        datos = ControladorRegistrarBuques.normalizar_datos_buque(
+            nombre=nombre,
+            categoria_buque_id=categoria_buque_id,
+            trb_arqueo_bruto=trb_arqueo_bruto,
+            eslora_metros=eslora_metros,
+            cliente_id=cliente_id,
+            numero_imo=numero_imo,
+            subtipo_descripcion=subtipo_descripcion,
+            calado_metros=calado_metros,
+            propulsores_proa_popa=propulsores_proa_popa,
+            es_autopropulsado=es_autopropulsado,
+            bandera_pais=bandera_pais,
+            activo=activo,
+        )
+        ControladorRegistrarBuques._validar_campos_obligatorios(datos)
+
+        for atributo, valor in datos.items():
+            setattr(buque, atributo, valor)
         if self.servicio_categoria_buque is not None:
-            buque.categoria_buque = self.servicio_categoria_buque.buscar_por_id(categoria_id_val)
-        buque.subtipo_descripcion = self._texto_o_none(subtipo_descripcion)
-        buque.trb = Decimal(str(trb_arqueo_bruto).strip())
-        buque.eslora = Decimal(str(eslora_metros).strip())
-        buque.calado = self._decimal_o_none(calado_metros)
-        buque.propulsores_proa_popa = bool(propulsores_proa_popa)
-        buque.es_autopropulsado = bool(es_autopropulsado)
-        buque.bandera_pais = self._texto_o_none(bandera_pais)
-        buque.activo = bool(activo)
-        self.servicio_buque.modificar_buque(buque)
+            buque.categoria_buque = self.servicio_categoria_buque.buscar_por_id(
+                datos["categoria_buque_id"]
+            )
+
+        try:
+            self.servicio_buque.modificar_buque(buque)
+        except SQLAlchemyError as error:
+            raise ErrorRegistroBuque(
+                ControladorRegistrarBuques._mensaje_error_bd(error)
+            ) from error
         return buque

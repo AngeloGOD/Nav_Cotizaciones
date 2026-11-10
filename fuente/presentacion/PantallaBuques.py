@@ -5,10 +5,22 @@ from fuente.utilidades.Componentes import *
 from fuente.utilidades.Componentes import (
     agregar_panel_flotante,
     boton_exportacion,
+    campo_con_mensaje_error,
+    crear_feedback_dialogo,
+    crear_mensaje_validacion,
     estado_vacio,
+    limpiar_error_campo,
     menu_exportacion,
+    mostrar_feedback_dialogo,
     mostrar_notificacion,
+    ocultar_feedback_dialogo,
     quitar_panel_flotante,
+    validar_campo,
+    validar_campos,
+    validar_registros_exportacion,
+    validador_numero,
+    validador_requerido,
+    vincular_validacion_campo,
 )
 from fuente.utilidades.ExportacionExcel import exportar_excel
 from fuente.utilidades.ExportacionPDF import exportar_pdf
@@ -528,6 +540,7 @@ class PantallaBuques(ft.Container):
         """Abre la ficha del buque; la edición se realiza dentro del mismo diálogo."""
         self.buque_en_detalle = buque
         self.modo_edicion_buque = False
+        self._feedback_ficha_buque = crear_feedback_dialogo(self._page)
         self.dialogo_buque = self._crear_dialogo_buque()
         self._page.show_dialog(self.dialogo_buque)
 
@@ -540,7 +553,13 @@ class PantallaBuques(ft.Container):
             title_padding=ft.Padding(18, 12, 18, 6),
             content=ft.Container(
                 width=640,
-                content=self._contenido_ficha_buque(),
+                content=ft.Column(
+                    spacing=10,
+                    controls=[
+                        self._feedback_ficha_buque,
+                        self._contenido_ficha_buque(),
+                    ],
+                ),
             ),
             content_padding=ft.Padding(14, 0, 14, 0),
             actions=self._acciones_ficha_buque(),
@@ -612,6 +631,8 @@ class PantallaBuques(ft.Container):
     def _contenido_ficha_buque(self):
         buque = self.buque_en_detalle
         self.campos_ficha_buque = {}
+        self._errores_ficha_buque = {}
+        self._validaciones_ficha_buque = {}
 
         categoria_obj = getattr(buque, "categoria_buque", None)
         categoria = (
@@ -798,6 +819,16 @@ class PantallaBuques(ft.Container):
 
         return contenido
 
+    @staticmethod
+    def _validar_calado(valor):
+        if valor is None or not str(valor).strip():
+            return None
+        return validador_numero(
+            "El calado",
+            minimo=0,
+            minimo_exclusivo=True,
+        )(valor)
+
     def _campo_ficha_buque(
         self,
         etiqueta,
@@ -808,6 +839,8 @@ class PantallaBuques(ft.Container):
         switch=False,
     ):
         if self.modo_edicion_buque:
+            validador = None
+            evento = "on_change"
             if nombre == "cliente_id":
                 control = SelectorCliente(self.servicio_cliente)
                 cliente_obj = getattr(self.buque_en_detalle, "cliente", None)
@@ -851,7 +884,8 @@ class PantallaBuques(ft.Container):
                     border_radius=9,
                 )
                 self.campos_ficha_buque[nombre] = control
-                return campo_detalle(etiqueta, control, expand=expand)
+                validador = validador_requerido("una categoría de buque")
+                evento = "on_select"
             elif nombre == "bandera_pais":
                 try:
                     paises = ServicioPaises.obtener_paises()
@@ -887,6 +921,11 @@ class PantallaBuques(ft.Container):
                 )
                 self.campos_ficha_buque[nombre] = control
             else:
+                es_numerico = nombre in (
+                    "trb_arqueo_bruto",
+                    "eslora_metros",
+                    "calado_metros",
+                )
                 control = ft.TextField(
                     value="" if valor is None else str(valor),
                     text_size=14,
@@ -895,8 +934,51 @@ class PantallaBuques(ft.Container):
                     border_color=COLOR_GRIS_CLARO,
                     focused_border_color=COLOR_NARANJA,
                     border_radius=9,
+                    input_filter=(
+                        ft.InputFilter(
+                            allow=True,
+                            regex_string=r"^[0-9.]*$",
+                            replacement_string="",
+                        )
+                        if es_numerico
+                        else None
+                    ),
                 )
                 self.campos_ficha_buque[nombre] = control
+                validadores = {
+                    "nombre": validador_requerido("el nombre del buque"),
+                    "trb_arqueo_bruto": validador_numero(
+                        "El arqueo bruto (TRB)",
+                        minimo=0,
+                        minimo_exclusivo=True,
+                    ),
+                    "eslora_metros": validador_numero(
+                        "La eslora",
+                        minimo=0,
+                        minimo_exclusivo=True,
+                    ),
+                    "calado_metros": self._validar_calado,
+                }
+                validador = validadores.get(nombre)
+                evento = "on_change"
+
+            if not switch and validador is not None:
+                mensaje_error = crear_mensaje_validacion()
+                self._errores_ficha_buque[nombre] = mensaje_error
+                self._validaciones_ficha_buque[nombre] = (
+                    control,
+                    mensaje_error,
+                    validador,
+                )
+                vincular_validacion_campo(
+                    control,
+                    mensaje_error,
+                    validador,
+                    page=self._page,
+                    evento=evento,
+                )
+                campo = campo_con_mensaje_error(control, mensaje_error)
+                return campo_detalle(etiqueta, campo, expand=expand)
 
         elif switch:
             activo = bool(valor)
@@ -1070,20 +1152,32 @@ class PantallaBuques(ft.Container):
         self.dialogo_buque.title = self._encabezado_ficha_buque()
         self.dialogo_buque.content = ft.Container(
             width=700,
-            content=self._contenido_ficha_buque(),
+            content=ft.Column(
+                spacing=10,
+                controls=[
+                    self._feedback_ficha_buque,
+                    self._contenido_ficha_buque(),
+                ],
+            ),
         )
         self.dialogo_buque.actions = self._acciones_ficha_buque()
         self._page.update()
 
     def activar_edicion_buque(self, e):
         self.modo_edicion_buque = True
+        ocultar_feedback_dialogo(self._feedback_ficha_buque, self._page)
         self._actualizar_ficha_buque()
 
     def cancelar_edicion_buque(self, e):
         self.modo_edicion_buque = False
+        ocultar_feedback_dialogo(self._feedback_ficha_buque, self._page)
         self._actualizar_ficha_buque()
 
-    def guardar_cambios_buque(self, e):
+    def guardar_cambios_buque(self, e=None):
+        if not validar_campos(self._validaciones_ficha_buque):
+            self._page.update()
+            return
+
         campos = self.campos_ficha_buque
         nombre = (campos["nombre"].value or "").strip()
         categoria_buque_id = getattr(
@@ -1097,15 +1191,6 @@ class PantallaBuques(ft.Container):
             )
         trb = (campos["trb_arqueo_bruto"].value or "").strip()
         eslora = (campos["eslora_metros"].value or "").strip()
-
-        if not nombre or not categoria_buque_id or not trb or not eslora:
-            mostrar_notificacion(
-                self._page,
-                "El nombre, la categoría, el arqueo bruto y la eslora son obligatorios.",
-                COLOR_ROJO,
-            )
-            return
-
         cliente_id = campos["cliente_id"].cliente_id_seleccionado
 
         try:
@@ -1125,20 +1210,22 @@ class PantallaBuques(ft.Container):
                 activo=bool(campos["activo"].value),
             )
         except Exception as error:
-            mostrar_notificacion(
-                self._page,
+            mostrar_feedback_dialogo(
+                self._feedback_ficha_buque,
                 f"No se pudieron guardar los cambios: {error}",
                 COLOR_ROJO,
+                page=self._page,
             )
             return
 
         self.modo_edicion_buque = False
         self.actualizar_directorio()
         self._actualizar_ficha_buque()
-        mostrar_notificacion(
-            self._page,
+        mostrar_feedback_dialogo(
+            self._feedback_ficha_buque,
             "Cambios guardados correctamente.",
             COLOR_VERDE,
+            page=self._page,
         )
 
     def pedir_confirmacion_eliminacion_ficha_buque(self, e):
@@ -2009,6 +2096,10 @@ class PantallaBuques(ft.Container):
                 texto=self.busqueda,
                 filtros=self.filtros_seleccionados,
             )
+            if not validar_registros_exportacion(
+                self._page, filas, "buques"
+            ):
+                return
             nombre_archivo = (
                 "buques_seleccionados.xlsx"
                 if seleccionados is not None
@@ -2048,6 +2139,10 @@ class PantallaBuques(ft.Container):
                 texto=self.busqueda,
                 filtros=self.filtros_seleccionados,
             )
+            if not validar_registros_exportacion(
+                self._page, filas, "buques"
+            ):
+                return
             if seleccionados is not None:
                 etiqueta_registros = f"Buques seleccionados: {len(filas)}"
                 nombre_archivo = "buques_seleccionados.pdf"

@@ -6,6 +6,7 @@ from fuente.negocio.controlador.ControladorBuque import ControladorBuque
 from fuente.negocio.controlador.ControladorClientes import ControladorClientes
 from fuente.negocio.controlador.ControladorRegistrarBuques import (
     ControladorRegistrarBuques,
+    ErrorRegistroBuque,
 )
 from fuente.negocio.controlador.ControladorRegistrarCliente import (
     ErrorRegistroCliente,
@@ -172,7 +173,71 @@ class PantallaRegistrarBuque(ft.Container):
             )
             self.activo.value = bool(self.buque_a_editar.activo)
 
+        self._errores_validacion = {
+            campo: crear_mensaje_validacion()
+            for campo in (
+                "nombre",
+                "categoria_buque",
+                "trb_arqueo_bruto",
+                "eslora_metros",
+                "calado_metros",
+            )
+        }
+        self._validaciones = {
+            "nombre": (
+                self.nombre,
+                self._errores_validacion["nombre"],
+                validador_requerido("el nombre del buque"),
+            ),
+            "categoria_buque": (
+                self.categoria_buque,
+                self._errores_validacion["categoria_buque"],
+                validador_requerido("una categoría de buque"),
+            ),
+            "trb_arqueo_bruto": (
+                self.trb_arqueo_bruto,
+                self._errores_validacion["trb_arqueo_bruto"],
+                validador_numero(
+                    "El arqueo bruto (TRB)",
+                    minimo=0,
+                    minimo_exclusivo=True,
+                ),
+            ),
+            "eslora_metros": (
+                self.eslora_metros,
+                self._errores_validacion["eslora_metros"],
+                validador_numero(
+                    "La eslora",
+                    minimo=0,
+                    minimo_exclusivo=True,
+                ),
+            ),
+            "calado_metros": (
+                self.calado_metros,
+                self._errores_validacion["calado_metros"],
+                self._validar_calado,
+            ),
+        }
+        for clave, (control, mensaje_error, validador) in self._validaciones.items():
+            vincular_validacion_campo(
+                control,
+                mensaje_error,
+                validador,
+                page=self._page,
+                evento="on_select" if clave == "categoria_buque" else "on_change",
+            )
+
         self.build_ui()
+
+    @staticmethod
+    def _validar_calado(valor):
+        if valor is None or not str(valor).strip():
+            return None
+        return validador_numero(
+            "El calado",
+            minimo=0,
+            minimo_exclusivo=True,
+        )(valor)
 
     def _obtener_opciones_categoria(self):
         try:
@@ -198,6 +263,7 @@ class PantallaRegistrarBuque(ft.Container):
         titulo,
         icono,
         control,
+        mensaje_error=None,
         expand=True,
     ):
         return ft.Container(
@@ -219,7 +285,11 @@ class PantallaRegistrarBuque(ft.Container):
                             ),
                         ],
                     ),
-                    control,
+                    (
+                        campo_con_mensaje_error(control, mensaje_error)
+                        if mensaje_error is not None
+                        else control
+                    ),
                 ],
             ),
         )
@@ -387,10 +457,66 @@ class PantallaRegistrarBuque(ft.Container):
             ],
         )
 
+        self._feedback_cliente_rapido = crear_feedback_dialogo(self._page)
+        self._errores_cliente_rapido = {
+            campo: crear_mensaje_validacion()
+            for campo in (
+                "nombre",
+                "rfc",
+                "tipo_persona",
+                "telefono",
+                "correo",
+                "direccion",
+            )
+        }
+        self._validaciones_cliente_rapido = {
+            "nombre": (
+                self._cliente_rapido_nombre,
+                self._errores_cliente_rapido["nombre"],
+                validador_requerido("el nombre o razón social"),
+            ),
+            "rfc": (
+                self._cliente_rapido_rfc,
+                self._errores_cliente_rapido["rfc"],
+                validador_requerido("el RFC"),
+            ),
+            "tipo_persona": (
+                self._cliente_rapido_tipo_persona,
+                self._errores_cliente_rapido["tipo_persona"],
+                validador_requerido("un tipo de persona"),
+            ),
+            "telefono": (
+                self._cliente_rapido_telefono,
+                self._errores_cliente_rapido["telefono"],
+                validador_telefono(),
+            ),
+            "correo": (
+                self._cliente_rapido_correo,
+                self._errores_cliente_rapido["correo"],
+                validador_correo(),
+            ),
+            "direccion": (
+                self._cliente_rapido_direccion,
+                self._errores_cliente_rapido["direccion"],
+                validador_requerido("la dirección fiscal"),
+            ),
+        }
+        for clave, (control, mensaje_error, validador) in (
+            self._validaciones_cliente_rapido.items()
+        ):
+            vincular_validacion_campo(
+                control,
+                mensaje_error,
+                validador,
+                page=self._page,
+                evento="on_select" if clave == "tipo_persona" else "on_change",
+            )
+
         contenido_dialogo = ft.Column(
             tight=True,
             spacing=10,
             controls=[
+                self._feedback_cliente_rapido,
                 tarjeta_detalle(
                     "Datos generales",
                     ft.Icons.ASSIGNMENT_OUTLINED,
@@ -404,11 +530,13 @@ class PantallaRegistrarBuque(ft.Container):
                                         "Nombre o razón social *",
                                         ft.Icons.PERSON_OUTLINED,
                                         self._cliente_rapido_nombre,
+                                        self._errores_cliente_rapido["nombre"],
                                     ),
                                     self._campo_dialogo_cliente(
                                         "RFC *",
                                         ft.Icons.BADGE_OUTLINED,
                                         self._cliente_rapido_rfc,
+                                        self._errores_cliente_rapido["rfc"],
                                     ),
                                 ],
                             ),
@@ -420,6 +548,9 @@ class PantallaRegistrarBuque(ft.Container):
                                         "Tipo de persona *",
                                         ft.Icons.PERSON_OUTLINE,
                                         self._cliente_rapido_tipo_persona,
+                                        self._errores_cliente_rapido[
+                                            "tipo_persona"
+                                        ],
                                         expand=4,
                                     ),
                                     ft.Container(
@@ -441,11 +572,13 @@ class PantallaRegistrarBuque(ft.Container):
                                 "Número telefónico *",
                                 ft.Icons.PHONE_OUTLINED,
                                 self._cliente_rapido_telefono,
+                                self._errores_cliente_rapido["telefono"],
                             ),
                             self._campo_dialogo_cliente(
                                 "Correo electrónico *",
                                 ft.Icons.MAIL_OUTLINE,
                                 self._cliente_rapido_correo,
+                                self._errores_cliente_rapido["correo"],
                             ),
                         ],
                     ),
@@ -457,6 +590,7 @@ class PantallaRegistrarBuque(ft.Container):
                         "Dirección fiscal completa *",
                         ft.Icons.LOCATION_ON_OUTLINED,
                         self._cliente_rapido_direccion,
+                        self._errores_cliente_rapido["direccion"],
                     ),
                 ),
             ],
@@ -508,9 +642,13 @@ class PantallaRegistrarBuque(ft.Container):
         self._page.pop_dialog()
 
     def _guardar_nuevo_cliente_rapido(self, e=None):
+        if not validar_campos(self._validaciones_cliente_rapido):
+            self._page.update()
+            return
+
         controlador_clientes = ControladorClientes(self.servicio_cliente)
         try:
-            controlador_clientes.registrar_cliente(
+            cliente = controlador_clientes.registrar_cliente(
                 razon_social=self._cliente_rapido_nombre.value,
                 tipo_persona=self._cliente_rapido_tipo_persona.value,
                 direccion=self._cliente_rapido_direccion.value,
@@ -521,9 +659,16 @@ class PantallaRegistrarBuque(ft.Container):
                 activo=bool(self._cliente_rapido_activo.value),
             )
         except (ValueError, ErrorRegistroCliente) as error:
-            mostrar_notificacion(self._page, str(error), COLOR_ROJO)
+            mostrar_feedback_dialogo(
+                self._feedback_cliente_rapido,
+                str(error),
+                COLOR_ROJO,
+                page=self._page,
+            )
             return
 
+        if getattr(cliente, "id", None) is not None:
+            self.cliente_busqueda.establecer_cliente(cliente)
         self._page.pop_dialog()
         mostrar_notificacion(
             self._page,
@@ -603,8 +748,15 @@ class PantallaRegistrarBuque(ft.Container):
             controls=[
                 ft.Row(
                     spacing=14,
+                    vertical_alignment=ft.CrossAxisAlignment.START,
                     controls=[
-                        ft.Container(expand=True, content=self.nombre),
+                        ft.Container(
+                            expand=True,
+                            content=campo_con_mensaje_error(
+                                self.nombre,
+                                self._errores_validacion["nombre"],
+                            ),
+                        ),
                         ft.Container(expand=True, content=self.numero_imo),
                         ft.Row(
                             expand=True,
@@ -622,8 +774,15 @@ class PantallaRegistrarBuque(ft.Container):
                 ),
                 ft.Row(
                     spacing=14,
+                    vertical_alignment=ft.CrossAxisAlignment.START,
                     controls=[
-                        ft.Container(expand=True, content=self.categoria_buque),
+                        ft.Container(
+                            expand=True,
+                            content=campo_con_mensaje_error(
+                                self.categoria_buque,
+                                self._errores_validacion["categoria_buque"],
+                            ),
+                        ),
                         ft.Container(
                             expand=True, content=self.subtipo_descripcion
                         ),
@@ -657,18 +816,34 @@ class PantallaRegistrarBuque(ft.Container):
                                     controls=[
                                         ft.Row(
                                             spacing=14,
+                                            vertical_alignment=ft.CrossAxisAlignment.START,
                                             controls=[
                                                 ft.Container(
                                                     expand=True,
-                                                    content=self.trb_arqueo_bruto,
+                                                    content=campo_con_mensaje_error(
+                                                        self.trb_arqueo_bruto,
+                                                        self._errores_validacion[
+                                                            "trb_arqueo_bruto"
+                                                        ],
+                                                    ),
                                                 ),
                                                 ft.Container(
                                                     expand=True,
-                                                    content=self.eslora_metros,
+                                                    content=campo_con_mensaje_error(
+                                                        self.eslora_metros,
+                                                        self._errores_validacion[
+                                                            "eslora_metros"
+                                                        ],
+                                                    ),
                                                 ),
                                                 ft.Container(
                                                     expand=True,
-                                                    content=self.calado_metros,
+                                                    content=campo_con_mensaje_error(
+                                                        self.calado_metros,
+                                                        self._errores_validacion[
+                                                            "calado_metros"
+                                                        ],
+                                                    ),
                                                 ),
                                             ],
                                         ),
@@ -929,33 +1104,37 @@ class PantallaRegistrarBuque(ft.Container):
     def cancelar(self, e):
         if self.vista_anterior:
             self.vista_anterior.build_ui()
-            self.vista_anterior.update()
+            self._page.update()
 
     def guardar(self, e):
+        if not validar_campos(self._validaciones):
+            self._page.update()
+            return
+
+        datos_buque = self.controlador.obtener_datos(self)
         try:
-            datos_buque = self.controlador.obtener_datos(self)
-            exito, mensaje = self.controlador.guardar_buque(
-                datos=datos_buque,
-                buque_a_editar=self.buque_a_editar,
-            )
-
-            self._page.show_dialog(
-                ft.SnackBar(content=ft.Text(mensaje))
-            )
-
-            if exito and self.vista_anterior:
-                self.vista_anterior.build_ui()
-                self.vista_anterior.actualizar_directorio()
-
-            self._page.update()
-
-        except Exception as error:
-            print(f"Error al guardar el buque: {error}")
-            self._page.show_dialog(
-                ft.SnackBar(
-                    content=ft.Text(
-                        "No se pudieron guardar los cambios del buque."
-                    )
+            if self.buque_a_editar is not None:
+                self.controlador.modificar_buque(
+                    buque=self.buque_a_editar,
+                    **datos_buque,
                 )
-            )
-            self._page.update()
+                mensaje_exito = "Buque modificado correctamente."
+            else:
+                self.controlador.registrar_buque(**datos_buque)
+                mensaje_exito = "Buque registrado correctamente."
+        except ValueError as error:
+            mostrar_notificacion(self._page, str(error), COLOR_ROJO)
+            return
+        except ErrorRegistroBuque as error:
+            mostrar_notificacion(self._page, str(error), COLOR_ROJO)
+            return
+
+        mostrar_notificacion(
+            self._page,
+            mensaje_exito,
+            COLOR_VERDE,
+        )
+        if self.vista_anterior:
+            self.vista_anterior.build_ui()
+            self.vista_anterior.actualizar_directorio()
+        self._page.update()

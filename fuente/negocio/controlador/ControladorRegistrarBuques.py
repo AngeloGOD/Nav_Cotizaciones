@@ -1,13 +1,206 @@
-from fuente.negocio.controlador.ControladorBuque import ControladorBuque
+from decimal import Decimal, InvalidOperation
+
+from sqlalchemy.exc import SQLAlchemyError
+
+from fuente.negocio.modelo.Buque import Buque
+from fuente.negocio.servicio.ServicioCategoriaBuque import ServicioCategoriaBuque
+
+
+class ErrorRegistroBuque(Exception):
+    pass
 
 
 class ControladorRegistrarBuques:
+    CAMPOS_OBLIGATORIOS = {
+        "nombre": "Nombre del buque",
+        "categoria_buque_id": "Categoría del buque",
+        "trb": "Arqueo bruto (TRB)",
+        "eslora": "Eslora (m)",
+    }
 
     def __init__(self, servicio_buque, servicio_categoria_buque=None):
-        self.controlador_buque = ControladorBuque(
-            servicio_buque,
-            servicio_categoria_buque=servicio_categoria_buque,
+        self.servicio_buque = servicio_buque
+        self.servicio_categoria_buque = (
+            servicio_categoria_buque
+            if servicio_categoria_buque is not None
+            else ServicioCategoriaBuque(servicio_buque.uow)
         )
+
+    def registrar_buque(
+        self,
+        nombre,
+        categoria_buque_id,
+        trb_arqueo_bruto,
+        eslora_metros,
+        cliente_id=None,
+        numero_imo=None,
+        subtipo_descripcion=None,
+        calado_metros=None,
+        propulsores_proa_popa=False,
+        es_autopropulsado=True,
+        bandera_pais=None,
+        activo=True,
+    ):
+        datos = self.normalizar_datos_buque(
+            nombre=nombre,
+            categoria_buque_id=categoria_buque_id,
+            trb_arqueo_bruto=trb_arqueo_bruto,
+            eslora_metros=eslora_metros,
+            cliente_id=cliente_id,
+            numero_imo=numero_imo,
+            subtipo_descripcion=subtipo_descripcion,
+            calado_metros=calado_metros,
+            propulsores_proa_popa=propulsores_proa_popa,
+            es_autopropulsado=es_autopropulsado,
+            bandera_pais=bandera_pais,
+            activo=activo,
+        )
+        self._validar_campos_obligatorios(datos)
+
+        buque = Buque(**datos)
+        try:
+            self.servicio_buque.registrar_buque(buque)
+        except SQLAlchemyError as error:
+            raise ErrorRegistroBuque(
+                self._mensaje_error_bd(error)
+            ) from error
+        return buque
+
+    def modificar_buque(
+        self,
+        buque,
+        nombre,
+        categoria_buque_id,
+        trb_arqueo_bruto,
+        eslora_metros,
+        cliente_id=None,
+        numero_imo=None,
+        subtipo_descripcion=None,
+        calado_metros=None,
+        propulsores_proa_popa=False,
+        es_autopropulsado=True,
+        bandera_pais=None,
+        activo=True,
+    ):
+        datos = self.normalizar_datos_buque(
+            nombre=nombre,
+            categoria_buque_id=categoria_buque_id,
+            trb_arqueo_bruto=trb_arqueo_bruto,
+            eslora_metros=eslora_metros,
+            cliente_id=cliente_id,
+            numero_imo=numero_imo,
+            subtipo_descripcion=subtipo_descripcion,
+            calado_metros=calado_metros,
+            propulsores_proa_popa=propulsores_proa_popa,
+            es_autopropulsado=es_autopropulsado,
+            bandera_pais=bandera_pais,
+            activo=activo,
+        )
+        self._validar_campos_obligatorios(datos)
+
+        for atributo, valor in datos.items():
+            setattr(buque, atributo, valor)
+        if self.servicio_categoria_buque is not None:
+            buque.categoria_buque = self.servicio_categoria_buque.buscar_por_id(
+                datos["categoria_buque_id"]
+            )
+
+        try:
+            self.servicio_buque.modificar_buque(buque)
+        except SQLAlchemyError as error:
+            raise ErrorRegistroBuque(
+                self._mensaje_error_bd(error)
+            ) from error
+        return buque
+
+    @staticmethod
+    def _texto_o_none(valor):
+        texto = str(valor).strip() if valor is not None else ""
+        return texto or None
+
+    @classmethod
+    def _entero_o_none(cls, valor, etiqueta):
+        texto = cls._texto_o_none(valor)
+        if texto is None:
+            return None
+        try:
+            return int(texto)
+        except (TypeError, ValueError) as error:
+            raise ValueError(f"{etiqueta} no es válido.") from error
+
+    @staticmethod
+    def _decimal_o_none(valor, etiqueta):
+        if valor is None or str(valor).strip() == "":
+            return None
+        try:
+            numero = Decimal(str(valor).strip())
+        except (InvalidOperation, ValueError, TypeError) as error:
+            raise ValueError(f"{etiqueta} debe ser un número válido.") from error
+        if not numero.is_finite():
+            raise ValueError(f"{etiqueta} debe ser un número válido.")
+        return numero
+
+    @classmethod
+    def normalizar_datos_buque(
+        cls,
+        nombre,
+        categoria_buque_id,
+        trb_arqueo_bruto,
+        eslora_metros,
+        cliente_id=None,
+        numero_imo=None,
+        subtipo_descripcion=None,
+        calado_metros=None,
+        propulsores_proa_popa=False,
+        es_autopropulsado=True,
+        bandera_pais=None,
+        activo=True,
+    ):
+        return {
+            "cliente_id": cls._entero_o_none(cliente_id, "El cliente"),
+            "nombre": str(nombre).strip() if nombre is not None else "",
+            "numero_imo": cls._texto_o_none(numero_imo),
+            "categoria_buque_id": cls._entero_o_none(
+                categoria_buque_id, "La categoría del buque"
+            ),
+            "subtipo_descripcion": cls._texto_o_none(subtipo_descripcion),
+            "trb": cls._decimal_o_none(
+                trb_arqueo_bruto, "El arqueo bruto (TRB)"
+            ),
+            "eslora": cls._decimal_o_none(eslora_metros, "La eslora"),
+            "calado": cls._decimal_o_none(calado_metros, "El calado"),
+            "propulsores_proa_popa": bool(propulsores_proa_popa),
+            "es_autopropulsado": bool(es_autopropulsado),
+            "bandera_pais": cls._texto_o_none(bandera_pais),
+            "activo": bool(activo),
+        }
+
+    @classmethod
+    def _validar_campos_obligatorios(cls, datos):
+        faltantes = [
+            etiqueta
+            for campo, etiqueta in cls.CAMPOS_OBLIGATORIOS.items()
+            if datos.get(campo) in (None, "")
+        ]
+        if faltantes:
+            raise ValueError(
+                "Completa los campos obligatorios: "
+                + ", ".join(faltantes)
+                + "."
+            )
+        if datos["trb"] <= 0:
+            raise ValueError("El arqueo bruto (TRB) debe ser mayor que 0.")
+        if datos["eslora"] <= 0:
+            raise ValueError("La eslora debe ser mayor que 0.")
+        if datos["calado"] is not None and datos["calado"] <= 0:
+            raise ValueError("El calado debe ser mayor que 0.")
+
+    @staticmethod
+    def _mensaje_error_bd(error):
+        detalle = str(error).lower()
+        if "numero_imo" in detalle or "buque_numero_imo_key" in detalle:
+            return "Ya existe un buque registrado con ese número IMO."
+        return "Ocurrió un error al guardar el buque en la base de datos."
 
     def obtener_datos(self, pantalla):
         categoria_buque_id = getattr(
@@ -36,14 +229,11 @@ class ControladorRegistrarBuques:
         }
 
     def validar_datos(self, datos):
-        if not datos["nombre"]:
-            return False, "El nombre del buque es obligatorio."
-        if not datos["categoria_buque_id"]:
-            return False, "Selecciona la categoría del buque."
-        if not datos["trb_arqueo_bruto"]:
-            return False, "El arqueo bruto es obligatorio."
-        if not datos["eslora_metros"]:
-            return False, "La eslora del buque es obligatoria."
+        try:
+            normalizados = self.normalizar_datos_buque(**datos)
+            self._validar_campos_obligatorios(normalizados)
+        except ValueError as error:
+            return False, str(error)
         return True, ""
 
     def guardar_buque(self, datos, buque_a_editar=None):
@@ -52,13 +242,15 @@ class ControladorRegistrarBuques:
             return False, mensaje
         try:
             if buque_a_editar is not None:
-                self.controlador_buque.modificar_buque(
+                self.modificar_buque(
                     buque=buque_a_editar,
-                    **datos
+                    **datos,
                 )
                 return True, "Buque modificado correctamente."
-            self.controlador_buque.registrar_buque(**datos)
+            self.registrar_buque(**datos)
             return True, "Buque registrado correctamente."
+        except (ValueError, ErrorRegistroBuque) as error:
+            return False, str(error)
         except Exception as error:
             print(f"Error al guardar el buque: {error}")
             return False, "No se pudieron guardar los cambios del buque."

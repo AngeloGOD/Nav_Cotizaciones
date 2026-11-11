@@ -2,6 +2,7 @@ import flet as ft
 
 from fuente.utilidades.Colores import *
 from fuente.utilidades.Componentes import *
+from fuente.utilidades.feedback import reproducir_sonido
 from fuente.negocio.controlador.ControladorClientes import (
     ControladorClientes,
 )
@@ -112,6 +113,11 @@ class PantallaRegistrarCliente(ft.Container):
                 validador,
                 page=self._page,
                 evento="on_select" if clave == "tipo_persona" else "on_change",
+                al_cambiar=(
+                    self._validar_rfc_al_cambiar_tipo
+                    if clave == "tipo_persona"
+                    else None
+                ),
             )
 
         # El encabezado permanece arriba y la zona de campos puede desplazarse.
@@ -126,6 +132,13 @@ class PantallaRegistrarCliente(ft.Container):
                 controls=[self.encabezado(), self.formulario()],
             ),
         )
+
+    def _validar_rfc_al_cambiar_tipo(self, e=None):
+        if not (self.rfc.value or "").strip():
+            return
+        control, mensaje_error, validador = self._validaciones["rfc"]
+        validar_campo(control, mensaje_error, validador)
+        self._page.update()
 
     def ajustar_campo(self, control):
         control.width = float("inf")
@@ -434,6 +447,7 @@ class PantallaRegistrarCliente(ft.Container):
 
     def guardar(self, e):
             if not validar_campos(self._validaciones):
+                reproducir_sonido(self._page, "error")
                 self._page.update()
                 return
 

@@ -292,6 +292,4 @@ class RepositorioCotizacion(Repositorio):
         return existente
 
     def eliminar(self, registro):
-        raise NotImplementedError(
-            "por implementar ..."
-        )
+        self.sesion.delete(registro)

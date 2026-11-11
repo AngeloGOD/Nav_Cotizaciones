@@ -1104,6 +1104,7 @@ class PantallaServicios(ft.Container):
         mostrar_notificacion(
             self.main_page,
             "Servicio eliminado correctamente.",
+            sonido="eliminacion",
         )
 
     def editar_servicio(self, servicio):

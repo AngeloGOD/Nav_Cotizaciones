@@ -29,6 +29,7 @@ from fuente.utilidades.Componentes import (
     card,
     agregar_panel_flotante,
     crear_mensaje_validacion,
+    dialogo_confirmacion,
     limpiar_error_campo,
     paginacion,
     panel_filtros,
@@ -90,6 +91,8 @@ class PantallaCotizaciones(ft.Container):
         self._checkboxes_seleccion_cotizaciones = {}
         self._filas_seleccion_cotizaciones = {}
         self._claves_cotizaciones_pagina = []
+        self._texto_seleccionadas = None
+        self._barra_seleccion = None
         self._tarea_busqueda = None
         self._texto_busqueda_pendiente = ""
         self.filtros_seleccionados = {
@@ -332,6 +335,9 @@ class PantallaCotizaciones(ft.Container):
                 self.cotizaciones_seleccionadas.clear()
                 self.pagina_actual = 1
                 self.actualizar_historial()
+                self._actualizar_vista_seleccion(
+                    set(self._claves_cotizaciones_pagina)
+                )
             return
 
         if self.main_page is None:
@@ -354,6 +360,9 @@ class PantallaCotizaciones(ft.Container):
         self.pagina_actual = 1
         self.cotizaciones_seleccionadas.clear()
         self.actualizar_historial()
+        self._actualizar_vista_seleccion(
+            set(self._claves_cotizaciones_pagina)
+        )
 
     def _cambiar_pagina(self, pagina: int) -> None:
         self.pagina_actual = pagina
@@ -699,6 +708,9 @@ class PantallaCotizaciones(ft.Container):
         self.pagina_actual = 1
         self.cerrar_filtros()
         self.actualizar_historial()
+        self._actualizar_vista_seleccion(
+            set(self._claves_cotizaciones_pagina)
+        )
 
     def aplicar_filtros(self, e=None):
         if not self._validar_fechas_filtro():
@@ -719,6 +731,9 @@ class PantallaCotizaciones(ft.Container):
         self.pagina_actual = 1
         self.cerrar_filtros()
         self.actualizar_historial()
+        self._actualizar_vista_seleccion(
+            set(self._claves_cotizaciones_pagina)
+        )
 
     def cerrar_filtros(self, e=None):
         if self._panel_filtros_abierto:
@@ -799,6 +814,40 @@ class PantallaCotizaciones(ft.Container):
                 else 150
             ),
             height=42,
+        )
+        self._texto_seleccionadas = ft.Text(
+            self._texto_seleccion_cotizaciones(),
+            size=12,
+            color=COLOR_NEGRO,
+            weight=ft.FontWeight.BOLD,
+            max_lines=1,
+        )
+        self._barra_seleccion = ft.Row(
+            visible=bool(self.cotizaciones_seleccionadas),
+            spacing=7,
+            vertical_alignment=ft.CrossAxisAlignment.CENTER,
+            controls=[
+                ft.Icon(
+                    ft.Icons.CHECK_CIRCLE_OUTLINED,
+                    size=18,
+                    color=COLOR_AZUL,
+                ),
+                self._texto_seleccionadas,
+                boton(
+                    texto="Eliminar",
+                    icono=ft.Icons.DELETE_OUTLINE,
+                    tipo="secundario",
+                    color=COLOR_ROJO,
+                    border_color="#FFC8CF",
+                    height=36,
+                    on_click=self.confirmar_eliminar_seleccionadas,
+                ),
+                ft.TextButton(
+                    "Cancelar",
+                    on_click=self.cancelar_seleccion,
+                    style=ft.ButtonStyle(color=COLOR_BANNER),
+                ),
+            ],
         )
         self._menu_exportacion = menu_exportacion(
             descripcion=self._texto_resumen_exportacion,
@@ -881,6 +930,7 @@ class PantallaCotizaciones(ft.Container):
                                             ],
                                         ),
                                         ft.Container(expand=True),
+                                        self._barra_seleccion,
                                         ft.GestureDetector(
                                             on_tap_down=self._marcar_clic_en_boton_menu,
                                             on_tap_up=self._limpiar_clic_en_boton_menu,
@@ -1029,6 +1079,7 @@ class PantallaCotizaciones(ft.Container):
                     self.main_page,
                     f"Se exportaron {len(filas)} proformas a Excel.",
                     COLOR_VERDE,
+                    sonido="documento",
                 )
         except Exception as error:
             mostrar_notificacion(
@@ -1063,6 +1114,7 @@ class PantallaCotizaciones(ft.Container):
                     self.main_page,
                     f"Se exportaron {len(filas)} proformas a PDF.",
                     COLOR_VERDE,
+                    sonido="documento",
                 )
         except Exception as error:
             mostrar_notificacion(
@@ -1426,6 +1478,7 @@ class PantallaCotizaciones(ft.Container):
                     self.main_page,
                     f"Se descargó la proforma {cotizacion.folio}.",
                     COLOR_VERDE,
+                    sonido="documento",
                 )
         except Exception as error:
             mostrar_notificacion(
@@ -1661,6 +1714,83 @@ class PantallaCotizaciones(ft.Container):
                 self.cotizaciones_seleccionadas.pop(clave, None)
         self._actualizar_vista_seleccion(claves)
 
+    def _texto_seleccion_cotizaciones(self):
+        cantidad = len(self.cotizaciones_seleccionadas)
+        return (
+            f"{cantidad} cotización seleccionada"
+            if cantidad == 1
+            else f"{cantidad} cotizaciones seleccionadas"
+        )
+
+    def cancelar_seleccion(self, e=None):
+        claves = set(self.cotizaciones_seleccionadas)
+        self.cotizaciones_seleccionadas.clear()
+        self._actualizar_vista_seleccion(claves)
+
+    def confirmar_eliminar_seleccionadas(self, e=None):
+        cantidad = len(self.cotizaciones_seleccionadas)
+        if not cantidad:
+            return
+        self.main_page.show_dialog(
+            dialogo_confirmacion(
+                page=self.main_page,
+                titulo="Eliminar cotizaciones seleccionadas",
+                mensaje=(
+                    f"¿Deseas eliminar {cantidad} cotización(es) seleccionada(s)? "
+                    "Esta acción no se puede deshacer."
+                ),
+                on_confirmar=self._eliminar_seleccionadas,
+                texto_confirmar="Eliminar",
+                texto_cancelar="Cancelar",
+                color_confirmar=COLOR_ROJO,
+            )
+        )
+
+    def _eliminar_seleccionadas(self):
+        ids: list[int] = []
+        for cotizacion in self.cotizaciones_seleccionadas.values():
+            id_cotizacion = getattr(cotizacion, "id", None)
+            if not isinstance(id_cotizacion, int):
+                mostrar_notificacion(
+                    self.main_page,
+                    "No se pudieron identificar todas las cotizaciones seleccionadas.",
+                    COLOR_ROJO,
+                )
+                return
+            ids.append(id_cotizacion)
+        try:
+            eliminadas = self.controlador.eliminar_cotizaciones(ids)
+        except Exception as error:
+            mostrar_notificacion(
+                self.main_page,
+                f"No se pudieron eliminar las cotizaciones: {error}",
+                COLOR_ROJO,
+            )
+            return
+
+        self.cotizaciones_seleccionadas.clear()
+        self.pagina_actual = min(
+            self.pagina_actual,
+            max(
+                1,
+                (
+                    max(0, self.total_registros - eliminadas)
+                    + self.registros_por_pagina - 1
+                )
+                // self.registros_por_pagina,
+            ),
+        )
+        self.actualizar_historial()
+        self._actualizar_vista_seleccion(
+            set(self._claves_cotizaciones_pagina)
+        )
+        mostrar_notificacion(
+            self.main_page,
+            f"Se eliminaron {eliminadas} cotización(es).",
+            COLOR_VERDE,
+            sonido="eliminacion",
+        )
+
     def _actualizar_vista_seleccion(self, claves_actualizadas):
         for clave in claves_actualizadas:
             checkbox = self._checkboxes_seleccion_cotizaciones.get(clave)
@@ -1679,6 +1809,9 @@ class PantallaCotizaciones(ft.Container):
             )
         )
         self._checkbox_seleccionar_pagina.update()
+        self._texto_seleccionadas.value = self._texto_seleccion_cotizaciones()
+        self._barra_seleccion.visible = bool(self.cotizaciones_seleccionadas)
+        self._barra_seleccion.update()
         self._actualizar_descripcion_exportacion()
         self._boton_exportar.update()
         self._texto_resumen_exportacion.update()

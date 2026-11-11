@@ -22,6 +22,7 @@ from fuente.utilidades.Componentes import (
     validador_requerido,
     vincular_validacion_campo,
 )
+from fuente.utilidades.feedback import reproducir_sonido
 from fuente.utilidades.ExportacionExcel import exportar_excel
 from fuente.utilidades.ExportacionPDF import exportar_pdf
 from fuente.negocio.controlador.ControladorBuque import ControladorBuque
@@ -1175,6 +1176,7 @@ class PantallaBuques(ft.Container):
 
     def guardar_cambios_buque(self, e=None):
         if not validar_campos(self._validaciones_ficha_buque):
+            reproducir_sonido(self._page, "error")
             self._page.update()
             return
 
@@ -1269,6 +1271,7 @@ class PantallaBuques(ft.Container):
             self._page,
             f"Buque '{buque.nombre}' eliminado correctamente.",
             COLOR_VERDE,
+            sonido="eliminacion",
         )
 
     def cerrar_ficha_buque(self, e):
@@ -1334,6 +1337,7 @@ class PantallaBuques(ft.Container):
                 self._page,
                 f"Buque '{buque.nombre}' eliminado correctamente.",
                 COLOR_VERDE,
+                sonido="eliminacion",
             )
 
             # Si eliminamos el último registro de una página,
@@ -1441,6 +1445,7 @@ class PantallaBuques(ft.Container):
             self._page,
             f"Se eliminaron {eliminados} buque(s).",
             COLOR_VERDE,
+            sonido="eliminacion",
         )
 
     def crear_tabla_buques(self, buques):
@@ -2118,6 +2123,7 @@ class PantallaBuques(ft.Container):
                     self._page,
                     f"Se exportaron {len(filas)} buques a Excel.",
                     COLOR_VERDE,
+                    sonido="documento",
                 )
         except Exception as error:
             mostrar_notificacion(
@@ -2196,6 +2202,7 @@ class PantallaBuques(ft.Container):
                     self._page,
                     f"Se exportaron {len(filas)} buques a PDF.",
                     COLOR_VERDE,
+                    sonido="documento",
                 )
         except Exception as error:
             mostrar_notificacion(

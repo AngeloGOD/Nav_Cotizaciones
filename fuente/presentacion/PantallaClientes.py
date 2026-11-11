@@ -22,6 +22,7 @@ from fuente.utilidades.Componentes import (
     validador_telefono,
     vincular_validacion_campo,
 )
+from fuente.utilidades.feedback import reproducir_sonido
 from fuente.utilidades.ExportacionExcel import exportar_excel
 from fuente.utilidades.ExportacionPDF import exportar_pdf
 from fuente.negocio.controlador.ControladorClientes import ControladorClientes
@@ -930,6 +931,11 @@ class PantallaClientes(ft.Container):
                     validador,
                     page=self._page,
                     evento=evento,
+                    al_cambiar=(
+                        self._validar_rfc_al_cambiar_tipo
+                        if nombre == "tipo_persona"
+                        else None
+                    ),
                 )
                 campo = campo_con_mensaje_error(control, mensaje_error)
                 return campo_detalle(etiqueta, campo, expand=expand)
@@ -996,6 +1002,15 @@ class PantallaClientes(ft.Container):
             )
 
         return campo_detalle(etiqueta, control, expand=expand)
+
+    def _validar_rfc_al_cambiar_tipo(self, e=None):
+        rfc = self.campos_ficha.get("rfc")
+        validacion = self._validaciones_ficha.get("rfc")
+        if rfc is None or validacion is None or not (rfc.value or "").strip():
+            return
+        control, mensaje_error, validador = validacion
+        validar_campo(control, mensaje_error, validador)
+        self._page.update()
 
     def _acciones_ficha_cliente(self):
         if self.modo_edicion:
@@ -1129,6 +1144,7 @@ class PantallaClientes(ft.Container):
 
     def guardar_cambios_cliente(self, e=None):
         if not validar_campos(self._validaciones_ficha):
+            reproducir_sonido(self._page, "error")
             self._page.update()
             return
 
@@ -1206,6 +1222,7 @@ class PantallaClientes(ft.Container):
             self._page,
             "Cliente eliminado correctamente.",
             COLOR_VERDE,
+            sonido="eliminacion",
         )
 
     def cerrar_ficha(self, e):
@@ -1326,6 +1343,7 @@ class PantallaClientes(ft.Container):
             self._page,
             f"Se eliminaron {eliminados} cliente(s).",
             COLOR_VERDE,
+            sonido="eliminacion",
         )
 
     def directorio(self):
@@ -1912,6 +1930,7 @@ class PantallaClientes(ft.Container):
                     self._page,
                     f"Se exportaron {len(filas)} clientes a Excel.",
                     COLOR_VERDE,
+                    sonido="documento",
                 )
         except Exception as error:
             mostrar_notificacion(
@@ -1986,6 +2005,7 @@ class PantallaClientes(ft.Container):
                     self._page,
                     f"Se exportaron {len(filas)} clientes a PDF.",
                     COLOR_VERDE,
+                    sonido="documento",
                 )
         except Exception as error:
             mostrar_notificacion(

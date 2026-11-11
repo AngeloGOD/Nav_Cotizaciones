@@ -11,6 +11,7 @@ _PATRONES_RFC = {
     12: _re.compile(r"^[A-ZÑ&]{3}\d{6}[A-Z0-9]{2}[A-Z0-9]$"),
     13: _re.compile(r"^[A-ZÑ&]{4}\d{6}[A-Z0-9]{2}[A-Z0-9]$"),
 }
+_RFC_GENERICOS_SAT = {"XAXX010101000", "XEXX010101000"}
 
 
 class Herramientas:
@@ -131,6 +132,7 @@ def vincular_validacion_campo(
     evento="on_change",
     controles_relacionados=(),
     marco=None,
+    al_cambiar=None,
 ):
     manejador_anterior = getattr(control, evento, None)
     manejador_blur_anterior = getattr(control, "on_blur", None)
@@ -144,6 +146,8 @@ def vincular_validacion_campo(
             controles_relacionados=controles_relacionados,
             marco=marco,
         )
+        if al_cambiar is not None:
+            al_cambiar(e)
         if cambio_error and page is not None:
             page.update()
 
@@ -218,6 +222,8 @@ def validar_rfc_mexicano(valor, tipo_persona=None):
         for anio in (1900 + anio_corto, 2000 + anio_corto)
     ):
         return "La fecha incluida en el RFC no es válida."
+    if rfc in _RFC_GENERICOS_SAT:
+        return None
 
     suma = 0
     try:

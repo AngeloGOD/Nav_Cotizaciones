@@ -15,6 +15,7 @@ from fuente.utilidades.inputs import (
     validador_requerido,
     vincular_validacion_campo,
 )
+from fuente.utilidades.feedback import reproducir_sonido
 
 
 COLOR_NARANJA = "#ff6600"     
@@ -2082,6 +2083,7 @@ class PantallaNuevoServicio(ft.Container):
             )
             return
         if not validar_campos(self._validaciones_formulario):
+            reproducir_sonido(self._obtener_pagina(), "error")
             self._actualizar_vista()
             return
         if self._archivo_imagen is not None:
@@ -2212,6 +2214,7 @@ class PantallaNuevoServicio(ft.Container):
             )
         )
         pagina.update()
+        reproducir_sonido(pagina, "exito" if exito else "error")
 
     def _obtener_pagina(self):
         if self.main_page is not None:

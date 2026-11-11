@@ -605,6 +605,26 @@ class ServicioCotizacion:
         with self.uow as uow:
             return uow.cotizacion.buscar_por_folio(folio)
 
+    def eliminar_cotizaciones(self, ids: list[int]) -> int:
+        ids_unicos = list(dict.fromkeys(int(id_cotizacion) for id_cotizacion in ids))
+        if not ids_unicos:
+            return 0
+
+        with self.uow as uow:
+            cotizaciones = []
+            for id_cotizacion in ids_unicos:
+                cotizacion = uow.cotizacion.buscar_por_id(id_cotizacion)
+                if cotizacion is None:
+                    raise ValueError(
+                        f"La cotización con identificador {id_cotizacion} ya no existe."
+                    )
+                cotizaciones.append(cotizacion)
+
+            for cotizacion in cotizaciones:
+                uow.cotizacion.eliminar(cotizacion)
+            uow.commit()
+        return len(cotizaciones)
+
     def consultar_pagina(
         self,
         no_pagina: int = 1,

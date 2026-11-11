@@ -648,6 +648,7 @@ class PantallaProductos(ft.Container):
                     self._page,
                     f"Se exportaron {len(productos)} productos a Excel.",
                     COLOR_VERDE,
+                    sonido="documento",
                 )
         except Exception as error:
             mostrar_notificacion(
@@ -694,6 +695,7 @@ class PantallaProductos(ft.Container):
                     self._page,
                     f"Se exportaron {len(filas)} productos a PDF.",
                     COLOR_VERDE,
+                    sonido="documento",
                 )
         except Exception as error:
             mostrar_notificacion(

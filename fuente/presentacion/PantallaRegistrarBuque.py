@@ -2,6 +2,7 @@ import flet as ft
 
 from fuente.utilidades.Colores import *
 from fuente.utilidades.Componentes import *
+from fuente.utilidades.feedback import reproducir_sonido
 from fuente.negocio.controlador.ControladorBuque import ControladorBuque
 from fuente.negocio.controlador.ControladorClientes import ControladorClientes
 from fuente.negocio.controlador.ControladorRegistrarBuques import (
@@ -716,6 +717,7 @@ class PantallaRegistrarBuque(ft.Container):
 
     def guardar(self, e):
         if not validar_campos(self._validaciones):
+            reproducir_sonido(self._page, "error")
             self._page.update()
             return
 

@@ -16,6 +16,7 @@ from fuente.utilidades.Componentes import (
     validador_requerido,
     vincular_validacion_campo,
 )
+from fuente.utilidades.feedback import reproducir_sonido
 from fuente.negocio.controlador.ControladorProductos import ControladorProductos
 from fuente.utilidades.ExportacionArchivos import obtener_selector_archivos
 
@@ -914,6 +915,7 @@ class PantallaRegistrarProducto(ft.Container):
 
     def guardar(self, e=None):
         if not validar_campos(self._validaciones):
+            reproducir_sonido(self._page, "error")
             self._page.update()
             return
 

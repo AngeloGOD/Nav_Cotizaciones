@@ -35,6 +35,7 @@ from fuente.negocio.servicio.ServicioCotizacion import ServicioCotizacion
 from fuente.negocio.servicio.ServicioProducto import ServicioProducto
 from fuente.negocio.servicio.ServicioServicio import ServicioServicio
 from fuente.infraestructura.servicios_externos.ServicioPaises import ServicioPaises
+from fuente.utilidades.feedback import precargar_sonidos
 
 IMAGENES_ESTATICAS = (
     "fondo_puerto.jpg",
@@ -139,6 +140,7 @@ def main(
             ],
         )
     )
+    precargar_sonidos(page)
 
 
 def run():

@@ -546,3 +546,8 @@ class ControladorCotizacion:
             filtros=filtros or {},
             texto=texto or "",
         )
+
+    def eliminar_cotizaciones(self, ids: list[int]) -> int:
+        if self.servicio_cotizacion is None:
+            raise ValueError("El servicio de cotizaciones no está disponible.")
+        return self.servicio_cotizacion.eliminar_cotizaciones(ids)

@@ -30,7 +30,9 @@ from fuente.negocio.modelo.Cotizacion import Cotizacion, DetalleCotizacion
 from fuente.negocio.servicio.ServicioCliente import ServicioCliente
 from fuente.negocio.servicio.ServicioBuque import ServicioBuque
 from fuente.negocio.servicio.ServicioCategoriaBuque import ServicioCategoriaBuque
+from fuente.negocio.servicio.ServicioCotizacion import ServicioCotizacion
 from fuente.negocio.servicio.ServicioProducto import ServicioProducto
+from fuente.negocio.servicio.ServicioServicio import ServicioServicio
 from fuente.infraestructura.servicios_externos.ServicioPaises import ServicioPaises
 
 IMAGENES_ESTATICAS = (
@@ -42,7 +44,14 @@ IMAGENES_ESTATICAS = (
 )
 
 
-def main(page: ft.Page, servicio_cliente, servicio_buque, servicio_categoria_buque=None):
+def main(
+    page: ft.Page,
+    servicio_cliente,
+    servicio_buque,
+    servicio_categoria_buque=None,
+    servicio_cotizacion=None,
+    servicio_servicio=None,
+):
     page.bgcolor = COLOR_FONDO
     page.padding = 0
     page.spacing = 0
@@ -76,6 +85,8 @@ def main(page: ft.Page, servicio_cliente, servicio_buque, servicio_categoria_buq
                                 servicio_cliente,
                                 servicio_buque,
                                 servicio_categoria_buque=servicio_categoria_buque,
+                                servicio_cotizacion=servicio_cotizacion,
+                                servicio_servicio=servicio_servicio,
                             ),
                         )
                     ],
@@ -136,13 +147,15 @@ def run():
         "activo": True,
     }
 
-    sessionFactory = sessionmaker(bind=engine)
+    sessionFactory = sessionmaker(bind=engine, expire_on_commit=False)
     uow = AlchemyUnitOfWork(sessionFactory)
 
     serv_cliente = ServicioCliente(uow=uow)
     serv_buque = ServicioBuque(uow=uow)
     serv_categoria_buque = ServicioCategoriaBuque(uow=uow)
     servicio_producto = ServicioProducto(uow=uow)
+    serv_servicio = ServicioServicio(uow=uow)
+    serv_cotizacion = ServicioCotizacion(uow=uow)
 
     # serv_buque.registrar_buque(Buque(**datos_buque))
 
@@ -155,7 +168,16 @@ def run():
     # serv_cliente.registrar_cliente(cliente=Cliente(**args))
     # A partir de aquí se puede inyectar el uow al servicio
 
-    ft.run(lambda page: main(page, serv_cliente, serv_buque, serv_categoria_buque))
+    ft.run(
+        lambda page: main(
+            page,
+            serv_cliente,
+            serv_buque,
+            serv_categoria_buque,
+            serv_cotizacion,
+            serv_servicio,
+        )
+    )
 
 
 if __name__ == "__main__":

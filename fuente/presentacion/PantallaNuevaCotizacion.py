@@ -1,513 +1,1823 @@
+from __future__ import annotations
+
+from datetime import date
+from decimal import Decimal, InvalidOperation, ROUND_HALF_UP
 import flet as ft
-from fuente.utilidades.Colores import COLOR_NARANJA, COLOR_BLANCO, COLOR_GRIS
+
+from fuente.negocio.controlador.ControladorCotizacion import (
+    ControladorCotizacion,
+    ErrorCotizacion,
+)
+from fuente.negocio.modelo.Buque import Buque
+from fuente.negocio.modelo.Cliente import Cliente
+from fuente.negocio.modelo.Cotizacion import DetalleCotizacion
+from fuente.negocio.modelo.ENUMs import Moneda
+from fuente.negocio.modelo.Servicio import Servicio
+from fuente.presentacion.SelectorBuque import SelectorBuque
+from fuente.presentacion.SelectorCliente import SelectorCliente
+from fuente.presentacion.SelectorServicio import SelectorServicio
+from fuente.utilidades.Colores import (
+    COLOR_AZUL,
+    COLOR_BANNER,
+    COLOR_BLANCO,
+    COLOR_FONDO,
+    COLOR_GRIS,
+    COLOR_GRIS_CLARO,
+    COLOR_NARANJA,
+    COLOR_ROJO,
+    COLOR_VERDE,
+)
+from fuente.utilidades.Componentes import (
+    banner_modulo,
+    boton,
+    card,
+    mostrar_notificacion,
+    sombra_suave,
+)
 
 COLOR_AZUL_OSCURO = "#0d1b2a"
-COLOR_FONDO_CABECERA = "#f4f6f9" 
-COLOR_FONDO_APP = "#f8f9fa" 
+
 
 class PantallaNuevaCotizacion(ft.Container):
-    def __init__(self, main_page, vista_anterior=None):
+    """Pantalla para elaborar y guardar una nueva Proforma de Gastos Portuarios (PDA)."""
+
+    def __init__(
+        self,
+        main_page: ft.Page | None = None,
+        vista_anterior=None,
+        servicio_cotizacion=None,
+        servicio_buque=None,
+        servicio_cliente=None,
+        servicio_servicio=None,
+        controlador: ControladorCotizacion | None = None,
+    ):
         super().__init__(
             expand=True,
-            padding=ft.Padding(20, 10, 20, 20)
+            bgcolor=COLOR_FONDO,
+            padding=ft.Padding(16, 10, 16, 20),
         )
         self.main_page = main_page
         self.vista_anterior = vista_anterior
 
-        self.ver_costo = True
-        self.ver_ganancia = True
-        self.ver_iva = True
-        
-        self.chk_costo = ft.Checkbox(label="Costo Unitario (MXN)", value=True, on_change=self.toggle_columnas, active_color=ft.Colors.BLUE_600)
-        self.chk_ganancia = ft.Checkbox(label="Ganancia (%)", value=True, on_change=self.toggle_columnas, active_color=ft.Colors.BLUE_600)
-        self.chk_iva = ft.Checkbox(label="IVA (%)", value=True, on_change=self.toggle_columnas, active_color=ft.Colors.BLUE_600)
-        
-        self.switch_cliente = ft.Switch(value=False, on_change=self.toggle_vista_cliente, active_color=COLOR_NARANJA)
+        self.servicio_cotizacion = servicio_cotizacion or getattr(
+            vista_anterior, "servicio_cotizacion", None
+        )
+        self.servicio_buque = servicio_buque or getattr(
+            vista_anterior, "servicio_buque", None
+        )
+        self.servicio_cliente = servicio_cliente or getattr(
+            vista_anterior, "servicio_cliente", None
+        )
+        self.servicio_servicio = servicio_servicio or getattr(
+            vista_anterior, "servicio_servicio", None
+        )
 
-        self.input_activo_fecha = None 
+        if controlador is not None:
+            self.controlador = controlador
+        elif self.servicio_cotizacion is not None:
+            self.controlador = ControladorCotizacion(
+                servicio_cotizacion=self.servicio_cotizacion,
+                servicio_buque=self.servicio_buque,
+                servicio_cliente=self.servicio_cliente,
+                servicio_servicio=self.servicio_servicio,
+            )
+            self.servicio_buque = self.controlador.servicio_buque
+            self.servicio_cliente = self.controlador.servicio_cliente
+            self.servicio_servicio = self.controlador.servicio_servicio
+        else:
+            self.controlador = None
+
+        self.buque_actual: Buque | None = None
+        self.cliente_actual: Cliente | None = None
+        self.filas_datos: list[dict] = []
+
+        # Visibilidad de columnas opcionales (modo interno vs vista cliente PDA)
+        self.ver_cantidad = True
+        self.ver_precio_unitario = True
+        self.ver_factura = True
+
+        self.chk_cantidad = ft.Checkbox(
+            label="Cantidad (Maniobras)",
+            value=True,
+            on_change=self.toggle_columnas,
+            active_color=COLOR_AZUL,
+        )
+        self.chk_precio_unitario = ft.Checkbox(
+            label="Precio Unitario",
+            value=True,
+            on_change=self.toggle_columnas,
+            active_color=COLOR_AZUL,
+        )
+        self.chk_factura = ft.Checkbox(
+            label="Factura / Invoice",
+            value=True,
+            on_change=self.toggle_columnas,
+            active_color=COLOR_AZUL,
+        )
+        self.switch_cliente = ft.Switch(
+            value=False,
+            on_change=self.toggle_vista_cliente,
+            active_color=COLOR_NARANJA,
+        )
+
+        self.input_activo_fecha: ft.TextField | None = None
         self.date_picker = ft.DatePicker(
             on_change=self.cambiar_fecha,
             help_text="Selecciona una fecha",
             cancel_text="Cancelar",
-            confirm_text="Seleccionar"
+            confirm_text="Seleccionar",
         )
 
-        self.cabecera_tabla = self._construir_cabecera_tabla()
-        self.lista_filas = ft.Column(
-            spacing=0,
-            controls=[
-                self.crear_fila_servicio("1", "Tomate rojo fresco", "Reja", "1", "$300.00", "10%", "16%", "$382.80", "$382.80"),
-                self.crear_fila_servicio("2", "Agua embotellada", "Caja", "2", "$120.00", "5%", "0%", "$126.00", "$252.00"),
-                self.crear_fila_servicio("3", "Servicio de amarre", "Servicio", "1", "$3,800.00", "0%", "16%", "$4,408.00", "$4,408.00"),
-            ]
-        )
+        self._inicializar_controles_encabezado()
+        self._inicializar_tabla_detalles()
+        self._inicializar_panel_totales()
 
         self.content = ft.Column(
             expand=True,
             scroll=ft.ScrollMode.AUTO,
-            spacing=20,
+            spacing=16,
             controls=[
-                self.encabezado(),
+                self._encabezado(),
                 ft.Row(
                     alignment=ft.MainAxisAlignment.START,
                     vertical_alignment=ft.CrossAxisAlignment.START,
-                    spacing=20,
-                    controls=[self.panel_izquierdo(), self.panel_derecho()]
+                    spacing=16,
+                    controls=[self._panel_izquierdo(), self._panel_derecho()],
                 ),
-                ft.Container(height=30)
-            ]
+                ft.Container(height=24),
+            ],
         )
 
-    def encabezado(self):
-        return ft.Container(
-            border_radius=10,
-            clip_behavior=ft.ClipBehavior.HARD_EDGE, 
-            image=ft.DecorationImage(src="assets/fondo_puerto.jpg", fit="cover"),
-            content=ft.Container(
-                padding=ft.Padding(30, 20, 30, 20),
-                gradient=ft.LinearGradient(
-                    begin=ft.alignment.Alignment(-1.0, 0.0), 
-                    end=ft.alignment.Alignment(1.0, 0.0),    
-                    colors=[COLOR_BLANCO, ft.Colors.with_opacity(0, COLOR_BLANCO)],
-                    stops=[0.25, 0.85] 
-                ),
-                content=ft.Row([
-                    ft.Row([
-                        ft.Container(
-                            content=ft.Icon(ft.Icons.POST_ADD, color=COLOR_BLANCO, size=30),
-                            bgcolor=ft.Colors.BLUE_800, padding=10, border_radius=8
-                        ),
-                        ft.Column([
-                            ft.Text("Nueva Cotización", size=26, weight=ft.FontWeight.W_900, color=COLOR_AZUL_OSCURO),
-                            ft.Text("Completa la información básica de la cotización y agrega los productos y servicios.", size=13, color=COLOR_GRIS)
-                        ], spacing=2)
-                    ], spacing=15)
-                ], alignment=ft.MainAxisAlignment.START)
-            )
+    def _obtener_folio_inicial(self) -> str:
+        if self.controlador is not None:
+            try:
+                return self.controlador.obtener_folio_sugerido()
+            except Exception as error:
+                print(f"Advertencia al consultar siguiente folio PDA: {error}")
+        return "PDA.-0001"
+
+    def _inicializar_controles_encabezado(self) -> None:
+        folio_inicial = self._obtener_folio_inicial()
+        hoy_str = date.today().strftime("%d/%m/%Y")
+
+        self.txt_folio = ft.TextField(
+            label="Folio PDA",
+            value=folio_inicial,
+            read_only=True,
+            prefix_icon=ft.Icons.TAG,
+            height=48,
+            text_size=13,
+            text_style=ft.TextStyle(
+                weight=ft.FontWeight.BOLD,
+                color=COLOR_BANNER,
+            ),
+            bgcolor="#F4F8FC",
+            border=ft.InputBorder.OUTLINE,
+            border_color=COLOR_GRIS_CLARO,
+            border_radius=8,
+            content_padding=ft.Padding(12, 8, 12, 8),
+            expand=True,
         )
 
-    def panel_izquierdo(self):
-        boton_cancelar = ft.Container(
-            content=ft.Row([ft.Icon(ft.Icons.CHEVRON_LEFT, size=18, color=COLOR_GRIS), ft.Text("Cancelar", color=COLOR_GRIS, weight=ft.FontWeight.W_600, size=13)], spacing=4, alignment=ft.MainAxisAlignment.CENTER),
-            padding=ft.Padding(10, 8, 15, 8), border=self.crear_borde_completo(1, ft.Colors.GREY_300), border_radius=6, ink=True,
+        self.txt_fecha_emision = self._crear_campo_fecha(
+            label="Fecha / Date *",
+            valor_inicial=hoy_str,
+        )
+        self.txt_fecha_arribo = self._crear_campo_fecha(
+            label="Arribo / ETA",
+            valor_inicial="",
+            hint_text="dd/mm/aaaa",
+        )
+        self.txt_fecha_zarpe = self._crear_campo_fecha(
+            label="Zarpe / ETD",
+            valor_inicial="",
+            hint_text="dd/mm/aaaa",
+        )
+
+        # Buscador de Buque y campos informativos (Vessel's Information)
+        self.selector_buque = SelectorBuque(
+            servicio_buque=self.servicio_buque,
+            on_buque_seleccionado=self._al_seleccionar_buque,
+            label="Buque / Vessel *",
+            hint_text="Buscar buque por nombre (ej. MT MTM HOUSTON)...",
+            height=52,
+        )
+
+        self.txt_tipo_buque = self._crear_campo_solo_lectura(
+            label="Tipo de buque / Type of vessel",
+            icono=ft.Icons.CATEGORY_OUTLINED,
+        )
+        self.txt_imo_buque = self._crear_campo_solo_lectura(
+            label="IMO",
+            icono=ft.Icons.NUMBERS_OUTLINED,
+        )
+        self.txt_trb_buque = self._crear_campo_solo_lectura(
+            label="UAB / GRT (TRB)",
+            icono=ft.Icons.SCALE_OUTLINED,
+        )
+        self.txt_eslora_buque = self._crear_campo_solo_lectura(
+            label="Eslora / LOA (m)",
+            icono=ft.Icons.STRAIGHTEN_OUTLINED,
+        )
+        self.txt_calado_buque = self._crear_campo_solo_lectura(
+            label="Calado / Draft (m)",
+            icono=ft.Icons.WATER_OUTLINED,
+        )
+
+        # Buscador de Cliente y Dirección automática
+        self.selector_cliente = SelectorCliente(
+            servicio_cliente=self.servicio_cliente,
+            on_cliente_seleccionado=self._al_seleccionar_cliente,
+            label="Cliente / Customer *",
+            hint_text="Buscar cliente por nombre o razón social...",
+            height=52,
+        )
+        self.txt_direccion_cliente = self._crear_campo_solo_lectura(
+            label="Dirección / Address",
+            icono=ft.Icons.LOCATION_ON_OUTLINED,
+        )
+
+        # Estancia, Moneda y Tipo de Cambio
+        self.txt_horas_estancia = ft.TextField(
+            label="Horas de estancia *",
+            value="32",
+            prefix_icon=ft.Icons.ACCESS_TIME,
+            height=48,
+            text_size=12,
+            border=ft.InputBorder.OUTLINE,
+            border_color=COLOR_GRIS_CLARO,
+            focused_border_color=COLOR_NARANJA,
+            border_radius=8,
+            content_padding=ft.Padding(12, 8, 12, 8),
+            input_filter=ft.InputFilter(
+                allow=True, regex_string=r"^[0-9.]*$", replacement_string=""
+            ),
+            on_change=self._al_cambiar_horas_estancia,
+            expand=True,
+        )
+
+        self.txt_dias_estancia = self._crear_campo_solo_lectura(
+            label="Días de estancia (derivado)",
+            icono=ft.Icons.CALENDAR_VIEW_DAY_OUTLINED,
+            valor="2 días",
+        )
+
+        self.dd_moneda = ft.Dropdown(
+            label="Moneda *",
+            value=Moneda.MXN.value,
+            options=[
+                ft.dropdown.Option(key=Moneda.MXN.value, text="MXN - Peso Mexicano"),
+                ft.dropdown.Option(key=Moneda.USD.value, text="USD - Dólar Americano"),
+            ],
+            height=48,
+            text_size=12,
+            border=ft.InputBorder.OUTLINE,
+            border_color=COLOR_GRIS_CLARO,
+            focused_border_color=COLOR_NARANJA,
+            border_radius=8,
+            content_padding=ft.Padding(12, 8, 12, 8),
+            on_select=self._al_cambiar_moneda,
+            expand=True,
+        )
+
+        self.txt_tipo_cambio = ft.TextField(
+            label="Tipo de cambio",
+            value="1.0000",
+            disabled=True,
+            prefix_icon=ft.Icons.CURRENCY_EXCHANGE,
+            height=48,
+            text_size=12,
+            border=ft.InputBorder.OUTLINE,
+            border_color=COLOR_GRIS_CLARO,
+            focused_border_color=COLOR_NARANJA,
+            border_radius=8,
+            content_padding=ft.Padding(12, 8, 12, 8),
+            input_filter=ft.InputFilter(
+                allow=True, regex_string=r"^[0-9.]*$", replacement_string=""
+            ),
+            on_change=self._al_cambiar_tipo_cambio,
+            expand=True,
+        )
+
+        # Condiciones operativas de la escala (ContextoEscala)
+        self.sw_mercancia_peligrosa = ft.Switch(
+            label="Transporta mercancía peligrosa",
+            value=False,
+            active_color=COLOR_NARANJA,
+        )
+        self.sw_propulsores_danados = ft.Switch(
+            label="Propulsores dañados / fuera de servicio",
+            value=False,
+            active_color=COLOR_NARANJA,
+        )
+        self.lbl_estado_propulsores = ft.Container(
+            padding=ft.Padding(10, 5, 10, 5),
+            border_radius=12,
+            bgcolor="#EEF5FD",
+            content=ft.Text(
+                "Seleccione un buque para ver configuración de propulsores",
+                size=11,
+                color=COLOR_BANNER,
+                weight=ft.FontWeight.W_500,
+            ),
+        )
+
+    @staticmethod
+    def _crear_campo_solo_lectura(
+        label: str,
+        icono,
+        valor: str = "",
+    ) -> ft.TextField:
+        return ft.TextField(
+            label=label,
+            value=valor,
+            read_only=True,
+            prefix_icon=icono,
+            height=48,
+            text_size=12,
+            bgcolor="#F4F8FC",
+            border=ft.InputBorder.OUTLINE,
+            border_color=COLOR_GRIS_CLARO,
+            border_radius=8,
+            content_padding=ft.Padding(12, 8, 12, 8),
+            expand=True,
+        )
+
+    def _crear_campo_fecha(
+        self,
+        label: str,
+        valor_inicial: str = "",
+        hint_text: str = "dd/mm/aaaa",
+    ) -> ft.TextField:
+        txt_field = ft.TextField(
+            label=label,
+            value=valor_inicial,
+            hint_text=hint_text,
+            prefix_icon=ft.Icons.CALENDAR_TODAY_OUTLINED,
+            height=48,
+            text_size=12,
+            border=ft.InputBorder.OUTLINE,
+            border_color=COLOR_GRIS_CLARO,
+            focused_border_color=COLOR_NARANJA,
+            border_radius=8,
+            content_padding=ft.Padding(12, 8, 12, 8),
+            expand=True,
+        )
+
+        def abrir_picker(e):
+            self.input_activo_fecha = txt_field
+            pagina = e.page or self.main_page
+            if pagina is not None:
+                if self.date_picker not in pagina.overlay:
+                    pagina.overlay.append(self.date_picker)
+                self.date_picker.open = True
+                pagina.update()
+
+        txt_field.suffix = ft.IconButton(
+            icon=ft.Icons.CALENDAR_MONTH,
+            icon_size=16,
+            icon_color=COLOR_NARANJA,
+            on_click=abrir_picker,
+            width=28,
+            height=28,
+            padding=0,
+        )
+        return txt_field
+
+    def _inicializar_tabla_detalles(self) -> None:
+        self.cabecera_tabla = self._construir_cabecera_tabla()
+        self.lista_filas = ft.Column(spacing=4, controls=[])
+        self.contenedor_resultados_servicio_activo = ft.Container(
+            visible=False,
+            padding=ft.Padding(110, 0, 120, 8),
+        )
+
+    def _inicializar_panel_totales(self) -> None:
+        self.lbl_subtotal_general = ft.Text(
+            "$ 0.00",
+            size=13,
+            weight=ft.FontWeight.BOLD,
+            color=COLOR_AZUL_OSCURO,
+        )
+        self.lbl_iva_general = ft.Text(
+            "$ 0.00",
+            size=13,
+            weight=ft.FontWeight.BOLD,
+            color=COLOR_AZUL_OSCURO,
+        )
+        self.lbl_total_general = ft.Text(
+            "$ 0.00",
+            size=16,
+            weight=ft.FontWeight.W_900,
+            color=COLOR_NARANJA,
+        )
+        self.lbl_moneda_totales = ft.Text(
+            "Importes expresados en MXN",
+            size=11,
+            color=COLOR_GRIS,
+        )
+
+    def _encabezado(self) -> ft.Control:
+        return banner_modulo(
+            src="fondo_puerto.jpg",
+            categoria="Proforma de Gastos Portuarios (PDA)",
+            titulo="Nueva Cotización",
+            descripcion=(
+                "Selecciona el buque y cliente, calcula los servicios portuarios "
+                "obligatorios o agrega conceptos manualmente."
+            ),
+            icono=ft.Icons.REQUEST_QUOTE_OUTLINED,
+        )
+
+    def _panel_izquierdo(self) -> ft.Control:
+        boton_cancelar = boton(
+            texto="Volver a cotizaciones",
+            icono=ft.Icons.ARROW_BACK,
+            tipo="secundario",
+            color=COLOR_BANNER,
+            height=42,
+            width=200,
             on_click=self.cancelar,
-            width=130, height=42
         )
-        return ft.Column([self.seccion_datos(), self.seccion_servicios(), boton_cancelar], expand=True, spacing=20)
-
-    def panel_derecho(self):
-        tarjeta_columnas = ft.Container(
-            border=self.crear_borde_completo(1, ft.Colors.GREY_200), border_radius=10, bgcolor=COLOR_BLANCO, padding=20,
-            content=ft.Column([
-                ft.Row([ft.Icon(ft.Icons.VIEW_COLUMN_OUTLINED, color=COLOR_AZUL_OSCURO, size=18), ft.Text("Columnas", weight=ft.FontWeight.BOLD, size=14, color=COLOR_AZUL_OSCURO)]),
-                ft.Text("Selecciona qué ver en la tabla.", size=11, color=COLOR_GRIS),
-                ft.Container(height=5),
-                self.chk_costo, self.chk_ganancia, self.chk_iva,
-                ft.Divider(height=20, color=ft.Colors.GREY_200),
-                ft.Row([ft.Icon(ft.Icons.VISIBILITY_OUTLINED, color=COLOR_GRIS, size=16), ft.Text("Vista cliente", size=12, weight=ft.FontWeight.W_500, color=COLOR_AZUL_OSCURO), ft.Container(expand=True), self.switch_cliente]),
-            ], spacing=10)
+        return ft.Column(
+            expand=True,
+            spacing=16,
+            controls=[
+                self._seccion_datos_generales(),
+                self._seccion_servicios(),
+                ft.Row(controls=[boton_cancelar]),
+            ],
         )
 
-        tarjeta_totales = ft.Container(
-            border=self.crear_borde_completo(1, ft.Colors.GREY_200), border_radius=10, bgcolor=COLOR_BLANCO, padding=20,
-            content=ft.Column([
-                ft.Row([ft.Icon(ft.Icons.CALCULATE_OUTLINED, color=ft.Colors.BLUE_400, size=20), ft.Text("Subtotal", size=12, color=COLOR_GRIS), ft.Container(expand=True), ft.Text("$10,998.60", size=12, weight=ft.FontWeight.BOLD, color=COLOR_AZUL_OSCURO)]),
-                ft.Row([ft.Container(width=28), ft.Text("IVA total", size=12, color=COLOR_GRIS), ft.Container(expand=True), ft.Text("$1,574.00", size=12, weight=ft.FontWeight.BOLD, color=COLOR_AZUL_OSCURO)]),
-                ft.Divider(height=20, color=ft.Colors.GREY_200),
-                ft.Row([ft.Text("Total", size=14, weight=ft.FontWeight.BOLD, color=COLOR_NARANJA), ft.Container(expand=True), ft.Text("$12,572.60", size=14, weight=ft.FontWeight.W_900, color=COLOR_NARANJA)]),
-            ])
-        )
-
-        boton_guardar = ft.Container(
-            content=ft.Row([ft.Icon(ft.Icons.SAVE_OUTLINED, color=COLOR_BLANCO, size=18), ft.Text("Guardar", color=COLOR_BLANCO, weight=ft.FontWeight.W_600, size=14)], alignment=ft.MainAxisAlignment.CENTER), 
-            bgcolor=COLOR_NARANJA, padding=ft.Padding(0, 12, 0, 12), border_radius=6, ink=True
-        )
-
-        return ft.Column([tarjeta_columnas, tarjeta_totales, boton_guardar], width=240, spacing=20)
-
-    def seccion_datos(self):
-        return ft.Container(
-            border=self.crear_borde_completo(1, ft.Colors.GREY_200), border_radius=10, bgcolor=COLOR_BLANCO,
-            content=ft.Column([
-                ft.Container(
-                    bgcolor=COLOR_BLANCO, padding=ft.Padding(20, 15, 20, 15), border=ft.Border(bottom=ft.BorderSide(1, ft.Colors.GREY_100)),
-                    content=ft.Row([self.crear_indicador_numero("1", ft.Colors.BLUE_600), ft.Text("Datos Generales", weight=ft.FontWeight.BOLD, size=15, color=COLOR_AZUL_OSCURO)], spacing=15)
-                ),
-                ft.Container(
-                    padding=20,
-                    content=ft.Column([
-                        ft.Row([
-                            self.crear_input("Nombre del Buque *", "Ej. MV Ocean Star", ft.Icons.DIRECTIONS_BOAT_OUTLINED), 
-                            self.crear_input_fecha("ETA (Fecha y hora) *", "25/10/2026", ft.Icons.CALENDAR_TODAY_OUTLINED), 
-                            self.crear_dropdown("Cliente *", "ABC Logística S.A. de C.V.", ft.Icons.PERSON_OUTLINE, ["ABC Logística S.A. de C.V.", "Maersk Line"])
-                        ], spacing=20),
-                        ft.Row([
-                            self.crear_dropdown("Tipo de Operación *", "Importación", ft.Icons.SWAP_HORIZ, ["Importación", "Exportación", "Transbordo"]), 
-                            self.crear_input_fecha("ETA (Fecha y hora) *", "25/10/2026", ft.Icons.CALENDAR_TODAY_OUTLINED), 
-                            self.crear_dropdown("Moneda *", "MXN - Peso Mexicano", ft.Icons.ATTACH_MONEY, ["MXN - Peso Mexicano", "USD - Dólar Americano"])
-                        ], spacing=20),
-                        ft.Row([
-                            self.crear_input_fecha("Vigencia de la Cotización *", "25/10/2026", ft.Icons.DATE_RANGE), 
-                            self.crear_dropdown("Condiciones de Pago", "30% anticipo - 70% contra entrega", ft.Icons.REQUEST_QUOTE_OUTLINED, ["30% anticipo - 70% contra entrega", "100% anticipo", "Crédito 30 días"]), 
-                            self.crear_input("Referencia / Folio Interno", "Ej. REF-2026-0012", ft.Icons.TAG)
-                        ], spacing=20),
-                    ], spacing=15)
-                )
-            ], spacing=0)
-        )
-
-    def seccion_servicios(self):
-        boton_agregar_concepto = ft.Container(
-            content=ft.Row(
-                [
-                    ft.Icon(ft.Icons.ADD, color=COLOR_NARANJA, size=16),
+    def _panel_derecho(self) -> ft.Control:
+        tarjeta_columnas = card(
+            ft.Column(
+                spacing=8,
+                controls=[
+                    ft.Row(
+                        spacing=8,
+                        controls=[
+                            ft.Icon(
+                                ft.Icons.VIEW_COLUMN_OUTLINED,
+                                color=COLOR_AZUL_OSCURO,
+                                size=18,
+                            ),
+                            ft.Text(
+                                "Columnas visibles",
+                                weight=ft.FontWeight.BOLD,
+                                size=14,
+                                color=COLOR_AZUL_OSCURO,
+                            ),
+                        ],
+                    ),
                     ft.Text(
-                        "Agregar Concepto",
-                        color=COLOR_NARANJA,
-                        weight=ft.FontWeight.W_600,
-                        size=13,
+                        "Configura las columnas de edición u ocúltalas en vista cliente (formato PDA).",
+                        size=11,
+                        color=COLOR_GRIS,
+                    ),
+                    self.chk_cantidad,
+                    self.chk_precio_unitario,
+                    self.chk_factura,
+                    ft.Divider(height=12, color=COLOR_GRIS_CLARO),
+                    ft.Row(
+                        vertical_alignment=ft.CrossAxisAlignment.CENTER,
+                        controls=[
+                            ft.Icon(
+                                ft.Icons.VISIBILITY_OUTLINED,
+                                color=COLOR_GRIS,
+                                size=16,
+                            ),
+                            ft.Text(
+                                "Vista cliente (PDA)",
+                                size=12,
+                                weight=ft.FontWeight.W_500,
+                                color=COLOR_AZUL_OSCURO,
+                            ),
+                            ft.Container(expand=True),
+                            self.switch_cliente,
+                        ],
                     ),
                 ],
-                spacing=5,
             ),
-            border=self.crear_borde_completo(1, COLOR_NARANJA),
-            padding=ft.Padding(15, 5, 15, 5),
-            border_radius=6,
-            ink=True,
+            padding=16,
+            radius=12,
+            border_color="#E1EAF4",
+            shadow=sombra_suave(),
+        )
+
+        tarjeta_totales = card(
+            ft.Column(
+                spacing=10,
+                controls=[
+                    ft.Row(
+                        spacing=8,
+                        controls=[
+                            ft.Icon(
+                                ft.Icons.CALCULATE_OUTLINED,
+                                color=COLOR_AZUL,
+                                size=20,
+                            ),
+                            ft.Text(
+                                "Resumen de Proforma",
+                                size=14,
+                                weight=ft.FontWeight.BOLD,
+                                color=COLOR_AZUL_OSCURO,
+                            ),
+                        ],
+                    ),
+                    self.lbl_moneda_totales,
+                    ft.Divider(height=8, color=COLOR_GRIS_CLARO),
+                    ft.Row(
+                        controls=[
+                            ft.Text("Subtotal", size=12, color=COLOR_GRIS),
+                            ft.Container(expand=True),
+                            self.lbl_subtotal_general,
+                        ]
+                    ),
+                    ft.Row(
+                        controls=[
+                            ft.Text("IVA / TAX", size=12, color=COLOR_GRIS),
+                            ft.Container(expand=True),
+                            self.lbl_iva_general,
+                        ]
+                    ),
+                    ft.Divider(height=12, color=COLOR_GRIS_CLARO),
+                    ft.Row(
+                        controls=[
+                            ft.Text(
+                                "Total",
+                                size=15,
+                                weight=ft.FontWeight.BOLD,
+                                color=COLOR_NARANJA,
+                            ),
+                            ft.Container(expand=True),
+                            self.lbl_total_general,
+                        ]
+                    ),
+                ],
+            ),
+            padding=16,
+            radius=12,
+            border_color="#E1EAF4",
+            shadow=sombra_suave(),
+        )
+
+        self.boton_guardar = boton(
+            texto="Guardar",
+            icono=ft.Icons.SAVE_OUTLINED,
+            tipo="principal",
+            height=44,
+            width=260,
+            on_click=self.guardar_cotizacion,
+        )
+
+        return ft.Column(
+            width=260,
+            spacing=16,
+            controls=[
+                tarjeta_columnas,
+                tarjeta_totales,
+                self.boton_guardar,
+            ],
+        )
+
+    def _seccion_datos_generales(self) -> ft.Control:
+        cuerpo_formulario = ft.Column(
+            spacing=14,
+            controls=[
+                # Bloque 1: Encabezado del Documento y Cliente (Folio PDA, Fecha, Cliente, Dirección)
+                ft.Row(
+                    spacing=8,
+                    vertical_alignment=ft.CrossAxisAlignment.CENTER,
+                    controls=[
+                        ft.Icon(ft.Icons.BADGE_OUTLINED, size=18, color=COLOR_NARANJA),
+                        ft.Text(
+                            "Datos del Documento y Cliente / Customer",
+                            size=13,
+                            weight=ft.FontWeight.BOLD,
+                            color=COLOR_BANNER,
+                        ),
+                    ],
+                ),
+                # Fila 1 (top=30): Folio PDA | Fecha Emisión | Cliente (SelectorCliente)
+                ft.Row(
+                    spacing=12,
+                    vertical_alignment=ft.CrossAxisAlignment.START,
+                    controls=[
+                        ft.Container(expand=2, content=self.txt_folio),
+                        ft.Container(expand=2, content=self.txt_fecha_emision),
+                        ft.Container(expand=4, content=self.selector_cliente),
+                    ],
+                ),
+                # Fila 2: Dirección del Cliente | Arribo (ETA) | Zarpe (ETD)
+                ft.Row(
+                    spacing=12,
+                    vertical_alignment=ft.CrossAxisAlignment.START,
+                    controls=[
+                        ft.Container(expand=4, content=self.txt_direccion_cliente),
+                        ft.Container(expand=2, content=self.txt_fecha_arribo),
+                        ft.Container(expand=2, content=self.txt_fecha_zarpe),
+                    ],
+                ),
+                # Fila 3: Horas de Estancia | Días de Estancia | Moneda | Tipo de Cambio
+                ft.Row(
+                    spacing=12,
+                    vertical_alignment=ft.CrossAxisAlignment.START,
+                    controls=[
+                        ft.Container(expand=2, content=self.txt_horas_estancia),
+                        ft.Container(expand=2, content=self.txt_dias_estancia),
+                        ft.Container(expand=2, content=self.dd_moneda),
+                        ft.Container(expand=2, content=self.txt_tipo_cambio),
+                    ],
+                ),
+                ft.Divider(height=8, color=COLOR_GRIS_CLARO),
+                # Bloque 2: Información del Buque / Vessel's Information
+                ft.Row(
+                    spacing=8,
+                    vertical_alignment=ft.CrossAxisAlignment.CENTER,
+                    controls=[
+                        ft.Icon(
+                            ft.Icons.DIRECTIONS_BOAT_OUTLINED,
+                            size=18,
+                            color=COLOR_NARANJA,
+                        ),
+                        ft.Text(
+                            "Información del Buque / Vessel's Information",
+                            size=13,
+                            weight=ft.FontWeight.BOLD,
+                            color=COLOR_BANNER,
+                        ),
+                    ],
+                ),
+                # Fila 4: SelectorBuque | Tipo de Buque | IMO
+                ft.Row(
+                    spacing=12,
+                    vertical_alignment=ft.CrossAxisAlignment.START,
+                    controls=[
+                        ft.Container(expand=4, content=self.selector_buque),
+                        ft.Container(expand=2, content=self.txt_tipo_buque),
+                        ft.Container(expand=2, content=self.txt_imo_buque),
+                    ],
+                ),
+                # Fila 5: UAB / GRT (TRB) | Eslora / LOA (m) | Calado / Draft (m)
+                ft.Row(
+                    spacing=12,
+                    vertical_alignment=ft.CrossAxisAlignment.START,
+                    controls=[
+                        ft.Container(expand=2, content=self.txt_trb_buque),
+                        ft.Container(expand=2, content=self.txt_eslora_buque),
+                        ft.Container(expand=2, content=self.txt_calado_buque),
+                    ],
+                ),
+                ft.Divider(height=8, color=COLOR_GRIS_CLARO),
+                # Bloque 3: Condiciones Operativas de la Escala (ContextoEscala)
+                ft.Container(
+                    bgcolor="#F7FAFD",
+                    border=ft.Border.all(1, "#E4ECF5"),
+                    border_radius=9,
+                    padding=ft.Padding(12, 8, 12, 8),
+                    content=ft.Row(
+                        spacing=16,
+                        wrap=True,
+                        vertical_alignment=ft.CrossAxisAlignment.CENTER,
+                        controls=[
+                            ft.Row(
+                                spacing=6,
+                                tight=True,
+                                controls=[
+                                    ft.Icon(
+                                        ft.Icons.SETTINGS_OUTLINED,
+                                        size=16,
+                                        color=COLOR_BANNER,
+                                    ),
+                                    ft.Text(
+                                        "Condiciones de la escala:",
+                                        size=12,
+                                        weight=ft.FontWeight.BOLD,
+                                        color=COLOR_BANNER,
+                                    ),
+                                ],
+                            ),
+                            self.sw_mercancia_peligrosa,
+                            self.sw_propulsores_danados,
+                            self.lbl_estado_propulsores,
+                        ],
+                    ),
+                ),
+            ],
+        )
+
+        # Stack que superpone los desplegables flotantes de SelectorCliente y SelectorBuque
+        stack_datos = ft.Stack(
+            clip_behavior=ft.ClipBehavior.NONE,
+            controls=[
+                cuerpo_formulario,
+                # Resultados flotantes de SelectorCliente (debajo de Fila 1, columna derecha)
+                ft.Container(
+                    top=84,
+                    left=0,
+                    right=0,
+                    content=ft.Row(
+                        spacing=12,
+                        controls=[
+                            ft.Container(expand=2),
+                            ft.Container(expand=2),
+                            ft.Container(
+                                expand=4,
+                                content=self.selector_cliente.contenido_resultados,
+                            ),
+                        ],
+                    ),
+                ),
+                # Resultados flotantes de SelectorBuque (debajo de Fila 4, columna izquierda)
+                ft.Container(
+                    top=296,
+                    left=0,
+                    right=0,
+                    content=ft.Row(
+                        spacing=12,
+                        controls=[
+                            ft.Container(
+                                expand=4,
+                                content=self.selector_buque.contenido_resultados,
+                            ),
+                            ft.Container(expand=2),
+                            ft.Container(expand=2),
+                        ],
+                    ),
+                ),
+            ],
+        )
+
+        return card(
+            ft.Column(
+                spacing=0,
+                controls=[
+                    ft.Container(
+                        padding=ft.Padding(18, 12, 18, 12),
+                        border=ft.Border(bottom=ft.BorderSide(1, "#E8EEF5")),
+                        content=ft.Row(
+                            spacing=12,
+                            controls=[
+                                self._crear_indicador_numero("1", COLOR_AZUL),
+                                ft.Column(
+                                    spacing=1,
+                                    controls=[
+                                        ft.Text(
+                                            "Encabezado de Proforma, Cliente y Buque",
+                                            weight=ft.FontWeight.BOLD,
+                                            size=15,
+                                            color=COLOR_AZUL_OSCURO,
+                                        ),
+                                        ft.Text(
+                                            "Selecciona el buque para autocompletar sus dimensiones y su cliente asociado.",
+                                            size=11,
+                                            color=COLOR_GRIS,
+                                        ),
+                                    ],
+                                ),
+                            ],
+                        ),
+                    ),
+                    ft.Container(
+                        padding=18,
+                        content=stack_datos,
+                    ),
+                ],
+            ),
+            padding=0,
+            radius=12,
+            border_color="#E1EAF4",
+            shadow=sombra_suave(),
+        )
+
+    def _seccion_servicios(self) -> ft.Control:
+        self.boton_agregar_concepto = boton(
+            texto="Agregar Concepto",
+            icono=ft.Icons.ADD,
+            tipo="secundario",
+            color=COLOR_NARANJA,
+            border_color=COLOR_NARANJA,
+            height=38,
             on_click=self.agregar_fila,
         )
-        
-        boton_calcular = ft.Container(
-            content=ft.Row([
-                ft.Icon(ft.Icons.CALCULATE_OUTLINED, color=COLOR_BLANCO, size=16),
-                ft.Text("Calcular Tarifas", color=COLOR_BLANCO, weight=ft.FontWeight.W_600, size=13)
-            ], spacing=5),
-            bgcolor=COLOR_NARANJA,
-            padding=ft.Padding(15, 5, 15, 5),
-            border_radius=6,
-            ink=True,
-            on_click=self.abrir_modal_calculos 
+
+        self.boton_calcular_servicios = boton(
+            texto="Calcular Servicios",
+            icono=ft.Icons.CALCULATE_OUTLINED,
+            tipo="principal",
+            color=COLOR_NARANJA,
+            height=38,
+            on_click=self.calcular_servicios,
         )
-        
+
         contenedor_tabla_con_scroll = ft.Row(
             scroll=ft.ScrollMode.ADAPTIVE,
             controls=[
                 ft.Container(
-                    width=1000, 
-                    content=ft.Column([
-                        self.cabecera_tabla,
-                        ft.Divider(height=20, color=ft.Colors.GREY_200),
-                        self.lista_filas,
-                        ft.Container(height=35) 
-                    ])
+                    width=1180,
+                    content=ft.Column(
+                        spacing=4,
+                        controls=[
+                            self.cabecera_tabla,
+                            ft.Divider(height=8, color=COLOR_GRIS_CLARO),
+                            self.contenedor_resultados_servicio_activo,
+                            self.lista_filas,
+                            ft.Container(height=20),
+                        ],
+                    ),
                 )
-            ]
+            ],
         )
 
-        return ft.Container(
-            border=self.crear_borde_completo(1, ft.Colors.GREY_200), border_radius=10, bgcolor=COLOR_BLANCO,
-            content=ft.Column([
+        return card(
+            ft.Column(
+                spacing=0,
+                controls=[
+                    ft.Container(
+                        padding=ft.Padding(18, 12, 18, 12),
+                        border=ft.Border(bottom=ft.BorderSide(1, "#E8EEF5")),
+                        content=ft.Row(
+                            alignment=ft.MainAxisAlignment.SPACE_BETWEEN,
+                            vertical_alignment=ft.CrossAxisAlignment.CENTER,
+                            controls=[
+                                ft.Row(
+                                    spacing=12,
+                                    controls=[
+                                        self._crear_indicador_numero("2", COLOR_AZUL),
+                                        ft.Column(
+                                            spacing=1,
+                                            controls=[
+                                                ft.Text(
+                                                    "Desglose de Servicios y Conceptos (Formato PDA)",
+                                                    weight=ft.FontWeight.BOLD,
+                                                    size=15,
+                                                    color=COLOR_AZUL_OSCURO,
+                                                ),
+                                                ft.Text(
+                                                    "Usa 'Calcular Servicios' para generar las partidas obligatorias/condicionales o 'Agregar Concepto' para buscar servicios adicionales.",
+                                                    size=11,
+                                                    color=COLOR_GRIS,
+                                                ),
+                                            ],
+                                        ),
+                                    ],
+                                ),
+                                ft.Row(
+                                    spacing=10,
+                                    controls=[
+                                        self.boton_agregar_concepto,
+                                        self.boton_calcular_servicios,
+                                    ],
+                                ),
+                            ],
+                        ),
+                    ),
+                    ft.Container(
+                        padding=18,
+                        content=ft.Column(
+                            spacing=10,
+                            controls=[
+                                contenedor_tabla_con_scroll,
+                                ft.Container(
+                                    bgcolor="#EEF5FD",
+                                    border=ft.Border.all(1, "#D6E6FA"),
+                                    border_radius=8,
+                                    padding=10,
+                                    content=ft.Row(
+                                        spacing=8,
+                                        controls=[
+                                            ft.Icon(
+                                                ft.Icons.INFO_OUTLINE,
+                                                color=COLOR_AZUL,
+                                                size=18,
+                                            ),
+                                            ft.Text(
+                                                "El IVA se calcula automáticamente según la tasa del servicio (16%, 8% o 0%). Al modificar Cantidad o Precio Unitario se actualizan Subtotal, IVA y Total en tiempo real.",
+                                                color=COLOR_BANNER,
+                                                size=11,
+                                            ),
+                                        ],
+                                    ),
+                                ),
+                            ],
+                        ),
+                    ),
+                ],
+            ),
+            padding=0,
+            radius=12,
+            border_color="#E1EAF4",
+            shadow=sombra_suave(),
+        )
+
+    def _construir_cabecera_tabla(self) -> ft.Row:
+        return ft.Row(
+            spacing=8,
+            vertical_alignment=ft.CrossAxisAlignment.CENTER,
+            controls=[
                 ft.Container(
-                    bgcolor=COLOR_BLANCO, padding=ft.Padding(20, 15, 20, 15), border=ft.Border(bottom=ft.BorderSide(1, ft.Colors.GREY_100)),
-                    content=ft.Row([
-                        ft.Row([self.crear_indicador_numero("2", ft.Colors.BLUE_600), ft.Column([ft.Text("Productos y servicios cotizados", weight=ft.FontWeight.BOLD, size=15, color=COLOR_AZUL_OSCURO), ft.Text("Agrega los productos y servicios que serán incluidos en esta cotización.", size=11, color=COLOR_GRIS)], spacing=0)], spacing=15),
-                        ft.Row([boton_agregar_concepto, boton_calcular], alignment=ft.MainAxisAlignment.END, spacing=10)
-                    ], alignment=ft.MainAxisAlignment.SPACE_BETWEEN)
+                    width=28,
+                    content=ft.Text(
+                        "#", size=11, color=COLOR_BANNER, weight=ft.FontWeight.BOLD
+                    ),
                 ),
                 ft.Container(
-                    padding=20,
-                    content=ft.Column([
-                        contenedor_tabla_con_scroll, 
-                        ft.Container(height=10),
-                        ft.Container(
-                            bgcolor=ft.Colors.BLUE_50, border=self.crear_borde_completo(1, ft.Colors.BLUE_100), border_radius=6, padding=12,
-                            content=ft.Row([ft.Icon(ft.Icons.INFO, color=ft.Colors.BLUE_500, size=18), ft.Text("El IVA y la ganancia se configuran por producto. Usa el panel derecho para ocultar columnas internas.", color=ft.Colors.BLUE_700, size=12)], spacing=10)
-                        )
-                    ])
-                )
-            ], spacing=0)
+                    width=130,
+                    content=ft.Text(
+                        "Categoría",
+                        size=11,
+                        color=COLOR_BANNER,
+                        weight=ft.FontWeight.BOLD,
+                    ),
+                ),
+                ft.Container(
+                    width=235,
+                    content=ft.Text(
+                        "Descripción",
+                        size=11,
+                        color=COLOR_BANNER,
+                        weight=ft.FontWeight.BOLD,
+                    ),
+                ),
+                ft.Container(
+                    width=175,
+                    content=ft.Text(
+                        "Proveedor",
+                        size=11,
+                        color=COLOR_BANNER,
+                        weight=ft.FontWeight.BOLD,
+                    ),
+                ),
+                ft.Container(
+                    width=62,
+                    visible=self.ver_cantidad,
+                    content=ft.Text(
+                        "Cant.",
+                        size=11,
+                        color=COLOR_BANNER,
+                        weight=ft.FontWeight.BOLD,
+                    ),
+                ),
+                ft.Container(
+                    width=95,
+                    visible=self.ver_precio_unitario,
+                    content=ft.Text(
+                        "Precio Unit.",
+                        size=11,
+                        color=COLOR_BANNER,
+                        weight=ft.FontWeight.BOLD,
+                    ),
+                ),
+                ft.Container(
+                    width=95,
+                    content=ft.Text(
+                        "Subtotal",
+                        size=11,
+                        color=COLOR_BANNER,
+                        weight=ft.FontWeight.BOLD,
+                    ),
+                ),
+                ft.Container(
+                    width=85,
+                    content=ft.Text(
+                        "IVA / TAX",
+                        size=11,
+                        color=COLOR_BANNER,
+                        weight=ft.FontWeight.BOLD,
+                    ),
+                ),
+                ft.Container(
+                    width=95,
+                    content=ft.Text(
+                        "Total",
+                        size=11,
+                        color=COLOR_BANNER,
+                        weight=ft.FontWeight.BOLD,
+                    ),
+                ),
+                ft.Container(
+                    width=85,
+                    visible=self.ver_factura,
+                    content=ft.Text(
+                        "Factura",
+                        size=11,
+                        color=COLOR_BANNER,
+                        weight=ft.FontWeight.BOLD,
+                    ),
+                ),
+                ft.Container(
+                    width=135,
+                    content=ft.Text(
+                        "Observaciones",
+                        size=11,
+                        color=COLOR_BANNER,
+                        weight=ft.FontWeight.BOLD,
+                    ),
+                ),
+                ft.Container(
+                    width=50,
+                    content=ft.Text(
+                        "Acciones",
+                        size=11,
+                        color=COLOR_BANNER,
+                        weight=ft.FontWeight.BOLD,
+                    ),
+                ),
+            ],
         )
 
-    def _construir_cabecera_tabla(self):
-        return ft.Row([
-            ft.Container(width=20, content=ft.Text("#", size=11, color=COLOR_GRIS, weight=ft.FontWeight.BOLD)),
-            ft.Container(expand=5, content=ft.Text("Producto / Servicio", size=11, color=COLOR_GRIS, weight=ft.FontWeight.BOLD)), 
-            ft.Container(expand=2, content=ft.Text("Unidad", size=11, color=COLOR_GRIS, weight=ft.FontWeight.BOLD)),
-            ft.Container(expand=1, content=ft.Text("Cant.", size=11, color=COLOR_GRIS, weight=ft.FontWeight.BOLD)),
-            ft.Container(expand=2, content=ft.Text("Costo Unit.", size=11, color=COLOR_GRIS, weight=ft.FontWeight.BOLD), visible=self.ver_costo),
-            ft.Container(expand=2, content=ft.Text("Ganancia", size=11, color=COLOR_GRIS, weight=ft.FontWeight.BOLD), visible=self.ver_ganancia),
-            ft.Container(expand=2, content=ft.Text("IVA", size=11, color=COLOR_GRIS, weight=ft.FontWeight.BOLD), visible=self.ver_iva),
-            ft.Container(expand=2, content=ft.Text("Precio Final", size=11, color=COLOR_GRIS, weight=ft.FontWeight.BOLD)),
-            ft.Container(expand=2, content=ft.Text("Importe", size=11, color=COLOR_GRIS, weight=ft.FontWeight.BOLD)),
-            ft.Container(width=70, content=ft.Text("Acciones", size=11, color=COLOR_GRIS, weight=ft.FontWeight.BOLD)),
-        ])
+    # =========================================================================
+    # MANEJADORES REACTIVOS DE ENCABEZADO (BUQUE, CLIENTE, ESTANCIA, MONEDA)
+    # =========================================================================
 
-    def agregar_fila(self, e):
-        siguiente_numero = str(len(self.lista_filas.controls) + 1)
-        nueva_fila = self.crear_fila_servicio(siguiente_numero, "Seleccione un producto", "Servicio", "1", "$0.00", "0%", "16%", "$0.00", "$0.00")
-        self.lista_filas.controls.append(nueva_fila)
-        self.update()
+    def _al_seleccionar_buque(self, buque: Buque | None) -> None:
+        self.buque_actual = buque
 
-    def eliminar_fila(self, fila_a_borrar):
-        if fila_a_borrar in self.lista_filas.controls:
-            self.lista_filas.controls.remove(fila_a_borrar)
-        for index, fila in enumerate(self.lista_filas.controls):
-            fila.content.controls[0].content.value = str(index + 1)
-        self.update()
+        if buque is None:
+            self.txt_tipo_buque.value = ""
+            self.txt_imo_buque.value = ""
+            self.txt_trb_buque.value = ""
+            self.txt_eslora_buque.value = ""
+            self.txt_calado_buque.value = ""
+            self.lbl_estado_propulsores.bgcolor = "#EEF5FD"
+            self.lbl_estado_propulsores.content.value = (
+                "Seleccione un buque para ver configuración de propulsores"
+            )
+            self.lbl_estado_propulsores.content.color = COLOR_BANNER
+            self._actualizar_ui()
+            return
 
-    def toggle_vista_cliente(self, e):
-        es_vista = e.control.value
-        self.chk_costo.value = not es_vista
-        self.chk_ganancia.value = not es_vista
-        self.chk_iva.value = not es_vista
+        categoria_obj = getattr(buque, "categoria_buque", None)
+        nombre_cat = getattr(categoria_obj, "categoria", None) or ""
+        subtipo = getattr(buque, "subtipo_descripcion", None) or ""
+        if nombre_cat and subtipo and subtipo.upper() != nombre_cat.upper():
+            self.txt_tipo_buque.value = f"{nombre_cat} ({subtipo})"
+        else:
+            self.txt_tipo_buque.value = nombre_cat or subtipo
+
+        self.txt_imo_buque.value = str(getattr(buque, "numero_imo", "") or "")
+        self.txt_trb_buque.value = (
+            f"{Decimal(str(buque.trb)):,.2f}"
+            if getattr(buque, "trb", None) is not None
+            else ""
+        )
+        self.txt_eslora_buque.value = (
+            f"{Decimal(str(buque.eslora)):,.2f}"
+            if getattr(buque, "eslora", None) is not None
+            else ""
+        )
+        self.txt_calado_buque.value = (
+            f"{Decimal(str(buque.calado)):,.2f}"
+            if getattr(buque, "calado", None) is not None
+            else ""
+        )
+
+        # Indicador visual de propulsores proa/popa del buque
+        tiene_propulsores = bool(getattr(buque, "propulsores_proa_popa", False))
+        if tiene_propulsores:
+            self.lbl_estado_propulsores.bgcolor = "#EAF8F0"
+            self.lbl_estado_propulsores.content.value = (
+                "Buque con propulsores en proa y popa"
+            )
+            self.lbl_estado_propulsores.content.color = COLOR_VERDE
+        else:
+            self.lbl_estado_propulsores.bgcolor = "#FFF3D9"
+            self.lbl_estado_propulsores.content.value = (
+                "Buque sin propulsores en proa y popa"
+            )
+            self.lbl_estado_propulsores.content.color = "#A66B00"
+
+        # Autocarga editable del cliente asociado al buque
+        cliente_buque = getattr(buque, "cliente", None)
+        if cliente_buque is not None:
+            self.selector_cliente.establecer_cliente(cliente_buque, notificar=False)
+            self._al_seleccionar_cliente(cliente_buque)
+
+        self._actualizar_ui()
+
+    def _al_seleccionar_cliente(self, cliente: Cliente | None) -> None:
+        self.cliente_actual = cliente
+        if cliente is None:
+            self.txt_direccion_cliente.value = ""
+        else:
+            self.txt_direccion_cliente.value = (
+                getattr(cliente, "direccion", "") or ""
+            )
+        self._actualizar_ui()
+
+    def _al_cambiar_horas_estancia(self, e=None) -> None:
+        horas_txt = (self.txt_horas_estancia.value or "").strip()
+        dias = ControladorCotizacion.calcular_dias_estancia(horas_txt)
+        if dias > 0:
+            sufijo = "día" if dias == 1 else "días"
+            self.txt_dias_estancia.value = f"{dias} {sufijo}"
+        else:
+            self.txt_dias_estancia.value = "0 días"
+        self._actualizar_ui()
+
+    def _al_cambiar_moneda(self, e=None) -> None:
+        moneda_sel = (self.dd_moneda.value or Moneda.MXN.value).upper()
+        if moneda_sel == Moneda.MXN.value:
+            self.txt_tipo_cambio.value = "1.0000"
+            self.txt_tipo_cambio.disabled = True
+        else:
+            self.txt_tipo_cambio.disabled = False
+            if (self.txt_tipo_cambio.value or "").strip() in ("", "1", "1.0", "1.00", "1.0000"):
+                self.txt_tipo_cambio.value = "16.0000"
+        self.lbl_moneda_totales.value = f"Importes expresados en {moneda_sel}"
+        self._recalcular_filas_por_moneda()
+        self._actualizar_ui()
+
+    def _al_cambiar_tipo_cambio(self, e=None) -> None:
+        self._recalcular_filas_por_moneda()
+        self._actualizar_ui()
+
+    def _obtener_parametros_contexto_actual(self) -> tuple[Decimal, Moneda, Decimal]:
+        try:
+            horas = Decimal((self.txt_horas_estancia.value or "24").strip())
+            if horas <= Decimal("0"):
+                horas = Decimal("24.00")
+        except (InvalidOperation, ValueError):
+            horas = Decimal("24.00")
+
+        moneda = (
+            Moneda.USD
+            if (self.dd_moneda.value or "MXN").upper() == "USD"
+            else Moneda.MXN
+        )
+
+        try:
+            tc = (
+                Decimal("1.0000")
+                if moneda == Moneda.MXN
+                else Decimal((self.txt_tipo_cambio.value or "16.0000").strip())
+            )
+            if tc <= Decimal("0"):
+                tc = Decimal("1.0000")
+        except (InvalidOperation, ValueError):
+            tc = Decimal("1.0000")
+
+        return horas, moneda, tc
+
+    def _recalcular_filas_por_moneda(self) -> None:
+        if not self.filas_datos or self.controlador is None:
+            return
+        horas, moneda, tc = self._obtener_parametros_contexto_actual()
+        for estado_fila in self.filas_datos:
+            servicio = estado_fila.get("servicio")
+            if servicio is None:
+                continue
+            try:
+                cant_actual = Decimal(
+                    (estado_fila["txt_cantidad"].value or "1").strip()
+                )
+            except (InvalidOperation, ValueError):
+                cant_actual = Decimal("1.00")
+
+            datos_calc = self.controlador.calcular_detalle_para_servicio_manual(
+                servicio=servicio,
+                buque=self.buque_actual,
+                horas_estancia=horas,
+                moneda=moneda,
+                tipo_cambio=tc,
+                cantidad=cant_actual,
+            )
+            self._poblar_controles_fila(
+                estado_fila, datos_calc, conservar_observaciones=True
+            )
+        self._recalcular_totales_generales()
+
+    # =========================================================================
+    # CÁLCULO AUTOMÁTICO Y GESTIÓN DE FILAS DE LA TABLA PDA
+    # =========================================================================
+
+    def calcular_servicios(self, e=None) -> list[DetalleCotizacion]:
+        buque = self.buque_actual or self.selector_buque.buque_seleccionado
+        if buque is None:
+            self._notificar(
+                "Selecciona un buque antes de calcular los servicios.",
+                COLOR_ROJO,
+            )
+            return []
+
+        try:
+            horas_dec = ControladorCotizacion._a_decimal(
+                self.txt_horas_estancia.value, "Las horas de estancia"
+            )
+            if horas_dec <= Decimal("0"):
+                raise ValueError("Las horas de estancia deben ser mayores que 0.")
+        except ValueError as error:
+            self._notificar(str(error), COLOR_ROJO)
+            return []
+
+        if self.controlador is None:
+            self._notificar(
+                "El controlador de cotizaciones no está configurado.",
+                COLOR_ROJO,
+            )
+            return []
+
+        _, moneda, tc = self._obtener_parametros_contexto_actual()
+
+        try:
+            detalles = self.controlador.calcular_servicios_obligatorios(
+                buque=buque,
+                horas_estancia=horas_dec,
+                moneda=moneda,
+                tipo_cambio=tc,
+                transporta_mercancia_peligrosa=bool(
+                    self.sw_mercancia_peligrosa.value
+                ),
+                propulsores_danados=bool(self.sw_propulsores_danados.value),
+            )
+        except Exception as error:
+            self._notificar(str(error), COLOR_ROJO)
+            return []
+
+        self.lista_filas.controls.clear()
+        self.filas_datos.clear()
+        self.contenedor_resultados_servicio_activo.visible = False
+
+        for idx, detalle in enumerate(detalles, start=1):
+            estado_fila = self._crear_fila_desde_detalle(idx, detalle)
+            self.filas_datos.append(estado_fila)
+            self.lista_filas.controls.append(estado_fila["contenedor"])
+
+        self._recalcular_totales_generales()
+        self._actualizar_ui()
+        return detalles
+
+    def agregar_fila(self, e=None) -> dict:
+        siguiente_numero = len(self.filas_datos) + 1
+        estado_fila = self._crear_estructura_fila(numero=siguiente_numero)
+        self.filas_datos.append(estado_fila)
+        self.lista_filas.controls.append(estado_fila["contenedor"])
+        self._recalcular_totales_generales()
+        self._actualizar_ui()
+        return estado_fila
+
+    def eliminar_fila(self, estado_fila: dict) -> None:
+        if estado_fila in self.filas_datos:
+            self.filas_datos.remove(estado_fila)
+        if estado_fila["contenedor"] in self.lista_filas.controls:
+            self.lista_filas.controls.remove(estado_fila["contenedor"])
+
+        for idx, fila in enumerate(self.filas_datos, start=1):
+            fila["disc"] = idx
+            fila["lbl_numero"].value = str(idx)
+
+        self._recalcular_totales_generales()
+        self._actualizar_ui()
+
+    def _al_abrir_resultados_servicio(
+        self, selector: SelectorServicio, mostrar: bool
+    ) -> None:
+        if mostrar:
+            self.contenedor_resultados_servicio_activo.content = (
+                selector.contenido_resultados
+            )
+            self.contenedor_resultados_servicio_activo.visible = True
+        else:
+            if (
+                self.contenedor_resultados_servicio_activo.content
+                is selector.contenido_resultados
+            ):
+                self.contenedor_resultados_servicio_activo.visible = False
+        self._actualizar_ui()
+
+    def _crear_fila_desde_detalle(
+        self, numero: int, detalle: DetalleCotizacion
+    ) -> dict:
+        servicio = getattr(detalle, "concepto", None)
+        proveedores = getattr(servicio, "proveedores", None) or []
+        proveedor_principal = proveedores[0] if proveedores else None
+        estado_fila = self._crear_estructura_fila(
+            numero=numero,
+            servicio_inicial=servicio,
+        )
+        datos = {
+            "concepto_id": detalle.concepto_id,
+            "servicio": servicio,
+            "categoria_pda": detalle.categoria_pda_nombre,
+            "descripcion": detalle.descripcion,
+            "proveedor": detalle.proveedor_nombre,
+            "proveedor_id": (
+                getattr(proveedor_principal, "id", None)
+                if proveedor_principal is not None
+                else None
+            ),
+            "proveedor_obj": proveedor_principal,
+            "cantidad": detalle.cantidad,
+            "precio_unitario": detalle.precio_unitario,
+            "tasa_iva": detalle.tasa_iva,
+            "subtotal": detalle.subtotal,
+            "iva": detalle.iva,
+            "total": detalle.total,
+            "factura": detalle.factura or "",
+            "observaciones": detalle.observaciones or "",
+        }
+        self._poblar_controles_fila(estado_fila, datos)
+        return estado_fila
+
+    def _crear_estructura_fila(
+        self,
+        numero: int,
+        servicio_inicial: Servicio | None = None,
+    ) -> dict:
+        estado_fila: dict = {
+            "disc": int(numero),
+            "servicio": servicio_inicial,
+            "concepto_id": (
+                int(servicio_inicial.id)
+                if servicio_inicial is not None
+                and getattr(servicio_inicial, "id", None) is not None
+                else None
+            ),
+            "proveedor_id": None,
+            "proveedor_obj": None,
+            "tasa_iva": (
+                Decimal(str(servicio_inicial.tasa_iva))
+                if servicio_inicial is not None
+                and getattr(servicio_inicial, "tasa_iva", None) is not None
+                else Decimal("0.1600")
+            ),
+            "subtotal": Decimal("0.00"),
+            "iva": Decimal("0.00"),
+            "total": Decimal("0.00"),
+        }
+
+        lbl_numero = ft.Text(
+            str(numero),
+            size=12,
+            weight=ft.FontWeight.BOLD,
+            color=COLOR_BANNER,
+        )
+        lbl_categoria = ft.Text(
+            "",
+            size=11,
+            weight=ft.FontWeight.W_600,
+            color=COLOR_AZUL_OSCURO,
+            max_lines=2,
+            overflow=ft.TextOverflow.ELLIPSIS,
+        )
+        lbl_proveedor = ft.Text(
+            "",
+            size=11,
+            color=COLOR_GRIS,
+            max_lines=2,
+            overflow=ft.TextOverflow.ELLIPSIS,
+        )
+
+        selector_servicio = SelectorServicio(
+            servicio_servicio=self.servicio_servicio,
+            servicio_inicial=servicio_inicial,
+            on_servicio_seleccionado=lambda serv, ef=estado_fila: self._al_seleccionar_servicio_en_fila(
+                ef, serv
+            ),
+            on_abrir_resultados=self._al_abrir_resultados_servicio,
+        )
+
+        txt_cantidad = ft.TextField(
+            value="1" if servicio_inicial is None else "1.00",
+            height=34,
+            text_size=11,
+            dense=True,
+            border=ft.InputBorder.OUTLINE,
+            border_color=COLOR_GRIS_CLARO,
+            focused_border_color=COLOR_NARANJA,
+            border_radius=6,
+            content_padding=ft.Padding(6, 4, 6, 4),
+            input_filter=ft.InputFilter(
+                allow=True, regex_string=r"^[0-9.]*$", replacement_string=""
+            ),
+            on_change=lambda e, ef=estado_fila: self._al_editar_importe_fila(ef),
+        )
+
+        txt_precio_unitario = ft.TextField(
+            value="0.00",
+            height=34,
+            text_size=11,
+            dense=True,
+            border=ft.InputBorder.OUTLINE,
+            border_color=COLOR_GRIS_CLARO,
+            focused_border_color=COLOR_NARANJA,
+            border_radius=6,
+            content_padding=ft.Padding(6, 4, 6, 4),
+            input_filter=ft.InputFilter(
+                allow=True, regex_string=r"^[0-9.]*$", replacement_string=""
+            ),
+            on_change=lambda e, ef=estado_fila: self._al_editar_importe_fila(ef),
+        )
+
+        lbl_subtotal = ft.Text(
+            "$ 0.00",
+            size=11,
+            weight=ft.FontWeight.W_600,
+            color=COLOR_AZUL_OSCURO,
+        )
+        lbl_iva = ft.Text(
+            "$ 0.00",
+            size=11,
+            weight=ft.FontWeight.W_600,
+            color=COLOR_AZUL_OSCURO,
+        )
+        lbl_total = ft.Text(
+            "$ 0.00",
+            size=11,
+            weight=ft.FontWeight.BOLD,
+            color=COLOR_AZUL_OSCURO,
+        )
+
+        txt_factura = ft.TextField(
+            value="",
+            hint_text="Factura",
+            height=34,
+            text_size=11,
+            dense=True,
+            border=ft.InputBorder.OUTLINE,
+            border_color=COLOR_GRIS_CLARO,
+            focused_border_color=COLOR_NARANJA,
+            border_radius=6,
+            content_padding=ft.Padding(6, 4, 6, 4),
+        )
+
+        txt_observaciones = ft.TextField(
+            value="",
+            hint_text="Observaciones",
+            height=34,
+            text_size=11,
+            dense=True,
+            border=ft.InputBorder.OUTLINE,
+            border_color=COLOR_GRIS_CLARO,
+            focused_border_color=COLOR_NARANJA,
+            border_radius=6,
+            content_padding=ft.Padding(6, 4, 6, 4),
+        )
+
+        celda_cantidad = ft.Container(
+            width=62,
+            visible=self.ver_cantidad,
+            content=txt_cantidad,
+        )
+        celda_precio = ft.Container(
+            width=95,
+            visible=self.ver_precio_unitario,
+            content=txt_precio_unitario,
+        )
+        celda_factura = ft.Container(
+            width=85,
+            visible=self.ver_factura,
+            content=txt_factura,
+        )
+
+        btn_borrar = ft.IconButton(
+            icon=ft.Icons.DELETE_OUTLINE,
+            icon_size=17,
+            icon_color=COLOR_ROJO,
+            tooltip="Eliminar concepto",
+            width=32,
+            height=32,
+            padding=0,
+            on_click=lambda e, ef=estado_fila: self.eliminar_fila(ef),
+        )
+
+        contenedor_fila = ft.Container(
+            padding=ft.Padding(0, 5, 0, 5),
+            border=ft.Border(bottom=ft.BorderSide(1, "#EEF2F7")),
+            content=ft.Row(
+                spacing=8,
+                vertical_alignment=ft.CrossAxisAlignment.CENTER,
+                controls=[
+                    ft.Container(width=28, content=lbl_numero),
+                    ft.Container(width=130, content=lbl_categoria),
+                    ft.Container(width=235, content=selector_servicio),
+                    ft.Container(width=175, content=lbl_proveedor),
+                    celda_cantidad,
+                    celda_precio,
+                    ft.Container(width=95, content=lbl_subtotal),
+                    ft.Container(width=85, content=lbl_iva),
+                    ft.Container(width=95, content=lbl_total),
+                    celda_factura,
+                    ft.Container(width=135, content=txt_observaciones),
+                    ft.Container(width=50, content=btn_borrar),
+                ],
+            ),
+        )
+
+        estado_fila.update(
+            {
+                "contenedor": contenedor_fila,
+                "lbl_numero": lbl_numero,
+                "lbl_categoria": lbl_categoria,
+                "selector_servicio": selector_servicio,
+                "lbl_proveedor": lbl_proveedor,
+                "txt_cantidad": txt_cantidad,
+                "txt_precio_unitario": txt_precio_unitario,
+                "lbl_subtotal": lbl_subtotal,
+                "lbl_iva": lbl_iva,
+                "lbl_total": lbl_total,
+                "txt_factura": txt_factura,
+                "txt_observaciones": txt_observaciones,
+                "celda_cantidad": celda_cantidad,
+                "celda_precio": celda_precio,
+                "celda_factura": celda_factura,
+            }
+        )
+        return estado_fila
+
+    def _poblar_controles_fila(
+        self,
+        estado_fila: dict,
+        datos: dict,
+        conservar_observaciones: bool = False,
+    ) -> None:
+        servicio = datos.get("servicio") or datos.get("concepto")
+        estado_fila["servicio"] = servicio
+        estado_fila["concepto_id"] = datos.get("concepto_id") or (
+            getattr(servicio, "id", None) if servicio else None
+        )
+        estado_fila["proveedor_id"] = datos.get("proveedor_id")
+        estado_fila["proveedor_obj"] = datos.get("proveedor_obj")
+        estado_fila["tasa_iva"] = Decimal(
+            str(datos.get("tasa_iva", Decimal("0.1600")))
+        )
+        estado_fila["subtotal"] = Decimal(str(datos.get("subtotal", Decimal("0.00"))))
+        estado_fila["iva"] = Decimal(str(datos.get("iva", Decimal("0.00"))))
+        estado_fila["total"] = Decimal(str(datos.get("total", Decimal("0.00"))))
+
+        estado_fila["lbl_categoria"].value = datos.get("categoria_pda") or ""
+        estado_fila["lbl_proveedor"].value = datos.get("proveedor") or ""
+        if servicio is not None:
+            estado_fila["selector_servicio"].establecer_servicio(servicio)
+
+        cant_dec = Decimal(str(datos.get("cantidad", Decimal("1.00"))))
+        estado_fila["txt_cantidad"].value = (
+            str(int(cant_dec))
+            if cant_dec == int(cant_dec)
+            else f"{cant_dec:.2f}"
+        )
+        precio_dec = Decimal(str(datos.get("precio_unitario", Decimal("0.00"))))
+        estado_fila["txt_precio_unitario"].value = f"{precio_dec:.2f}"
+
+        estado_fila["lbl_subtotal"].value = ControladorCotizacion.formatear_moneda(
+            estado_fila["subtotal"]
+        )
+        estado_fila["lbl_iva"].value = ControladorCotizacion.formatear_iva_celda(
+            estado_fila["iva"], estado_fila["tasa_iva"]
+        )
+        estado_fila["lbl_total"].value = ControladorCotizacion.formatear_moneda(
+            estado_fila["total"]
+        )
+
+        if not conservar_observaciones:
+            estado_fila["txt_factura"].value = datos.get("factura") or ""
+            estado_fila["txt_observaciones"].value = datos.get("observaciones") or ""
+
+    def _al_seleccionar_servicio_en_fila(
+        self, estado_fila: dict, servicio: Servicio
+    ) -> None:
+        if self.controlador is None:
+            return
+        horas, moneda, tc = self._obtener_parametros_contexto_actual()
+        buque = self.buque_actual or self.selector_buque.buque_seleccionado
+        try:
+            datos_calculados = (
+                self.controlador.calcular_detalle_para_servicio_manual(
+                    servicio=servicio,
+                    buque=buque,
+                    horas_estancia=horas,
+                    moneda=moneda,
+                    tipo_cambio=tc,
+                )
+            )
+            self._poblar_controles_fila(estado_fila, datos_calculados)
+            self._recalcular_totales_generales()
+            self._actualizar_ui()
+        except Exception as error:
+            self._notificar(str(error), COLOR_ROJO)
+
+    def _al_editar_importe_fila(self, estado_fila: dict) -> None:
+        cant_str = (estado_fila["txt_cantidad"].value or "0").strip()
+        precio_str = (estado_fila["txt_precio_unitario"].value or "0").strip()
+        tasa_iva = estado_fila.get("tasa_iva", Decimal("0.1600"))
+
+        importes = ControladorCotizacion.recalcular_importes_fila(
+            cantidad=cant_str or "0",
+            precio_unitario=precio_str or "0",
+            tasa_iva=tasa_iva,
+        )
+        estado_fila["subtotal"] = importes["subtotal"]
+        estado_fila["iva"] = importes["iva"]
+        estado_fila["total"] = importes["total"]
+
+        estado_fila["lbl_subtotal"].value = ControladorCotizacion.formatear_moneda(
+            importes["subtotal"]
+        )
+        estado_fila["lbl_iva"].value = ControladorCotizacion.formatear_iva_celda(
+            importes["iva"], tasa_iva
+        )
+        estado_fila["lbl_total"].value = ControladorCotizacion.formatear_moneda(
+            importes["total"]
+        )
+
+        self._recalcular_totales_generales()
+        self._actualizar_ui()
+
+    def _recalcular_totales_generales(self) -> tuple[Decimal, Decimal, Decimal]:
+        acum_subtotal = Decimal("0.00")
+        acum_iva = Decimal("0.00")
+
+        for fila in self.filas_datos:
+            acum_subtotal += Decimal(str(fila.get("subtotal", Decimal("0.00"))))
+            acum_iva += Decimal(str(fila.get("iva", Decimal("0.00"))))
+
+        subtotal = acum_subtotal.quantize(Decimal("0.01"), rounding=ROUND_HALF_UP)
+        iva = acum_iva.quantize(Decimal("0.01"), rounding=ROUND_HALF_UP)
+        total = (subtotal + iva).quantize(Decimal("0.01"), rounding=ROUND_HALF_UP)
+
+        self.lbl_subtotal_general.value = ControladorCotizacion.formatear_moneda(
+            subtotal
+        )
+        self.lbl_iva_general.value = ControladorCotizacion.formatear_moneda(iva)
+        self.lbl_total_general.value = ControladorCotizacion.formatear_moneda(total)
+        return subtotal, iva, total
+
+    # =========================================================================
+    # GUARDADO DE LA COTIZACIÓN EN BASE DE DATOS
+    # =========================================================================
+
+    def obtener_detalles_para_guardar(self) -> list[dict]:
+        partidas: list[dict] = []
+        for idx, fila in enumerate(self.filas_datos, start=1):
+            servicio = fila.get("servicio") or getattr(
+                fila.get("selector_servicio"), "servicio_seleccionado", None
+            )
+            concepto_id = fila.get("concepto_id") or (
+                getattr(servicio, "id", None) if servicio is not None else None
+            )
+            if concepto_id is None:
+                continue
+
+            partidas.append(
+                {
+                    "disc": idx,
+                    "concepto_id": int(concepto_id),
+                    "servicio": servicio,
+                    "proveedor_id": fila.get("proveedor_id"),
+                    "proveedor_obj": fila.get("proveedor_obj"),
+                    "cantidad": fila["txt_cantidad"].value,
+                    "precio_unitario": fila["txt_precio_unitario"].value,
+                    "tasa_iva": fila.get("tasa_iva", Decimal("0.1600")),
+                    "subtotal": fila.get("subtotal", Decimal("0.00")),
+                    "iva": fila.get("iva", Decimal("0.00")),
+                    "factura": fila["txt_factura"].value,
+                    "observaciones": fila["txt_observaciones"].value,
+                }
+            )
+        return partidas
+
+    def guardar_cotizacion(self, e=None):
+        if self.controlador is None:
+            self._notificar(
+                "El controlador de cotizaciones no está disponible.",
+                COLOR_ROJO,
+            )
+            return None
+
+        buque = self.buque_actual or self.selector_buque.buque_seleccionado
+        buque_id = (
+            getattr(buque, "id", None)
+            or self.selector_buque.buque_id_seleccionado
+        )
+        cliente = self.cliente_actual or self.selector_cliente.cliente_seleccionado
+        cliente_id = (
+            getattr(cliente, "id", None)
+            or self.selector_cliente.cliente_id_seleccionado
+        )
+
+        partidas = self.obtener_detalles_para_guardar()
+
+        try:
+            cotizacion = self.controlador.guardar_nueva_cotizacion(
+                cliente=cliente,
+                cliente_id=cliente_id,
+                buque=buque,
+                buque_id=buque_id,
+                detalles=partidas,
+                folio=self.txt_folio.value,
+                fecha_emision=self.txt_fecha_emision.value,
+                fecha_arribo=self.txt_fecha_arribo.value,
+                fecha_zarpe=self.txt_fecha_zarpe.value,
+                horas_estancia=self.txt_horas_estancia.value,
+                moneda=self.dd_moneda.value,
+                tipo_cambio=self.txt_tipo_cambio.value,
+                transporta_mercancia_peligrosa=bool(
+                    self.sw_mercancia_peligrosa.value
+                ),
+                propulsores_danados=bool(self.sw_propulsores_danados.value),
+            )
+        except (ValueError, ErrorCotizacion) as error:
+            self._notificar(str(error), COLOR_ROJO)
+            return None
+
+        self.txt_folio.value = cotizacion.folio
+        self._notificar(
+            f"Cotización {cotizacion.folio} registrada correctamente.",
+            COLOR_VERDE,
+        )
+
+        if self.vista_anterior is not None:
+            if hasattr(self.vista_anterior, "actualizar_historial"):
+                self.vista_anterior.actualizar_historial()
+            if self.parent is not None:
+                self.parent.content = self.vista_anterior
+                self.parent.update()
+        return cotizacion
+
+    # =========================================================================
+    # VISIBILIDAD DE COLUMNAS Y NAVEGACIÓN
+    # =========================================================================
+
+    def toggle_vista_cliente(self, e) -> None:
+        es_vista_cliente = bool(self.switch_cliente.value)
+        self.chk_cantidad.value = not es_vista_cliente
+        self.chk_precio_unitario.value = not es_vista_cliente
         self.toggle_columnas(None)
 
-    def toggle_columnas(self, e):
-        self.ver_costo = self.chk_costo.value
-        self.ver_ganancia = self.chk_ganancia.value
-        self.ver_iva = self.chk_iva.value
-        
-        self.cabecera_tabla.controls[4].visible = self.ver_costo
-        self.cabecera_tabla.controls[5].visible = self.ver_ganancia
-        self.cabecera_tabla.controls[6].visible = self.ver_iva
+    def toggle_columnas(self, e) -> None:
+        self.ver_cantidad = bool(self.chk_cantidad.value)
+        self.ver_precio_unitario = bool(self.chk_precio_unitario.value)
+        self.ver_factura = bool(self.chk_factura.value)
 
-        for fila in self.lista_filas.controls:
-            celdas = fila.content.controls
-            celdas[4].visible = self.ver_costo
-            celdas[5].visible = self.ver_ganancia
-            celdas[6].visible = self.ver_iva
-            
-        self.update()
+        self.cabecera_tabla.controls[4].visible = self.ver_cantidad
+        self.cabecera_tabla.controls[5].visible = self.ver_precio_unitario
+        self.cabecera_tabla.controls[9].visible = self.ver_factura
 
-    def cancelar(self, e=None):
-        if self.vista_anterior:
+        for fila in self.filas_datos:
+            fila["celda_cantidad"].visible = self.ver_cantidad
+            fila["celda_precio"].visible = self.ver_precio_unitario
+            fila["celda_factura"].visible = self.ver_factura
+
+        self._actualizar_ui()
+
+    def cancelar(self, e=None) -> None:
+        if self.vista_anterior is not None and self.parent is not None:
+            if hasattr(self.vista_anterior, "actualizar_historial"):
+                self.vista_anterior.actualizar_historial()
             self.parent.content = self.vista_anterior
             self.parent.update()
-        else:
-            print("Error: No se configuró una vista anterior para regresar.")
 
-    def cambiar_fecha(self, e):
+    def cambiar_fecha(self, e) -> None:
         if self.date_picker.value and self.input_activo_fecha:
             fecha_formateada = self.date_picker.value.strftime("%d/%m/%Y")
             self.input_activo_fecha.value = fecha_formateada
-            self.input_activo_fecha.update()
+            try:
+                self.input_activo_fecha.update()
+            except RuntimeError:
+                pass
 
-    def crear_borde_completo(self, ancho, color):
-        return ft.Border(top=ft.BorderSide(ancho, color), right=ft.BorderSide(ancho, color), bottom=ft.BorderSide(ancho, color), left=ft.BorderSide(ancho, color))
-
-    def crear_indicador_numero(self, numero, color_fondo):
-        return ft.Container(width=26, height=26, bgcolor=color_fondo, border_radius=13, alignment=ft.alignment.Alignment(0, 0), content=ft.Text(numero, color=COLOR_BLANCO, weight=ft.FontWeight.BOLD, size=13))
-
-    def crear_input(self, label, hint, icon):
+    @staticmethod
+    def _crear_indicador_numero(numero: str, color_fondo: str) -> ft.Container:
         return ft.Container(
-            expand=True,
-            content=ft.Column([
-                ft.Text(label, size=11, color=COLOR_AZUL_OSCURO, weight=ft.FontWeight.W_600),
-                ft.Row([
-                    ft.TextField(hint_text=hint, prefix_icon=icon, border_color=ft.Colors.GREY_300, border_radius=6, height=42, content_padding=10, text_size=12, expand=True)
-                ])
-            ], spacing=5)
+            width=26,
+            height=26,
+            bgcolor=color_fondo,
+            border_radius=13,
+            alignment=ft.Alignment(0, 0),
+            content=ft.Text(
+                numero,
+                color=COLOR_BLANCO,
+                weight=ft.FontWeight.BOLD,
+                size=13,
+            ),
         )
 
-    def crear_input_fecha(self, label, hint, icon):
-        def abrir_picker(e):
-            self.input_activo_fecha = txt_field
-            if self.date_picker not in e.page.overlay:
-                e.page.overlay.append(self.date_picker)
-            self.date_picker.open = True
-            e.page.update()
+    def _notificar(self, mensaje: str, color: str = COLOR_VERDE) -> None:
+        pagina = self.main_page
+        if pagina is None:
+            try:
+                pagina = self.page
+            except RuntimeError:
+                pagina = None
+        if pagina is not None:
+            try:
+                mostrar_notificacion(pagina, mensaje, color)
+            except Exception:
+                pass
 
-        btn_calendario = ft.IconButton(icon=ft.Icons.CALENDAR_MONTH, icon_size=16, icon_color=COLOR_NARANJA, on_click=abrir_picker, width=30, height=30)
-        txt_field = ft.TextField(hint_text=hint, prefix_icon=icon, suffix=btn_calendario, border_color=ft.Colors.GREY_300, border_radius=6, height=42, content_padding=10, text_size=12, expand=True)
-        
-        return ft.Container(
-            expand=True,
-            content=ft.Column([
-                ft.Text(label, size=11, color=COLOR_AZUL_OSCURO, weight=ft.FontWeight.W_600),
-                ft.Row([txt_field])
-            ], spacing=5)
-        )
-
-    def crear_dropdown(self, label, hint, icon, opciones):
-        elementos = [ft.dropdown.Option(opt) for opt in opciones]
-        return ft.Container(
-            expand=True,
-            content=ft.Column([
-                ft.Row([ft.Icon(icon, size=14, color=COLOR_AZUL_OSCURO), ft.Text(label, size=11, color=COLOR_AZUL_OSCURO, weight=ft.FontWeight.W_600)], spacing=5),
-                ft.Row([
-                    ft.Dropdown(hint_text=hint, border_color=ft.Colors.GREY_300, border_radius=6, height=42, content_padding=10, text_size=12, options=elementos, expand=True)
-                ])
-            ], spacing=5)
-        )
-
-    def crear_dropdown_tabla(self, valor, opciones):
-        elementos = [ft.dropdown.Option(opt) for opt in opciones]
-        return ft.Dropdown(value=valor, border_color=ft.Colors.GREY_300, border_radius=6, height=32, content_padding=ft.Padding(8, 0, 8, 0), text_size=11, dense=True, options=elementos)
-
-    def crear_input_tabla(self, valor):
-        return ft.TextField(value=valor, border_color=ft.Colors.GREY_300, border_radius=6, height=32, content_padding=ft.Padding(8, 0, 8, 0), text_size=11, dense=True)
-
-    def crear_fila_servicio(self, numero, producto, unidad, cant, costo, ganancia, iva, precio_fin, importe):
-        fila = ft.Container(padding=ft.Padding(0, 5, 0, 5), border=ft.Border(bottom=ft.BorderSide(1, ft.Colors.GREY_100)))
-        btn_borrar = ft.Container(content=ft.Icon(ft.Icons.DELETE_OUTLINE, size=16, color=ft.Colors.RED_400), ink=True, padding=4, border_radius=4, on_click=lambda e: self.eliminar_fila(fila))
-        
-        fila.content = ft.Row([
-            ft.Container(width=20, content=ft.Text(numero, size=12, color=COLOR_GRIS)),
-            ft.Container(expand=5, content=self.crear_dropdown_tabla(producto, [producto, "Lanchaje", "Practicaje", "Agua", "Comida", "Seleccione un producto"])),
-            ft.Container(expand=2, content=self.crear_dropdown_tabla(unidad, ["Reja", "Caja", "Servicio"])),
-            ft.Container(expand=1, content=self.crear_input_tabla(cant)),
-            ft.Container(expand=2, content=self.crear_input_tabla(costo), visible=self.ver_costo),
-            ft.Container(expand=2, content=self.crear_dropdown_tabla(ganancia, ["0%", "5%", "10%", "15%"]), visible=self.ver_ganancia),
-            ft.Container(expand=2, content=self.crear_dropdown_tabla(iva, ["0%", "8%", "16%"]), visible=self.ver_iva),
-            ft.Container(expand=2, content=ft.Text(precio_fin, size=12, weight=ft.FontWeight.W_600, color=COLOR_AZUL_OSCURO)),
-            ft.Container(expand=2, content=ft.Text(importe, size=12, weight=ft.FontWeight.W_600, color=COLOR_AZUL_OSCURO)),
-            ft.Container(width=70, content=ft.Row([ft.Icon(ft.Icons.EDIT_OUTLINED, size=16, color=COLOR_GRIS), btn_borrar], spacing=10))
-        ])
-        
-        return fila
-
-   
-    def abrir_modal_calculos(self, e):
-        trb = "42,500"
-        eslora = "180.00 m"
-        calado = "9.50 m"
-        
-       
-        def crear_fila_modal(icono, concepto, tarifa, cant, subtotal):
-            return ft.Container(
-                border=ft.Border(bottom=ft.BorderSide(1, ft.Colors.GREY_100)),
-                padding=ft.Padding(0, 8, 0, 8),
-                content=ft.Row([
-                    ft.Container(expand=3, content=ft.Row([ft.Icon(icono, size=16, color=COLOR_GRIS), ft.Text(concepto, size=13)])),
-                    ft.Container(expand=2, content=ft.Text(tarifa, size=13)),
-                    
-                    ft.Container(expand=2, content=ft.TextField(value=cant, height=28, content_padding=0, text_size=12, text_align=ft.TextAlign.CENTER, border_color=ft.Colors.GREY_300, border_radius=4)),
-                    ft.Container(expand=2, content=ft.Text(subtotal, size=13, weight=ft.FontWeight.BOLD, color=COLOR_AZUL_OSCURO)),
-                ])
-            )
-
-        tabla_tarifas = ft.Column([
-            ft.Row([
-                ft.Container(expand=3, content=ft.Text("Concepto", size=12, weight=ft.FontWeight.BOLD, color=COLOR_AZUL_OSCURO)),
-                ft.Container(expand=2, content=ft.Text("Tarifa", size=12, weight=ft.FontWeight.BOLD, color=COLOR_AZUL_OSCURO)),
-                ft.Container(expand=2, content=ft.Text("Cant.", size=12, weight=ft.FontWeight.BOLD, color=COLOR_AZUL_OSCURO)),
-                ft.Container(expand=2, content=ft.Text("Subtotal", size=12, weight=ft.FontWeight.BOLD, color=COLOR_AZUL_OSCURO)),
-            ]),
-            ft.Divider(height=10, color=ft.Colors.GREY_200),
-            crear_fila_modal(ft.Icons.DIRECTIONS_BOAT_OUTLINED, "Lanchaje", "$120.00", "1", "$120.00"),
-            crear_fila_modal(ft.Icons.VERIFIED_USER_OUTLINED, "Practicaje", "$250.00", "1", "$250.00"),
-            crear_fila_modal(ft.Icons.ANCHOR, "Amarre", "$180.00", "1", "$180.00"),
-        ], spacing=0)
-
-        # 2. CONTENEDOR MAESTRO
-        contenido_modal = ft.Container(
-            width=650, 
-            bgcolor=COLOR_BLANCO,
-            border_radius=10,
-            clip_behavior=ft.ClipBehavior.HARD_EDGE,
-            content=ft.Column([
-                
-                
-                ft.Container(
-                    image=ft.DecorationImage(src="assets/fondo_menulateral.jpg", fit="cover"), 
-                    content=ft.Container(
-                        
-                        bgcolor="#CC0d1b2a", 
-                        padding=ft.Padding(25, 25, 25, 25),
-                        content=ft.Row([
-                            ft.Container(
-                                content=ft.Icon(ft.Icons.ANCHOR, color=COLOR_BLANCO, size=24),
-                                bgcolor=COLOR_NARANJA, padding=10, border_radius=8
-                            ),
-                            ft.Column([
-                                ft.Text("Cálculo de Tarifas Portuarias", size=22, weight=ft.FontWeight.BOLD, color=COLOR_BLANCO),
-                                ft.Text("Desglose automático basado en las dimensiones del buque.", size=13, color="white70")
-                            ], spacing=2)
-                        ], spacing=15)
-                    )
-                ),
-                
-                # --- CUERPO DEL POP-UP ---
-                ft.Container(
-                    padding=ft.Padding(25, 15, 25, 25),
-                    content=ft.Column([
-                        # Ficha técnica
-                        ft.Container(
-                            bgcolor=ft.Colors.BLUE_50,
-                            border=ft.Border(top=ft.BorderSide(1, ft.Colors.BLUE_100), bottom=ft.BorderSide(1, ft.Colors.BLUE_100), left=ft.BorderSide(1, ft.Colors.BLUE_100), right=ft.BorderSide(1, ft.Colors.BLUE_100)),
-                            border_radius=8,
-                            padding=15,
-                            content=ft.Column([
-                                ft.Row([
-                                    ft.Icon(ft.Icons.DIRECTIONS_BOAT, color=ft.Colors.BLUE_700, size=20),
-                                    ft.Column([
-                                        ft.Text("MV Ocean Star", weight=ft.FontWeight.BOLD, size=15, color=COLOR_AZUL_OSCURO),
-                                        ft.Text("Buque de Carga General", size=12, color=COLOR_GRIS)
-                                    ], spacing=0)
-                                ], spacing=10),
-                                ft.Divider(height=15, color=ft.Colors.BLUE_100),
-                                ft.Row([
-                                    ft.Column([ft.Text("TRB", size=11, color=COLOR_GRIS), ft.Text(trb, weight=ft.FontWeight.BOLD, size=14, color=COLOR_AZUL_OSCURO)]),
-                                    ft.Column([ft.Text("Eslora", size=11, color=COLOR_GRIS), ft.Text(eslora, weight=ft.FontWeight.BOLD, size=14, color=COLOR_AZUL_OSCURO)]),
-                                    ft.Column([ft.Text("Calado", size=11, color=COLOR_GRIS), ft.Text(calado, weight=ft.FontWeight.BOLD, size=14, color=COLOR_AZUL_OSCURO)]),
-                                    ft.Column([
-                                        ft.Text("Estadía (Horas)", size=11, color=COLOR_GRIS), 
-                                        ft.TextField(value="72", prefix_icon=ft.Icons.ACCESS_TIME, width=110, height=36, content_padding=0, text_size=13, text_align=ft.TextAlign.CENTER, border_color=ft.Colors.BLUE_400, border_radius=6)
-                                    ])
-                                ], alignment=ft.MainAxisAlignment.SPACE_BETWEEN)
-                            ])
-                        ),
-                        
-                        ft.Container(height=5),
-                        
-                        # Título de tabla
-                        ft.Row([
-                            ft.Row([ft.Icon(ft.Icons.RECEIPT_LONG_OUTLINED, color=COLOR_AZUL_OSCURO, size=18), ft.Text("Tarifas Calculadas", size=14, weight=ft.FontWeight.BOLD, color=COLOR_AZUL_OSCURO)]),
-                            ft.Container(content=ft.Row([ft.Icon(ft.Icons.CHECK_CIRCLE, color=ft.Colors.GREEN_600, size=14), ft.Text("Tarifas actualizadas", size=11, color=ft.Colors.GREEN_700)], spacing=4), bgcolor=ft.Colors.GREEN_50, padding=ft.Padding(8, 4, 8, 4), border_radius=12)
-                        ], alignment=ft.MainAxisAlignment.SPACE_BETWEEN),
-                        
-                        # TABLA
-                        tabla_tarifas,
-                        
-                        # Barra de Totales
-                        ft.Container(
-                            padding=ft.Padding(15, 12, 15, 12),
-                            bgcolor=ft.Colors.ORANGE_50,
-                            border_radius=6,
-                            content=ft.Row([
-                                ft.Row([ft.Icon(ft.Icons.MONETIZATION_ON_OUTLINED, color=COLOR_NARANJA, size=20), ft.Text("Total de Tarifas Portuarias", size=14, weight=ft.FontWeight.BOLD, color=COLOR_AZUL_OSCURO)]),
-                                ft.Text("$ 550.00 USD", size=18, weight=ft.FontWeight.W_900, color=COLOR_NARANJA)
-                            ], alignment=ft.MainAxisAlignment.SPACE_BETWEEN)
-                        ),
-                        
-                        # BOTÓN APLICAR
-                        ft.Container(
-                            content=ft.Row([
-                                ft.Icon(ft.Icons.CHECK, color=COLOR_BLANCO, size=18),
-                                ft.Text("Aplicar a Cotización", color=COLOR_BLANCO, weight=ft.FontWeight.BOLD, size=15)
-                            ], alignment=ft.MainAxisAlignment.CENTER),
-                            bgcolor=COLOR_NARANJA,
-                            padding=12,
-                            border_radius=6,
-                            ink=True,
-                            on_click=lambda e: self.cerrar_modal_y_aplicar(e, modal)
-                        )
-                    ], spacing=10, tight=True, scroll=ft.ScrollMode.ADAPTIVE)
-                )
-            ], spacing=0)
-        )
-
-        modal = ft.AlertDialog(
-            shape=ft.RoundedRectangleBorder(radius=10),
-            content_padding=0, 
-            title_padding=0,   
-            content=contenido_modal
-        )
-        
-        e.page.overlay.append(modal)
-        modal.open = True
-        e.page.update()
-
-    def cerrar_modal_y_aplicar(self, e, modal):
-        modal.open = False
-        e.page.update()
+    def _actualizar_ui(self) -> None:
+        try:
+            pagina = None
+            try:
+                pagina = self.page
+            except RuntimeError:
+                pagina = None
+            if pagina is not None:
+                pagina.update()
+            elif self.main_page is not None:
+                self.main_page.update()
+            else:
+                self.update()
+        except RuntimeError:
+            pass

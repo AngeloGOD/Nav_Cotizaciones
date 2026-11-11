@@ -1,5 +1,7 @@
 import flet as ft
 
+from fuente.negocio.servicio.ServicioCotizacion import ServicioCotizacion
+from fuente.negocio.servicio.ServicioServicio import ServicioServicio
 from fuente.presentacion.MenuLateral import MenuLateral
 from fuente.presentacion.BarraSuperior import BarraSuperior
 from fuente.presentacion.dashboard import dashboard
@@ -19,6 +21,8 @@ class PantallaPrincipal(ft.Container):
         servicio_cliente,
         servicio_buque,
         servicio_categoria_buque=None,
+        servicio_cotizacion=None,
+        servicio_servicio=None,
     ):
         super().__init__(
             expand=True,
@@ -30,6 +34,19 @@ class PantallaPrincipal(ft.Container):
         self.servicio_cliente = servicio_cliente
         self.servicio_buque = servicio_buque
         self.servicio_categoria_buque = servicio_categoria_buque
+        uow = getattr(servicio_buque, "uow", None) or getattr(
+            servicio_cliente, "uow", None
+        )
+        self.servicio_cotizacion = (
+            servicio_cotizacion
+            if servicio_cotizacion is not None
+            else (ServicioCotizacion(uow) if uow is not None else None)
+        )
+        self.servicio_servicio = (
+            servicio_servicio
+            if servicio_servicio is not None
+            else (ServicioServicio(uow) if uow is not None else None)
+        )
 
         self.content_area = ft.Container(
             expand=True,
@@ -75,7 +92,11 @@ class PantallaPrincipal(ft.Container):
             )
         elif ruta == "ruta_cotizaciones":
             self.content_area.content = PantallaCotizaciones(
-                self.main_page
+                self.main_page,
+                servicio_cotizacion=self.servicio_cotizacion,
+                servicio_buque=self.servicio_buque,
+                servicio_cliente=self.servicio_cliente,
+                servicio_servicio=self.servicio_servicio,
             )
         elif ruta == "ruta_productos":
             self.content_area.content = PantallaProductos(
@@ -84,7 +105,7 @@ class PantallaPrincipal(ft.Container):
         elif ruta == "ruta_servicios":
             self.content_area.content = PantallaServicios(
                 self.main_page
-                        )
+            )
         elif ruta == "ruta_reportes":
             self.content_area.content = PantallaReportes(self.main_page)
 

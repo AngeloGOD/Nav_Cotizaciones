@@ -1,6 +1,6 @@
 from __future__ import annotations
 
-from sqlalchemy import and_, func, or_, select
+from sqlalchemy import and_, func, or_, select, text
 from sqlalchemy.orm import selectinload
 from sqlalchemy.orm.session import Session
 
@@ -22,6 +22,7 @@ class RepositorioCotizacion(Repositorio):
         return (
             selectinload(Cotizacion.cliente),
             selectinload(Cotizacion.buque).selectinload(Buque.categoria_buque),
+            selectinload(Cotizacion.buque).selectinload(Buque.cliente),
             selectinload(Cotizacion.detalles)
             .selectinload(DetalleCotizacion.concepto)
             .selectinload(Concepto.categoria_pda),
@@ -29,6 +30,41 @@ class RepositorioCotizacion(Repositorio):
             .selectinload(DetalleCotizacion.concepto)
             .selectinload(Concepto.proveedores),
         )
+
+    def obtener_siguiente_id(self) -> int:
+        stmt_max = select(func.coalesce(func.max(Cotizacion.id), 0) + 1)
+        siguiente_por_max = int(self.sesion.scalar(stmt_max) or 1)
+
+        bind = getattr(self.sesion, "bind", None) or self.sesion.get_bind()
+        nombre_dialecto = (
+            getattr(getattr(bind, "dialect", None), "name", "")
+            if bind is not None
+            else ""
+        )
+
+        if nombre_dialecto == "postgresql":
+            try:
+                with self.sesion.begin_nested():
+                    nombre_secuencia = self.sesion.scalar(
+                        text("SELECT pg_get_serial_sequence('cotizacion', 'id')")
+                    )
+                    if nombre_secuencia:
+                        fila = self.sesion.execute(
+                            text(
+                                f"SELECT last_value, is_called FROM {nombre_secuencia}"
+                            )
+                        ).first()
+                        if fila is not None:
+                            ultimo_valor = int(fila[0])
+                            fue_llamada = bool(fila[1])
+                            siguiente_secuencia = (
+                                ultimo_valor + 1 if fue_llamada else ultimo_valor
+                            )
+                            return max(siguiente_por_max, siguiente_secuencia)
+            except Exception:
+                return siguiente_por_max
+
+        return siguiente_por_max
 
     def insertar(self, cotizacion: Cotizacion) -> Cotizacion:
         if cotizacion.cliente is not None:

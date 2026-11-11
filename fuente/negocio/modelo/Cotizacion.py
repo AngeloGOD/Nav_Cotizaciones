@@ -184,3 +184,54 @@ class DetalleCotizacion(Base):
         sub = Decimal(str(self.subtotal)) if self.subtotal is not None else Decimal("0.00")
         imp = Decimal(str(self.iva)) if self.iva is not None else Decimal("0.00")
         return sub + imp
+
+    @property
+    def categoria_pda_nombre(self) -> str:
+        try:
+            concepto_obj = getattr(self, "concepto", None)
+            cat_pda = (
+                getattr(concepto_obj, "categoria_pda", None)
+                if concepto_obj is not None
+                else None
+            )
+            return getattr(cat_pda, "nombre", "") or ""
+        except Exception:
+            return ""
+
+    @property
+    def descripcion(self) -> str:
+        try:
+            concepto_obj = getattr(self, "concepto", None)
+            return getattr(concepto_obj, "nombre_es", "") or ""
+        except Exception:
+            return ""
+
+    @property
+    def proveedor_nombre(self) -> str:
+        try:
+            concepto_obj = getattr(self, "concepto", None)
+            proveedores = (
+                getattr(concepto_obj, "proveedores", None)
+                if concepto_obj is not None
+                else None
+            )
+            if proveedores:
+                return getattr(proveedores[0], "nombre", "") or ""
+        except Exception:
+            pass
+        return ""
+
+    @property
+    def tasa_iva(self) -> Decimal:
+        try:
+            concepto_obj = getattr(self, "concepto", None)
+            tasa = (
+                getattr(concepto_obj, "tasa_iva", None)
+                if concepto_obj is not None
+                else None
+            )
+            if tasa is not None:
+                return Decimal(str(tasa))
+        except Exception:
+            pass
+        return Decimal("0.0000")

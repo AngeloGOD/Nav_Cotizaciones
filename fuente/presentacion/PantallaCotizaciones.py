@@ -1,11 +1,15 @@
+from __future__ import annotations
+
+from decimal import Decimal
 import flet as ft
 import flet_datatable2 as ftd
 
+from fuente.negocio.controlador.ControladorCotizacion import ControladorCotizacion
+from fuente.negocio.modelo.ENUMs import EstadoCotizacion
 from fuente.presentacion.PantallaNuevaCotizacion import PantallaNuevaCotizacion
 from fuente.utilidades.Colores import (
     COLOR_AZUL,
     COLOR_BANNER,
-    COLOR_BLANCO,
     COLOR_FONDO,
     COLOR_GRIS,
     COLOR_NARANJA,
@@ -16,24 +20,32 @@ from fuente.utilidades.Colores import (
 from fuente.utilidades.Componentes import (
     badge_estado,
     banner_modulo,
-    boton,
     barra_busqueda,
+    boton,
     card,
     paginacion,
     sombra_suave,
-    tarjeta_indicador,
     tabla,
+    tarjeta_indicador,
 )
 
 
 class PantallaCotizaciones(ft.Container):
     COTIZACIONES_DEMO = (
         {
+            "folio": "PDA.-0127",
+            "fecha": "26/10/2026",
+            "buque": "MT MTM HOUSTON",
+            "cliente": "MERITUS DE MEXICO SA DE CV",
+            "monto": "$ 502,777.15 MXN",
+            "estado": "PENDIENTE",
+        },
+        {
             "folio": "COT-2026-0048",
             "fecha": "04/11/2026",
             "buque": "MSC ORION",
             "cliente": "MSC Shipping S.A.",
-            "monto": "$245,800.00 MXN",
+            "monto": "$ 245,800.00 MXN",
             "estado": "Pendiente",
         },
         {
@@ -41,43 +53,56 @@ class PantallaCotizaciones(ft.Container):
             "fecha": "02/11/2026",
             "buque": "MAERSK LIMA",
             "cliente": "Maersk México",
-            "monto": "$182,400.00 MXN",
-            "estado": "Aprobada",
-        },
-        {
-            "folio": "COT-2026-0046",
-            "fecha": "01/11/2026",
-            "buque": "NAVIOS AZURE",
-            "cliente": "Navios South American",
-            "monto": "$96,750.00 MXN",
-            "estado": "Aprobada",
-        },
-        {
-            "folio": "COT-2026-0045",
-            "fecha": "28/10/2026",
-            "buque": "ONE COMMANDER",
-            "cliente": "Oceanic Logistics",
-            "monto": "$123,500.00 MXN",
-            "estado": "Cancelada",
-        },
-        {
-            "folio": "COT-2026-0044",
-            "fecha": "25/10/2026",
-            "buque": "EVERGREEN SKY",
-            "cliente": "Evergreen Line",
-            "monto": "$201,300.00 MXN",
+            "monto": "$ 182,400.00 MXN",
             "estado": "Aprobada",
         },
     )
-    TOTAL_COTIZACIONES_DEMO = 46
+    TOTAL_COTIZACIONES_DEMO = 3
 
-    def __init__(self, main_page):
+    def __init__(
+        self,
+        main_page,
+        servicio_cotizacion=None,
+        servicio_buque=None,
+        servicio_cliente=None,
+        servicio_servicio=None,
+    ):
         super().__init__(
             expand=True,
             bgcolor=COLOR_FONDO,
             padding=0,
         )
         self.main_page = main_page
+        self.servicio_cotizacion = servicio_cotizacion
+        self.servicio_buque = servicio_buque
+        self.servicio_cliente = servicio_cliente
+        self.servicio_servicio = servicio_servicio
+
+        self.controlador = (
+            ControladorCotizacion(
+                servicio_cotizacion=servicio_cotizacion,
+                servicio_buque=servicio_buque,
+                servicio_cliente=servicio_cliente,
+                servicio_servicio=servicio_servicio,
+            )
+            if servicio_cotizacion is not None
+            else None
+        )
+        if self.controlador is not None:
+            self.servicio_buque = self.controlador.servicio_buque
+            self.servicio_cliente = self.controlador.servicio_cliente
+            self.servicio_servicio = self.controlador.servicio_servicio
+
+        self.pagina_actual = 1
+        self.registros_por_pagina = 10
+        self.busqueda = ""
+        self.registros_actuales: list = []
+        self.total_registros = 0
+
+        self.build_ui()
+
+    def build_ui(self) -> None:
+        self._cargar_registros()
         self.content = ft.Column(
             expand=True,
             scroll=ft.ScrollMode.AUTO,
@@ -98,30 +123,108 @@ class PantallaCotizaciones(ft.Container):
             ],
         )
 
+    def _cargar_registros(self) -> None:
+        if self.controlador is not None:
+            try:
+                registros, total = self.controlador.obtener_historial_cotizaciones(
+                    pagina=self.pagina_actual,
+                    limite=self.registros_por_pagina,
+                    texto=self.busqueda,
+                )
+                self.registros_actuales = registros
+                self.total_registros = total
+                return
+            except Exception as error:
+                print(f"Advertencia al consultar cotizaciones en BD: {error}")
+
+        self.registros_actuales = []
+        self.total_registros = 0
+
+    def actualizar_historial(self) -> None:
+        self.build_ui()
+        try:
+            pagina = None
+            try:
+                pagina = self.page
+            except RuntimeError:
+                pagina = None
+            if pagina is not None:
+                pagina.update()
+            elif self.main_page is not None:
+                self.main_page.update()
+            else:
+                self.update()
+        except RuntimeError:
+            pass
+
     def _encabezado(self):
         return banner_modulo(
             src="fondo_puerto.jpg",
             categoria="Gestión de cotizaciones",
             titulo="Cotizaciones",
-            descripcion="Consulta el historial y prepara nuevas cotizaciones para tus clientes y buques.",
+            descripcion="Consulta el historial y prepara nuevas cotizaciones (PDA) para tus clientes y buques.",
             icono=ft.Icons.REQUEST_QUOTE_OUTLINED,
         )
 
     def _tarjetas_resumen(self):
+        if self.controlador is not None and (
+            self.total_registros > 0 or self.servicio_cotizacion is not None
+        ):
+            total_cot = self.total_registros
+            aprobadas = sum(
+                1
+                for c in self.registros_actuales
+                if getattr(
+                    getattr(c, "estado", None),
+                    "value",
+                    str(getattr(c, "estado", "")),
+                ).upper()
+                in (
+                    EstadoCotizacion.APROBADA.value,
+                    EstadoCotizacion.PENDIENTE.value,
+                    "PROFORMA",
+                )
+            )
+            canceladas = sum(
+                1
+                for c in self.registros_actuales
+                if getattr(
+                    getattr(c, "estado", None),
+                    "value",
+                    str(getattr(c, "estado", "")),
+                ).upper()
+                in (EstadoCotizacion.RECHAZADA.value, "CANCELADA")
+            )
+            suma_total = sum(
+                (
+                    Decimal(str(getattr(c, "total", "0.00") or "0.00"))
+                    for c in self.registros_actuales
+                ),
+                Decimal("0.00"),
+            )
+            monto_texto = f"$ {suma_total:,.2f} MXN"
+            etiqueta_origen = "Registros en base de datos"
+        else:
+            total_cot = self.TOTAL_COTIZACIONES_DEMO
+            aprobadas = 2
+            canceladas = 0
+            monto_texto = "$ 930,977.15 MXN"
+            etiqueta_origen = "Registros de ejemplo"
+
         resumenes = (
             (
                 "Cotizaciones totales",
-                str(self.TOTAL_COTIZACIONES_DEMO),
-                "Registros de ejemplo",
+                str(total_cot),
+                etiqueta_origen,
                 ft.Icons.DESCRIPTION_OUTLINED,
                 COLOR_AZUL,
                 "#EAF2FF",
                 "#D7E6FF",
             ),
             (
-                "Cotizaciones aprobadas",
-                "28",
-                "Aprobadas · demo",
+                "Proformas activas",
+                str(aprobadas),
+                etiqueta_origen,
                 ft.Icons.CHECK_CIRCLE_OUTLINED,
                 COLOR_VERDE,
                 "#EAF8F0",
@@ -129,8 +232,8 @@ class PantallaCotizaciones(ft.Container):
             ),
             (
                 "Cotizaciones canceladas",
-                "6",
-                "Canceladas · demo",
+                str(canceladas),
+                etiqueta_origen,
                 ft.Icons.CANCEL_OUTLINED,
                 COLOR_ROJO,
                 "#FDECEE",
@@ -138,8 +241,8 @@ class PantallaCotizaciones(ft.Container):
             ),
             (
                 "Monto total cotizado",
-                "$531,000 MXN",
-                "Monto ilustrativo",
+                monto_texto,
+                etiqueta_origen,
                 ft.Icons.PAYMENTS_OUTLINED,
                 COLOR_NARANJA,
                 "#FFF2E8",
@@ -177,11 +280,22 @@ class PantallaCotizaciones(ft.Container):
             borde,
         )
 
+    def _al_buscar(self, e) -> None:
+        self.busqueda = (e.control.value or "").strip()
+        self.pagina_actual = 1
+        self.actualizar_historial()
+
+    def _cambiar_pagina(self, pagina: int) -> None:
+        self.pagina_actual = pagina
+        self.actualizar_historial()
+
     def _barra_herramientas(self):
         buscador = barra_busqueda(
             hint="Buscar por folio, buque o cliente...",
+            on_change=self._al_buscar,
             expand=True,
         )
+        buscador.value = self.busqueda
         buscador.height = 42
         boton_filtros = boton(
             texto="Filtros",
@@ -215,6 +329,23 @@ class PantallaCotizaciones(ft.Container):
             height=42,
         )
 
+        usando_bd = self.controlador is not None
+        cantidad_mostrada = (
+            len(self.registros_actuales)
+            if usando_bd
+            else len(self.COTIZACIONES_DEMO)
+        )
+        total_mostrar = (
+            self.total_registros
+            if usando_bd
+            else self.TOTAL_COTIZACIONES_DEMO
+        )
+        subtitulo = (
+            "Proformas PDA registradas en la base de datos"
+            if usando_bd
+            else "Muestra de registros · datos ilustrativos"
+        )
+
         return card(
             ft.Column(
                 expand=True,
@@ -246,7 +377,7 @@ class PantallaCotizaciones(ft.Container):
                                         color=COLOR_BANNER,
                                     ),
                                     ft.Text(
-                                        "Muestra de registros · datos ilustrativos",
+                                        subtitulo,
                                         size=12,
                                         color=COLOR_GRIS,
                                     ),
@@ -262,16 +393,15 @@ class PantallaCotizaciones(ft.Container):
                         vertical_alignment=ft.CrossAxisAlignment.CENTER,
                         controls=[
                             ft.Text(
-                                f"Mostrando {len(self.COTIZACIONES_DEMO)} de "
-                                f"{self.TOTAL_COTIZACIONES_DEMO} cotizaciones · demo",
+                                f"Mostrando {cantidad_mostrada} de {total_mostrar} cotizaciones",
                                 size=12,
                                 color=COLOR_GRIS,
                             ),
                             paginacion(
-                                total_registros=self.TOTAL_COTIZACIONES_DEMO,
-                                registros_por_pagina=5,
-                                pagina_actual=1,
-                                on_change=lambda pagina: None,
+                                total_registros=max(1, total_mostrar),
+                                registros_por_pagina=self.registros_por_pagina,
+                                pagina_actual=self.pagina_actual,
+                                on_change=self._cambiar_pagina,
                             ),
                         ],
                     ),
@@ -293,9 +423,51 @@ class PantallaCotizaciones(ft.Container):
             on_click=lambda e: self.abrir_nueva_cotizacion(),
         )
 
+    def _normalizar_fila_tabla(self, item) -> dict[str, str]:
+        if isinstance(item, dict):
+            return item
+        fecha_obj = getattr(item, "creado_en", None) or getattr(
+            item, "fecha_arribo", None
+        )
+        fecha_str = (
+            fecha_obj.strftime("%d/%m/%Y")
+            if hasattr(fecha_obj, "strftime")
+            else str(fecha_obj or "")
+        )
+        buque_obj = getattr(item, "buque", None)
+        buque_nombre = (
+            getattr(buque_obj, "nombre", None)
+            or f"Buque #{getattr(item, 'buque_id', '')}"
+        )
+        cliente_obj = getattr(item, "cliente", None)
+        cliente_nombre = (
+            getattr(cliente_obj, "razon_social", None)
+            or f"Cliente #{getattr(item, 'cliente_id', '')}"
+        )
+        total_val = Decimal(str(getattr(item, "total", "0.00") or "0.00"))
+        moneda_obj = getattr(item, "moneda", "MXN")
+        moneda_str = getattr(moneda_obj, "value", str(moneda_obj or "MXN"))
+        estado_obj = getattr(item, "estado", "PENDIENTE")
+        estado_str = getattr(estado_obj, "value", str(estado_obj or "PENDIENTE"))
+
+        return {
+            "folio": getattr(item, "folio", ""),
+            "fecha": fecha_str,
+            "buque": buque_nombre,
+            "cliente": cliente_nombre,
+            "monto": f"$ {total_val:,.2f} {moneda_str}",
+            "estado": estado_str,
+        }
+
     def _tabla_historial(self):
+        origen = (
+            self.registros_actuales
+            if self.controlador is not None
+            else self.COTIZACIONES_DEMO
+        )
         filas = []
-        for cotizacion in self.COTIZACIONES_DEMO:
+        for registro in origen:
+            cotizacion = self._normalizar_fila_tabla(registro)
             filas.append(
                 ftd.DataRow2(
                     cells=[
@@ -307,7 +479,9 @@ class PantallaCotizaciones(ft.Container):
                                 weight=ft.FontWeight.W_600,
                             )
                         ),
-                        ft.DataCell(ft.Text(cotizacion["fecha"], size=13, color=COLOR_GRIS)),
+                        ft.DataCell(
+                            ft.Text(cotizacion["fecha"], size=13, color=COLOR_GRIS)
+                        ),
                         ft.DataCell(
                             ft.Text(
                                 cotizacion["buque"],
@@ -372,9 +546,16 @@ class PantallaCotizaciones(ft.Container):
     def _estado_visual(estado):
         return {
             "Pendiente": "pendiente",
+            "PENDIENTE": "pendiente",
+            "BORRADOR": "pendiente",
+            "PROFORMA": "activo",
+            "APROBADA": "activo",
             "Aprobada": "activo",
+            "RECHAZADA": "inactivo",
+            "Rechazada": "inactivo",
             "Cancelada": "inactivo",
-        }.get(estado, "info")
+            "CANCELADA": "inactivo",
+        }.get(str(estado), "info")
 
     @staticmethod
     def _acciones_fila():
@@ -396,8 +577,16 @@ class PantallaCotizaciones(ft.Container):
         )
 
     def abrir_nueva_cotizacion(self):
-        self.parent.content = PantallaNuevaCotizacion(
+        nueva_vista = PantallaNuevaCotizacion(
             self.main_page,
             vista_anterior=self,
+            servicio_cotizacion=self.servicio_cotizacion,
+            servicio_buque=self.servicio_buque,
+            servicio_cliente=self.servicio_cliente,
+            servicio_servicio=self.servicio_servicio,
+            controlador=self.controlador,
         )
-        self.parent.update()
+        if self.parent is not None:
+            self.parent.content = nueva_vista
+            self.parent.update()
+        return nueva_vista

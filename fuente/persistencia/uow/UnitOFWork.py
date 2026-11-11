@@ -26,6 +26,9 @@ class AlchemyUnitOfWork(AbstractUnitOfWork):
     def commit(self):
         self.session.commit()
 
+    def flush(self):
+        self.session.flush()
+
     def rollback(self):
         self.session.rollback()
         

@@ -1,4 +1,7 @@
-import asyncio
+from __future__ import annotations
+
+import threading
+from typing import Callable, TYPE_CHECKING
 import flet as ft
 
 from fuente.utilidades.Colores import (
@@ -8,33 +11,60 @@ from fuente.utilidades.Colores import (
     COLOR_NARANJA,
 )
 
+if TYPE_CHECKING:
+    from fuente.negocio.modelo.Cliente import Cliente
+
 
 class SelectorCliente(ft.Stack):
+    """Buscador autocompletable de clientes con debounce y lista desplegable flotante."""
 
-    def __init__(self, servicio_cliente):
+    def __init__(
+        self,
+        servicio_cliente,
+        on_cliente_seleccionado: Callable[[Cliente | None], None] | None = None,
+        label: str = "Cliente (opcional)",
+        hint_text: str = "Buscar cliente por razón social...",
+        height: int = 58,
+    ):
         super().__init__(
             expand=True,
-            height=58,
+            height=height,
             clip_behavior=ft.ClipBehavior.NONE,
         )
 
         self.servicio_cliente = servicio_cliente
-        self.cliente_id_seleccionado = None
+        self.on_cliente_seleccionado = on_cliente_seleccionado
+        self.cliente_seleccionado: Cliente | None = None
+        self.cliente_id_seleccionado: int | None = None
         self._numero_busqueda = 0
+        self._temporizador: threading.Timer | None = None
+
+        self.boton_limpiar = ft.IconButton(
+            icon=ft.Icons.CLOSE,
+            icon_size=16,
+            icon_color=COLOR_GRIS,
+            tooltip="Limpiar selección",
+            width=28,
+            height=28,
+            padding=0,
+            visible=False,
+            on_click=self._al_limpiar_click,
+        )
 
         # Campo de búsqueda con expand=True
         self.campo = ft.TextField(
             expand=True,
             width=float("inf"),
-            label="Cliente (opcional)",
-            hint_text="Buscar cliente por razón social...",
-            height=58,
+            label=label,
+            hint_text=hint_text,
+            height=height,
             text_size=14,
             border=ft.InputBorder.OUTLINE,
             border_radius=9,
             border_color=COLOR_GRIS_CLARO,
             focused_border_color=COLOR_NARANJA,
             prefix_icon=ft.Icons.PERSON_SEARCH,
+            suffix=self.boton_limpiar,
             content_padding=ft.Padding(14, 12, 14, 12),
             on_change=self._al_cambiar_texto,
         )
@@ -71,40 +101,60 @@ class SelectorCliente(ft.Stack):
             self.campo,
         ]
 
-    def _al_cambiar_texto(self, e=None):
+    @property
+    def value(self) -> str:
+        return self.campo.value or ""
+
+    @value.setter
+    def value(self, val: str | None) -> None:
+        self.campo.value = "" if val is None else str(val)
+
+    def _cancelar_temporizador(self) -> None:
+        if self._temporizador is not None:
+            self._temporizador.cancel()
+            self._temporizador = None
+
+    def _al_limpiar_click(self, e=None) -> None:
+        self.limpiar(notificar=True)
+
+    def _al_cambiar_texto(self, e=None) -> None:
+        self._cancelar_temporizador()
         self._numero_busqueda += 1
         numero_actual = self._numero_busqueda
 
         termino = (self.campo.value or "").strip()
+        tenia_cliente = self.cliente_seleccionado is not None
+        self.cliente_seleccionado = None
         self.cliente_id_seleccionado = None
+        self.boton_limpiar.visible = bool(termino)
 
         # Ocultar inmediatamente los resultados anteriores.
         self._ocultar_resultados()
+        if tenia_cliente and self.on_cliente_seleccionado is not None:
+            self.on_cliente_seleccionado(None)
         self._actualizar()
 
         # Buscar desde dos caracteres.
         if len(termino) < 2:
             return
 
-        try:
-            self.page.run_task(
-                self._buscar_clientes,
-                termino,
-                numero_actual,
-            )
-        except RuntimeError:
-            pass
+        self._temporizador = threading.Timer(
+            0.35,
+            self._ejecutar_busqueda,
+            args=(termino, numero_actual),
+        )
+        self._temporizador.daemon = True
+        self._temporizador.start()
 
-    async def _buscar_clientes(self, termino, numero_actual):
-        # Pequeña pausa para evitar consultas excesivas.
-        await asyncio.sleep(0.30)
-
+    def _ejecutar_busqueda(self, termino: str, numero_actual: int) -> None:
         if numero_actual != self._numero_busqueda:
             return
 
         try:
-            clientes = self.servicio_cliente.buscar_por_nombre(termino)
-
+            if self.servicio_cliente is not None:
+                clientes = self.servicio_cliente.buscar_por_nombre(termino)
+            else:
+                clientes = []
         except Exception as error:
             print(f"Error al buscar clientes: {error}")
 
@@ -123,7 +173,7 @@ class SelectorCliente(ft.Stack):
 
         self._mostrar_resultados(clientes)
 
-    def _mostrar_resultados(self, clientes):
+    def _mostrar_resultados(self, clientes) -> None:
         self.lista_resultados.controls.clear()
 
         if not clientes:
@@ -137,19 +187,12 @@ class SelectorCliente(ft.Stack):
                     ),
                 )
             )
-
         else:
             for cliente in clientes:
-
                 razon_social = (
-                    getattr(cliente, "razon_social", "")
-                    or "Sin razón social"
+                    getattr(cliente, "razon_social", "") or "Sin razón social"
                 )
-
-                rfc = (
-                    getattr(cliente, "rfc", None)
-                    or "No registrado"
-                )
+                rfc = getattr(cliente, "rfc", None) or "No registrado"
 
                 self.lista_resultados.controls.append(
                     ft.Container(
@@ -157,7 +200,6 @@ class SelectorCliente(ft.Stack):
                         border_radius=7,
                         bgcolor="#F4F8FC",
                         on_click=lambda e, c=cliente: self._seleccionar_cliente(c),
-
                         content=ft.Row(
                             spacing=10,
                             vertical_alignment=ft.CrossAxisAlignment.CENTER,
@@ -173,7 +215,6 @@ class SelectorCliente(ft.Stack):
                                         overflow=ft.TextOverflow.ELLIPSIS,
                                     ),
                                 ),
-
                                 ft.Column(
                                     spacing=1,
                                     horizontal_alignment=ft.CrossAxisAlignment.END,
@@ -201,20 +242,8 @@ class SelectorCliente(ft.Stack):
         self.contenido_resultados.visible = True
         self._actualizar()
 
-    def _seleccionar_cliente(self, cliente):
-        self._numero_busqueda += 1
-
-        self.cliente_id_seleccionado = int(cliente.id)
-        self.campo.value = cliente.razon_social or ""
-
-        self._ocultar_resultados()
-        self._actualizar()
-
-    def establecer_cliente(self, cliente):
-        if cliente is None:
-            self.limpiar()
-            return
-
+    def _seleccionar_cliente(self, cliente: Cliente) -> None:
+        self._cancelar_temporizador()
         self._numero_busqueda += 1
 
         try:
@@ -224,28 +253,66 @@ class SelectorCliente(ft.Stack):
             cliente_id = None
             razon_social = ""
 
+        self.cliente_seleccionado = cliente
         self.cliente_id_seleccionado = (
             int(cliente_id) if cliente_id is not None else None
         )
         self.campo.value = razon_social
+        self.boton_limpiar.visible = bool(self.campo.value)
 
         self._ocultar_resultados()
+        if self.on_cliente_seleccionado is not None:
+            self.on_cliente_seleccionado(cliente)
         self._actualizar()
 
-    def limpiar(self):
+    def establecer_cliente(
+        self, cliente: Cliente | None, notificar: bool = False
+    ) -> None:
+        if cliente is None:
+            self.limpiar(notificar=notificar)
+            return
+
+        self._cancelar_temporizador()
         self._numero_busqueda += 1
 
-        self.cliente_id_seleccionado = None
-        self.campo.value = ""
+        try:
+            cliente_id = getattr(cliente, "id", None)
+            razon_social = getattr(cliente, "razon_social", "") or ""
+        except Exception:
+            cliente_id = None
+            razon_social = ""
+
+        self.cliente_seleccionado = cliente
+        self.cliente_id_seleccionado = (
+            int(cliente_id) if cliente_id is not None else None
+        )
+        self.campo.value = razon_social
+        self.boton_limpiar.visible = bool(self.campo.value)
 
         self._ocultar_resultados()
+        if notificar and self.on_cliente_seleccionado is not None:
+            self.on_cliente_seleccionado(cliente)
         self._actualizar()
 
-    def _ocultar_resultados(self):
+    def limpiar(self, notificar: bool = False) -> None:
+        self._cancelar_temporizador()
+        self._numero_busqueda += 1
+
+        self.cliente_seleccionado = None
+        self.cliente_id_seleccionado = None
+        self.campo.value = ""
+        self.boton_limpiar.visible = False
+
+        self._ocultar_resultados()
+        if notificar and self.on_cliente_seleccionado is not None:
+            self.on_cliente_seleccionado(None)
+        self._actualizar()
+
+    def _ocultar_resultados(self) -> None:
         self.contenido_resultados.visible = False
         self.lista_resultados.controls.clear()
 
-    def _actualizar(self):
+    def _actualizar(self) -> None:
         try:
             if self.page:
                 self.page.update()

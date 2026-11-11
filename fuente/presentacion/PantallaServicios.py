@@ -1,4 +1,11 @@
+import logging
+
 import flet as ft
+from sqlalchemy.exc import SQLAlchemyError
+
+from fuente.negocio.controlador.ControladorServicios import ControladorServicios
+from fuente.negocio.modelo.ENUMs import TipoConcepto
+from fuente.negocio.servicio.ServicioServicio import ServicioServicio
 from fuente.presentacion.PantallaNuevoServicio import PantallaNuevoServicio
 from fuente.utilidades.Colores import (
     COLOR_AZUL,
@@ -15,9 +22,12 @@ from fuente.utilidades.Componentes import (
     boton,
     boton_vista,
     card,
+    dialogo_confirmacion,
     estado_vacio,
     fila_catalogo,
+    mostrar_notificacion,
     sombra_suave,
+    tarjeta_detalle,
     tarjeta_catalogo,
 )
 
@@ -25,72 +35,33 @@ COLOR_AZUL_OSCURO = "#0d1b2a"
 
 class PantallaServicios(ft.Container):
     
-    def __init__(self, main_page):
+    def __init__(
+        self,
+        main_page,
+        servicio_servicio: ServicioServicio | None = None,
+    ):
         super().__init__(expand=True, bgcolor=COLOR_FONDO, padding=0)
         self.main_page = main_page 
+        self.servicio_servicio = servicio_servicio
+        self.controlador_servicios = (
+            ControladorServicios(servicio_servicio)
+            if servicio_servicio is not None
+            else None
+        )
         
         self._menu_exportacion_abierto = False
         self._vista_servicios = "catalogo"
         self.registros_por_pagina = 8
         self.pagina_actual = 1
-        self.servicios_demo = [
-            {
-                "nombre": "Manejo de Carga",
-                "categoria": "Logística",
-                "descripcion": "Coordinación integral de carga y descarga.",
-                "detalle": "Por operación",
-                "imagen": "photo-1494412519320-aa613dfb7738",
-            },
-            {
-                "nombre": "Almacenaje en Puerto",
-                "categoria": "Almacenaje",
-                "descripcion": "Resguardo seguro de mercancía.",
-                "detalle": "Por día",
-                "imagen": "photo-1586528116311-ad8dd3c8310d",
-            },
-            {
-                "nombre": "Transporte Terrestre",
-                "categoria": "Transporte",
-                "descripcion": "Traslado eficiente y seguro.",
-                "detalle": "Por viaje",
-                "imagen": "photo-1519003722824-194d4455a60c",
-            },
-            {
-                "nombre": "Gestión Aduanera",
-                "categoria": "Aduanero",
-                "descripcion": "Trámites y asesoría aduanal.",
-                "detalle": "Por trámite",
-                "imagen": "photo-1450101499163-c8848c66ca85",
-            },
-            {
-                "nombre": "Estiba y Desestiba",
-                "categoria": "Operativo",
-                "descripcion": "Operaciones portuarias especializadas.",
-                "detalle": "Por tonelada",
-                "imagen": "photo-1578575437130-527eed3abbec",
-            },
-            {
-                "nombre": "Cadena de Frío",
-                "categoria": "Especializado",
-                "descripcion": "Control de temperatura en todo el proceso.",
-                "detalle": "Por contenedor",
-                "imagen": "photo-1581091226825-a6a2a5aee158",
-            },
-            {
-                "nombre": "Agencia Marítima",
-                "categoria": "Marítimo",
-                "descripcion": "Representación y servicios marítimos.",
-                "detalle": "Cuota fija",
-                "imagen": "photo-1500375592092-40eb2168fd21",
-            },
-            {
-                "nombre": "Distribución Nacional",
-                "categoria": "Terrestre",
-                "descripcion": "Entrega segura en todo México.",
-                "detalle": "Por entrega",
-                "imagen": "photo-1519003722824-194d4455a60c",
-            },
-        ]
+        self.servicios_catalogo = []
+        self.total_servicios = 0
+        self._error_catalogo = None
+        if self.controlador_servicios is not None:
+            try:
+                self._cargar_servicios_catalogo()
+            except SQLAlchemyError as error:
+                logging.exception("No se pudo cargar el catálogo de servicios.")
+                self._error_catalogo = error
         
         banner = banner_modulo(
             src="fondo_puerto.jpg",
@@ -136,10 +107,15 @@ class PantallaServicios(ft.Container):
         )
 
         # --- TARJETAS RESUMEN ---
+        conteos = self._obtener_conteos_resumen()
+        self._texto_resumen_total = self._crear_texto_resumen(conteos["total"])
+        self._texto_resumen_fija = self._crear_texto_resumen(conteos["fija"])
+        self._texto_resumen_factor = self._crear_texto_resumen(conteos["factor"])
+        self._texto_resumen_variable = self._crear_texto_resumen(conteos["variable"])
         tarjetas_resumen = ft.Row([
             self.crear_tarjeta_resumen(
                 "Total Servicios",
-                "24",
+                self._texto_resumen_total,
                 ft.Icons.FORMAT_LIST_BULLETED,
                 COLOR_AZUL,
                 "#EAF2FF",
@@ -147,7 +123,7 @@ class PantallaServicios(ft.Container):
             ),
             self.crear_tarjeta_resumen(
                 "Cuota Fija",
-                "10",
+                self._texto_resumen_fija,
                 ft.Icons.ATTACH_MONEY,
                 "#16A765",
                 "#EAF8F0",
@@ -155,7 +131,7 @@ class PantallaServicios(ft.Container):
             ),
             self.crear_tarjeta_resumen(
                 "Factor Unitario",
-                "8",
+                self._texto_resumen_factor,
                 ft.Icons.CALCULATE_OUTLINED,
                 "#168BDE",
                 "#EAF4FF",
@@ -163,7 +139,7 @@ class PantallaServicios(ft.Container):
             ),
             self.crear_tarjeta_resumen(
                 "Por Rangos/Días",
-                "6",
+                self._texto_resumen_variable,
                 ft.Icons.LAYERS_OUTLINED,
                 "#8B35D3",
                 "#F4ECFF",
@@ -222,7 +198,7 @@ class PantallaServicios(ft.Container):
         # =========================================================
 
         self._texto_total_servicios = ft.Text(
-            f"{len(self.servicios_demo)} servicios en el catálogo",
+            f"{self.total_servicios} servicios en el catálogo",
             size=12,
             color=COLOR_GRIS,
         )
@@ -295,8 +271,7 @@ class PantallaServicios(ft.Container):
             vertical_alignment=ft.CrossAxisAlignment.CENTER,
             controls=[
                 ft.Text(
-                    f"Mostrando 1–{len(self.servicios_demo)} de "
-                    f"{len(self.servicios_demo)} servicios",
+                    self._texto_pie_catalogo(),
                     size=12,
                     color=COLOR_GRIS,
                 ),
@@ -304,7 +279,7 @@ class PantallaServicios(ft.Container):
                     spacing=4,
                     controls=[
                         ft.Text(
-                            "Página 1 de 1",
+                            self._texto_pagina_catalogo(),
                             size=12,
                             color=COLOR_GRIS,
                         ),
@@ -315,7 +290,7 @@ class PantallaServicios(ft.Container):
                             bgcolor=COLOR_AZUL,
                             border_radius=8,
                             content=ft.Text(
-                                "1",
+                                str(self.pagina_actual),
                                 size=13,
                                 color=COLOR_BLANCO,
                                 weight=ft.FontWeight.BOLD,
@@ -325,6 +300,9 @@ class PantallaServicios(ft.Container):
                 ),
             ],
         )
+        self._texto_pie = pie_catalogo.controls[0]
+        self._texto_paginacion = pie_catalogo.controls[1].controls[0]
+        self._texto_numero_pagina = pie_catalogo.controls[1].controls[1].content
 
         self.content = ft.Column(
             expand=True,
@@ -353,6 +331,125 @@ class PantallaServicios(ft.Container):
             ],
         )
 
+    def _cargar_servicios_catalogo(self):
+        if self.controlador_servicios is None:
+            return
+        self.total_servicios = self.controlador_servicios.obtener_cantidad_registros()
+        registros = self.controlador_servicios.obtener_servicios(
+            pagina=1,
+            limite=max(self.total_servicios, 1),
+        )
+        self.servicios_catalogo = [
+            self._adaptar_servicio(servicio) for servicio in registros
+        ]
+
+    @staticmethod
+    def _adaptar_servicio(servicio):
+        tipo = servicio.tipo_concepto.value
+        variable = getattr(servicio, "variable_primaria", None)
+        variable = variable.value if variable is not None else None
+        if tipo == TipoConcepto.SERVICIO_CUOTA_FIJA.value:
+            detalle = f"${servicio.cuota:,.2f} MXN"
+        elif tipo == TipoConcepto.SERVICIO_FACTOR_UNITARIO.value:
+            detalle = f"${servicio.factor_mxn:,.4f} MXN / {variable}"
+        elif tipo == TipoConcepto.SERVICIO_LINEAL_MIXTO.value:
+            detalle = (
+                f"${servicio.cuota_base:,.2f} + "
+                f"${servicio.factor_mxn:,.4f} MXN / {variable}"
+            )
+        elif tipo == TipoConcepto.SERVICIO_FACTOR_COMPUESTO.value:
+            detalle = (
+                f"${servicio.factor_mxn:,.4f} MXN / {variable} × "
+                f"{servicio.variable_secundaria.value}"
+            )
+        elif tipo == TipoConcepto.SERVICIO_RANGO.value:
+            detalle = f"{len(servicio.rangos)} rangos · {servicio.variable_rangos.value}"
+        else:
+            detalle = f"{len(servicio.tramos)} tramos · {servicio.variable_dias.value}"
+
+        return {
+            "id": servicio.id,
+            "nombre": servicio.nombre_es,
+            "categoria": (
+                servicio.categoria_pda.nombre
+                if servicio.categoria_pda is not None
+                else "Sin categoría"
+            ),
+            "descripcion": servicio.nombre_en or f"Unidad: {servicio.unidad_medida}",
+            "detalle": detalle,
+            "tipo": tipo,
+            "sku": servicio.sku,
+            "proveedores": [proveedor.nombre for proveedor in servicio.proveedores],
+            "imagen": servicio.imagen_path,
+        }
+
+    def _obtener_conteos_resumen(self):
+        tipos_factor = {
+            TipoConcepto.SERVICIO_FACTOR_UNITARIO.value,
+            TipoConcepto.SERVICIO_LINEAL_MIXTO.value,
+            TipoConcepto.SERVICIO_FACTOR_COMPUESTO.value,
+        }
+        tipos_variables = {
+            TipoConcepto.SERVICIO_RANGO.value,
+            TipoConcepto.SERVICIO_INCREMENTAL.value,
+        }
+        return {
+            "total": self.total_servicios,
+            "fija": sum(
+                servicio["tipo"] == TipoConcepto.SERVICIO_CUOTA_FIJA.value
+                for servicio in self.servicios_catalogo
+            ),
+            "factor": sum(
+                servicio["tipo"] in tipos_factor
+                for servicio in self.servicios_catalogo
+            ),
+            "variable": sum(
+                servicio["tipo"] in tipos_variables
+                for servicio in self.servicios_catalogo
+            ),
+        }
+
+    def _texto_pie_catalogo(self):
+        if not self.total_servicios:
+            return "Mostrando 0 de 0 servicios"
+        primero = (self.pagina_actual - 1) * self.registros_por_pagina + 1
+        ultimo = min(
+            self.pagina_actual * self.registros_por_pagina,
+            self.total_servicios,
+        )
+        return f"Mostrando {primero}–{ultimo} de {self.total_servicios} servicios"
+
+    def _texto_pagina_catalogo(self):
+        total_paginas = max(
+            1,
+            (self.total_servicios + self.registros_por_pagina - 1)
+            // self.registros_por_pagina,
+        )
+        return f"Página {self.pagina_actual} de {total_paginas}"
+
+    def recargar_catalogo(self):
+        try:
+            self._cargar_servicios_catalogo()
+        except SQLAlchemyError as error:
+            self._error_catalogo = error
+            self._contenido_servicios.content = self._crear_vista_servicios()
+            raise
+        self._error_catalogo = None
+        self._texto_total_servicios.value = (
+            f"{self.total_servicios} servicios en el catálogo"
+        )
+        conteos = self._obtener_conteos_resumen()
+        self._texto_resumen_total.value = str(conteos["total"])
+        self._texto_resumen_fija.value = str(conteos["fija"])
+        self._texto_resumen_factor.value = str(conteos["factor"])
+        self._texto_resumen_variable.value = str(conteos["variable"])
+        self._texto_pie.value = self._texto_pie_catalogo()
+        self._texto_paginacion.value = self._texto_pagina_catalogo()
+        self._texto_numero_pagina.value = str(self.pagina_actual)
+        self._contenido_servicios.content = self._crear_vista_servicios()
+        if self.main_page is not None:
+            self.main_page.update()
+
     def _crear_etiqueta_servicio(self, categoria):
         estilos = {
             "Logística": ("#FFF0C2", "#B26A00"),
@@ -364,7 +461,7 @@ class PantallaServicios(ft.Container):
             "Marítimo": ("#D9ECFF", "#176FC1"),
             "Terrestre": ("#FFF0C2", "#B26A00"),
         }
-        fondo, color = estilos[categoria]
+        fondo, color = estilos.get(categoria, ("#EAF2FF", "#176FC1"))
         return ft.Container(
             padding=ft.Padding(8, 4, 8, 4),
             bgcolor=fondo,
@@ -379,12 +476,19 @@ class PantallaServicios(ft.Container):
         )
 
     def _crear_vista_servicios(self):
-        servicios = self.servicios_demo[:self.registros_por_pagina]
+        if self._error_catalogo is not None:
+            return estado_vacio(
+                ft.Icons.ERROR_OUTLINE,
+                "No se pudo cargar el catálogo",
+                "Revisa la conexión con la base de datos e inténtalo de nuevo.",
+            )
+
+        servicios = self.servicios_catalogo[:self.registros_por_pagina]
         if not servicios:
             return estado_vacio(
                 ft.Icons.WORK_OUTLINE,
-                "No se encontraron servicios",
-                "Prueba cambiando la búsqueda o los filtros.",
+                "Aún no hay servicios registrados",
+                "Registra un servicio para que esté disponible al crear cotizaciones.",
             )
 
         if self._vista_servicios == "lista":
@@ -396,10 +500,7 @@ class PantallaServicios(ft.Container):
                         servicio["categoria"]
                     ),
                     detalle=servicio["detalle"],
-                    ruta_imagen=(
-                        "https://images.unsplash.com/"
-                        f"{servicio['imagen']}?auto=format&fit=crop&w=700&q=80"
-                    ),
+                    ruta_imagen=servicio["imagen"] or None,
                     icono_secundario=ft.Icons.ATTACH_MONEY,
                     on_info=lambda e, s=servicio: self.ver_servicio(s),
                 )
@@ -437,10 +538,7 @@ class PantallaServicios(ft.Container):
                     servicio["categoria"]
                 ),
                 detalle=servicio["detalle"],
-                ruta_imagen=(
-                    "https://images.unsplash.com/"
-                    f"{servicio['imagen']}?auto=format&fit=crop&w=700&q=80"
-                ),
+                ruta_imagen=servicio["imagen"] or None,
                 icono_secundario=ft.Icons.ATTACH_MONEY,
                 on_click=lambda e, s=servicio: self.ver_servicio(s),
             )
@@ -476,44 +574,253 @@ class PantallaServicios(ft.Container):
         self._vista_servicios = vista
         self.registros_por_pagina = 16 if vista == "lista" else 8
         self.pagina_actual = 1
+        self._texto_pie.value = self._texto_pie_catalogo()
+        self._texto_paginacion.value = self._texto_pagina_catalogo()
+        self._texto_numero_pagina.value = str(self.pagina_actual)
         self._contenido_servicios.content = self._crear_vista_servicios()
         self._botones_vista.controls = self._crear_botones_vista()
         if self.main_page is not None:
             self.main_page.update()
 
     def ver_servicio(self, servicio):
+        datos_generales = ft.Column(
+            spacing=8,
+            controls=[
+                ft.Text(servicio["nombre"], color=COLOR_NEGRO, size=15),
+                ft.Text(servicio["descripcion"], color=COLOR_GRIS),
+                ft.Text(f"Categoría PDA: {servicio['categoria']}", color=COLOR_NEGRO),
+                ft.Text(f"Método y tarifa: {servicio['detalle']}", color=COLOR_NEGRO),
+            ],
+        )
+        tarjetas = [
+            tarjeta_detalle(
+                "Datos generales",
+                ft.Icons.WORK_OUTLINE,
+                datos_generales,
+            )
+        ]
+        if servicio["sku"]:
+            tarjetas.append(
+                tarjeta_detalle(
+                    "Identificación",
+                    ft.Icons.QR_CODE_2_OUTLINED,
+                    ft.Text(f"SKU: {servicio['sku']}", color=COLOR_NEGRO),
+                )
+            )
+        if servicio["proveedores"]:
+            tarjetas.append(
+                tarjeta_detalle(
+                    "Proveedores autorizados",
+                    ft.Icons.BUSINESS_OUTLINED,
+                    ft.Text(
+                        ", ".join(servicio["proveedores"]),
+                        color=COLOR_NEGRO,
+                    ),
+                )
+            )
+        controles = []
+        if servicio["imagen"]:
+            controles.append(
+                ft.Container(
+                    height=180,
+                    border_radius=10,
+                    bgcolor="#EAF1F7",
+                    clip_behavior=ft.ClipBehavior.HARD_EDGE,
+                    content=ft.Image(
+                        src=servicio["imagen"],
+                        width=float("inf"),
+                        height=180,
+                        fit=ft.BoxFit.COVER,
+                    ),
+                )
+            )
+        else:
+            controles.append(
+                ft.Container(
+                    height=120,
+                    border_radius=10,
+                    bgcolor="#EAF1F7",
+                    alignment=ft.Alignment(0, 0),
+                    content=ft.Icon(
+                        ft.Icons.IMAGE_OUTLINED,
+                        size=36,
+                        color=COLOR_GRIS,
+                    ),
+                )
+            )
+        controles.extend(tarjetas)
         self.main_page.show_dialog(
             ft.AlertDialog(
                 modal=True,
-                title=ft.Text(
-                    servicio["nombre"],
-                    color=COLOR_BANNER,
-                    weight=ft.FontWeight.BOLD,
-                ),
-                content=ft.Column(
-                    tight=True,
-                    spacing=8,
+                bgcolor="#F4F8FC",
+                shape=ft.RoundedRectangleBorder(radius=18),
+                title=ft.Row(
                     controls=[
-                        ft.Text(servicio["descripcion"], color=COLOR_GRIS),
-                        ft.Text(
-                            f"Categoría: {servicio['categoria']}",
-                            color=COLOR_NEGRO,
+                        ft.Column(
+                            spacing=2,
+                            expand=True,
+                            controls=[
+                                ft.Text(
+                                    "Ficha del servicio",
+                                    color=COLOR_BANNER,
+                                    weight=ft.FontWeight.BOLD,
+                                ),
+                                ft.Text(
+                                    servicio["nombre"],
+                                    size=13,
+                                    color=COLOR_GRIS,
+                                ),
+                            ],
                         ),
-                        ft.Text(
-                            f"Tipo de cobro: {servicio['detalle']}",
-                            color=COLOR_NEGRO,
+                        ft.IconButton(
+                            icon=ft.Icons.CLOSE,
+                            tooltip="Cerrar",
+                            icon_color=COLOR_BANNER,
+                            on_click=lambda e: self.main_page.pop_dialog(),
                         ),
                     ],
                 ),
+                title_padding=ft.Padding(22, 18, 22, 10),
+                content=ft.Column(
+                    width=650,
+                    tight=True,
+                    spacing=8,
+                    controls=controles,
+                ),
                 actions=[
-                    ft.TextButton(
-                        "Cerrar",
-                        on_click=lambda e: self.main_page.pop_dialog(),
+                    ft.Row(
+                        expand=True,
+                        alignment=ft.MainAxisAlignment.SPACE_BETWEEN,
+                        controls=[
+                            ft.OutlinedButton(
+                                content=ft.Row(
+                                    tight=True,
+                                    spacing=6,
+                                    controls=[
+                                        ft.Icon(
+                                            ft.Icons.DELETE_OUTLINE,
+                                            color=ft.Colors.RED_600,
+                                            size=18,
+                                        ),
+                                        ft.Text(
+                                            "Eliminar",
+                                            color=ft.Colors.RED_600,
+                                        ),
+                                    ],
+                                ),
+                                on_click=lambda e, item=servicio: (
+                                    self.pedir_confirmacion_eliminacion(item)
+                                ),
+                                style=ft.ButtonStyle(
+                                    side=ft.BorderSide(1, ft.Colors.RED_600),
+                                    shape=ft.RoundedRectangleBorder(radius=8),
+                                ),
+                            ),
+                            ft.Button(
+                                content=ft.Row(
+                                    tight=True,
+                                    spacing=6,
+                                    controls=[
+                                        ft.Icon(
+                                            ft.Icons.EDIT_OUTLINED,
+                                            color=COLOR_BLANCO,
+                                            size=18,
+                                        ),
+                                        ft.Text("Editar", color=COLOR_BLANCO),
+                                    ],
+                                ),
+                                bgcolor=COLOR_NARANJA,
+                                on_click=lambda e, item=servicio: (
+                                    self.editar_servicio(item)
+                                ),
+                                style=ft.ButtonStyle(
+                                    shape=ft.RoundedRectangleBorder(radius=8),
+                                ),
+                            ),
+                        ],
                     )
                 ],
-                actions_alignment=ft.MainAxisAlignment.END,
+                actions_alignment=ft.MainAxisAlignment.SPACE_BETWEEN,
+                actions_padding=ft.Padding(18, 12, 18, 18),
+                content_padding=ft.Padding(18, 0, 18, 0),
+                scrollable=True,
             )
         )
+
+    def pedir_confirmacion_eliminacion(self, servicio):
+        self.main_page.show_dialog(
+            dialogo_confirmacion(
+                page=self.main_page,
+                titulo="Confirmar eliminación",
+                mensaje=(
+                    f"¿Deseas eliminar el servicio '{servicio['nombre']}'? "
+                    "Esta acción no se puede deshacer."
+                ),
+                on_confirmar=lambda: self._eliminar_servicio(servicio),
+                texto_confirmar="Eliminar",
+            )
+        )
+
+    def _eliminar_servicio(self, servicio):
+        try:
+            self.controlador_servicios.eliminar_servicio(servicio["id"])
+        except ValueError as error:
+            mostrar_notificacion(self.main_page, str(error), ft.Colors.RED_600)
+            return
+        except SQLAlchemyError:
+            logging.exception("No se pudo eliminar el servicio.")
+            mostrar_notificacion(
+                self.main_page,
+                "No se pudo eliminar el servicio. Puede estar asociado a una cotización.",
+                ft.Colors.RED_600,
+            )
+            return
+
+        self.main_page.pop_dialog()
+        try:
+            self.recargar_catalogo()
+        except SQLAlchemyError:
+            logging.exception("El servicio se eliminó, pero el catálogo no se actualizó.")
+            mostrar_notificacion(
+                self.main_page,
+                "El servicio se eliminó, pero no se pudo actualizar el catálogo.",
+                ft.Colors.RED_600,
+            )
+            return
+        mostrar_notificacion(
+            self.main_page,
+            "Servicio eliminado correctamente.",
+        )
+
+    def editar_servicio(self, servicio):
+        self.main_page.pop_dialog()
+        try:
+            registro = self.controlador_servicios.buscar_por_id(servicio["id"])
+        except SQLAlchemyError:
+            logging.exception("No se pudo recuperar el servicio para editarlo.")
+            mostrar_notificacion(
+                self.main_page,
+                "No se pudo cargar el servicio para editarlo.",
+                ft.Colors.RED_600,
+            )
+            return
+        if registro is None:
+            mostrar_notificacion(
+                self.main_page,
+                "El servicio que intentas editar ya no existe.",
+                ft.Colors.RED_600,
+            )
+            return
+
+        self.vista_catalogo = self.content
+        self.padding = 0
+        self.content = PantallaNuevoServicio(
+            self.main_page,
+            vista_anterior=self,
+            controlador=self.controlador_servicios,
+            servicio_edicion=registro,
+        )
+        self.update()
 
     # =========================================================
     # 2. CAMBIO: Función para hacer el cambio de pantalla
@@ -522,7 +829,11 @@ class PantallaServicios(ft.Container):
         # Guardar la vista de la tabla actual en memoria
         self.vista_catalogo = self.content
         self.padding = 0
-        self.content = PantallaNuevoServicio(self.main_page, vista_anterior=self)
+        self.content = PantallaNuevoServicio(
+            self.main_page,
+            vista_anterior=self,
+            controlador=self.controlador_servicios,
+        )
         self.update()
     # --- LÓGICA DE EVENTOS ---
     def alternar_menu_exportacion(self, e=None):
@@ -548,6 +859,11 @@ class PantallaServicios(ft.Container):
         bg_icono,
         color_borde,
     ):
+        texto_cantidad = (
+            cantidad
+            if isinstance(cantidad, ft.Text)
+            else self._crear_texto_resumen(cantidad)
+        )
         return card(
             ft.Row(
                 spacing=10,
@@ -573,14 +889,7 @@ class PantallaServicios(ft.Container):
                                 max_lines=1,
                                 overflow=ft.TextOverflow.ELLIPSIS,
                             ),
-                            ft.Text(
-                                cantidad,
-                                size=22,
-                                color=COLOR_BANNER,
-                                weight=ft.FontWeight.BOLD,
-                                max_lines=1,
-                                overflow=ft.TextOverflow.ELLIPSIS,
-                            ),
+                            texto_cantidad,
                         ],
                     ),
                     ft.Icon(
@@ -595,4 +904,15 @@ class PantallaServicios(ft.Container):
             radius=12,
             shadow=sombra_suave(),
             expand=True,
+        )
+
+    @staticmethod
+    def _crear_texto_resumen(cantidad):
+        return ft.Text(
+            str(cantidad),
+            size=22,
+            color=COLOR_BANNER,
+            weight=ft.FontWeight.BOLD,
+            max_lines=1,
+            overflow=ft.TextOverflow.ELLIPSIS,
         )

@@ -572,7 +572,7 @@ class PantallaNuevaCotizacion(ft.Container):
         )
 
         return ft.Column(
-            width=260,
+            width=280,
             spacing=16,
             controls=[
                 tarjeta_columnas,
@@ -811,26 +811,21 @@ class PantallaNuevaCotizacion(ft.Container):
             on_click=self.calcular_servicios,
         )
 
-        contenedor_tabla_con_scroll = ft.Row(
-            scroll=ft.ScrollMode.ADAPTIVE,
-            controls=[
-                ft.Container(
-                    width=1180,
-                    content=ft.Column(
-                        spacing=4,
-                        controls=[
-                            self.cabecera_tabla,
-                            ft.Divider(height=8, color=COLOR_GRIS_CLARO),
-                            self.contenedor_resultados_servicio_activo,
-                            self.lista_filas,
-                            ft.Container(height=20),
-                        ],
-                    ),
-                )
-            ],
+        contenedor_tabla = ft.Container(
+            width=1380,
+            content=ft.Column(
+                spacing=4,
+                controls=[
+                    self.cabecera_tabla,
+                    ft.Divider(height=8, color=COLOR_GRIS_CLARO),
+                    self.contenedor_resultados_servicio_activo,
+                    self.lista_filas,
+                    ft.Container(height=20),
+                ],
+            ),
         )
 
-        return card(
+        tarjeta_desglose = card(
             ft.Column(
                 spacing=0,
                 controls=[
@@ -838,28 +833,20 @@ class PantallaNuevaCotizacion(ft.Container):
                         padding=ft.Padding(18, 12, 18, 12),
                         border=ft.Border(bottom=ft.BorderSide(1, "#E8EEF5")),
                         content=ft.Row(
-                            alignment=ft.MainAxisAlignment.SPACE_BETWEEN,
+                            spacing=14,
+                            wrap=True,
                             vertical_alignment=ft.CrossAxisAlignment.CENTER,
                             controls=[
                                 ft.Row(
                                     spacing=12,
+                                    vertical_alignment=ft.CrossAxisAlignment.CENTER,
                                     controls=[
                                         self._crear_indicador_numero("2", COLOR_AZUL),
-                                        ft.Column(
-                                            spacing=1,
-                                            controls=[
-                                                ft.Text(
-                                                    "Desglose de Servicios y Conceptos (Formato PDA)",
-                                                    weight=ft.FontWeight.BOLD,
-                                                    size=15,
-                                                    color=COLOR_AZUL_OSCURO,
-                                                ),
-                                                ft.Text(
-                                                    "Usa 'Calcular Servicios' para generar las partidas obligatorias/condicionales o 'Agregar Concepto' para buscar servicios adicionales.",
-                                                    size=11,
-                                                    color=COLOR_GRIS,
-                                                ),
-                                            ],
+                                        ft.Text(
+                                            "Desglose de Servicios y Conceptos (Formato PDA)",
+                                            weight=ft.FontWeight.BOLD,
+                                            size=15,
+                                            color=COLOR_AZUL_OSCURO,
                                         ),
                                     ],
                                 ),
@@ -878,7 +865,7 @@ class PantallaNuevaCotizacion(ft.Container):
                         content=ft.Column(
                             spacing=10,
                             controls=[
-                                contenedor_tabla_con_scroll,
+                                contenedor_tabla,
                                 ft.Container(
                                     bgcolor="#EEF5FD",
                                     border=ft.Border.all(1, "#D6E6FA"),
@@ -909,6 +896,13 @@ class PantallaNuevaCotizacion(ft.Container):
             radius=12,
             border_color="#E1EAF4",
             shadow=sombra_suave(),
+        )
+        return ft.Row(
+            expand=True,
+            scroll=ft.ScrollMode.ADAPTIVE,
+            controls=[
+                ft.Container(width=1420, content=tarjeta_desglose),
+            ],
         )
 
     def _construir_cabecera_tabla(self) -> ft.Row:
@@ -1235,14 +1229,36 @@ class PantallaNuevaCotizacion(ft.Container):
             self._notificar(str(error), COLOR_ROJO)
             return []
 
-        self.lista_filas.controls.clear()
-        self.filas_datos.clear()
+        if not detalles:
+            self._notificar(
+                "No se encontraron servicios configurados para este buque. "
+                "Se conservaron los conceptos que ya estaban en el desglose.",
+                COLOR_NARANJA,
+            )
+            return []
+
+        filas_manuales = [
+            fila
+            for fila in self.filas_datos
+            if not fila.get("calculado_automaticamente", False)
+        ]
+        self.filas_datos = filas_manuales
+        self.lista_filas.controls = [
+            fila["contenedor"] for fila in filas_manuales
+        ]
         self.contenedor_resultados_servicio_activo.visible = False
 
-        for idx, detalle in enumerate(detalles, start=1):
+        for idx, detalle in enumerate(
+            detalles, start=len(self.filas_datos) + 1
+        ):
             estado_fila = self._crear_fila_desde_detalle(idx, detalle)
+            estado_fila["calculado_automaticamente"] = True
             self.filas_datos.append(estado_fila)
             self.lista_filas.controls.append(estado_fila["contenedor"])
+
+        for idx, fila in enumerate(self.filas_datos, start=1):
+            fila["disc"] = idx
+            fila["lbl_numero"].value = str(idx)
 
         self._recalcular_totales_generales()
         self._actualizar_ui()

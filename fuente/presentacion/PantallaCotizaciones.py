@@ -10,6 +10,7 @@ from fuente.presentacion.PantallaNuevaCotizacion import PantallaNuevaCotizacion
 from fuente.utilidades.Colores import (
     COLOR_AZUL,
     COLOR_BANNER,
+    COLOR_BLANCO,
     COLOR_FONDO,
     COLOR_GRIS,
     COLOR_NARANJA,
@@ -22,43 +23,20 @@ from fuente.utilidades.Componentes import (
     banner_modulo,
     barra_busqueda,
     boton,
+    boton_exportacion,
     card,
     paginacion,
     sombra_suave,
     tabla,
     tarjeta_indicador,
 )
+from fuente.utilidades.ExportacionExcel import exportar_excel
+from fuente.utilidades.ExportacionPDF import exportar_pdf, exportar_proforma_pdf
+from fuente.utilidades.contenedores import menu_exportacion
+from fuente.utilidades.feedback import mostrar_notificacion, validar_registros_exportacion
 
 
 class PantallaCotizaciones(ft.Container):
-    COTIZACIONES_DEMO = (
-        {
-            "folio": "PDA.-0127",
-            "fecha": "26/10/2026",
-            "buque": "MT MTM HOUSTON",
-            "cliente": "MERITUS DE MEXICO SA DE CV",
-            "monto": "$ 502,777.15 MXN",
-            "estado": "PENDIENTE",
-        },
-        {
-            "folio": "COT-2026-0048",
-            "fecha": "04/11/2026",
-            "buque": "MSC ORION",
-            "cliente": "MSC Shipping S.A.",
-            "monto": "$ 245,800.00 MXN",
-            "estado": "Pendiente",
-        },
-        {
-            "folio": "COT-2026-0047",
-            "fecha": "02/11/2026",
-            "buque": "MAERSK LIMA",
-            "cliente": "Maersk México",
-            "monto": "$ 182,400.00 MXN",
-            "estado": "Aprobada",
-        },
-    )
-    TOTAL_COTIZACIONES_DEMO = 3
-
     def __init__(
         self,
         main_page,
@@ -98,6 +76,8 @@ class PantallaCotizaciones(ft.Container):
         self.busqueda = ""
         self.registros_actuales: list = []
         self.total_registros = 0
+        self._menu_exportacion_abierto = False
+        self._clic_en_boton_menu = False
 
         self.build_ui()
 
@@ -167,49 +147,47 @@ class PantallaCotizaciones(ft.Container):
         )
 
     def _tarjetas_resumen(self):
-        if self.controlador is not None and (
-            self.total_registros > 0 or self.servicio_cotizacion is not None
-        ):
-            total_cot = self.total_registros
-            aprobadas = sum(
-                1
+        total_cot = self.total_registros
+        aprobadas = sum(
+            1
+            for c in self.registros_actuales
+            if getattr(
+                getattr(c, "estado", None),
+                "value",
+                str(getattr(c, "estado", "")),
+            ).upper()
+            in (
+                EstadoCotizacion.PROFORMA.value,
+                EstadoCotizacion.BORRADOR.value,
+                EstadoCotizacion.ANTICIPO_RECIBIDO.value,
+                EstadoCotizacion.EN_OPERACION.value,
+            )
+        )
+        canceladas = sum(
+            1
+            for c in self.registros_actuales
+            if getattr(
+                getattr(c, "estado", None),
+                "value",
+                str(getattr(c, "estado", "")),
+            ).upper()
+            == EstadoCotizacion.CANCELADA.value
+        )
+        suma_total = sum(
+            (
+                Decimal(str(getattr(c, "total", "0.00") or "0.00"))
                 for c in self.registros_actuales
-                if getattr(
-                    getattr(c, "estado", None),
-                    "value",
-                    str(getattr(c, "estado", "")),
-                ).upper()
-                in (
-                    EstadoCotizacion.APROBADA.value,
-                    EstadoCotizacion.PENDIENTE.value,
-                    "PROFORMA",
-                )
-            )
-            canceladas = sum(
-                1
-                for c in self.registros_actuales
-                if getattr(
-                    getattr(c, "estado", None),
-                    "value",
-                    str(getattr(c, "estado", "")),
-                ).upper()
-                in (EstadoCotizacion.RECHAZADA.value, "CANCELADA")
-            )
-            suma_total = sum(
-                (
-                    Decimal(str(getattr(c, "total", "0.00") or "0.00"))
-                    for c in self.registros_actuales
-                ),
-                Decimal("0.00"),
-            )
-            monto_texto = f"$ {suma_total:,.2f} MXN"
-            etiqueta_origen = "Registros en base de datos"
-        else:
-            total_cot = self.TOTAL_COTIZACIONES_DEMO
-            aprobadas = 2
-            canceladas = 0
-            monto_texto = "$ 930,977.15 MXN"
-            etiqueta_origen = "Registros de ejemplo"
+            ),
+            Decimal("0.00"),
+        )
+        moneda_obj = (
+            getattr(self.registros_actuales[0], "moneda", None)
+            if self.registros_actuales
+            else None
+        )
+        moneda = getattr(moneda_obj, "value", "MXN")
+        monto_texto = f"$ {suma_total:,.2f} {moneda}"
+        etiqueta_origen = "Registros en base de datos"
 
         resumenes = (
             (
@@ -321,90 +299,145 @@ class PantallaCotizaciones(ft.Container):
         )
 
     def _panel_historial(self):
-        boton_exportar = boton(
+        self._texto_resumen_exportacion = ft.Text(
+            "Proformas coincidentes con la búsqueda actual",
+            size=11,
+            color=COLOR_GRIS,
+        )
+        self._boton_exportar = boton_exportacion(
             texto="Exportar",
-            icono=ft.Icons.DOWNLOAD_OUTLINED,
-            tipo="secundario",
+            on_click=self.alternar_menu_exportacion,
             width=120,
             height=42,
         )
+        self._menu_exportacion = menu_exportacion(
+            descripcion=self._texto_resumen_exportacion,
+            on_pdf=self._exportar_cotizaciones_pdf,
+            on_excel=self._exportar_cotizaciones_excel,
+            descripcion_pdf="Genera un PDF con las proformas del historial.",
+            descripcion_excel="Descarga las proformas del historial en Excel.",
+            top=52,
+            right=0,
+            width=280,
+        )
+        self._menu_exportacion.visible = False
 
-        usando_bd = self.controlador is not None
-        cantidad_mostrada = (
-            len(self.registros_actuales)
-            if usando_bd
-            else len(self.COTIZACIONES_DEMO)
-        )
-        total_mostrar = (
-            self.total_registros
-            if usando_bd
-            else self.TOTAL_COTIZACIONES_DEMO
-        )
-        subtitulo = (
-            "Proformas PDA registradas en la base de datos"
-            if usando_bd
-            else "Muestra de registros · datos ilustrativos"
-        )
+        cantidad_mostrada = len(self.registros_actuales)
+        total_mostrar = self.total_registros
+        subtitulo = "Proformas PDA registradas en la base de datos"
 
         return card(
-            ft.Column(
+            ft.Stack(
                 expand=True,
-                spacing=10,
+                clip_behavior=ft.ClipBehavior.NONE,
                 controls=[
-                    ft.Row(
-                        spacing=10,
-                        vertical_alignment=ft.CrossAxisAlignment.CENTER,
-                        controls=[
-                            ft.Container(
-                                width=42,
-                                height=42,
-                                alignment=ft.Alignment(0, 0),
-                                bgcolor="#FFF2E8",
-                                border_radius=11,
-                                content=ft.Icon(
-                                    ft.Icons.LIST_ALT_OUTLINED,
-                                    size=23,
-                                    color=COLOR_NARANJA,
+                    ft.GestureDetector(
+                        expand=True,
+                        on_tap_down=self._clic_fondo_exportacion,
+                        content=ft.Column(
+                            expand=True,
+                            spacing=10,
+                            controls=[
+                                ft.Row(
+                                    spacing=10,
+                                    vertical_alignment=ft.CrossAxisAlignment.CENTER,
+                                    controls=[
+                                        ft.Container(
+                                            width=42,
+                                            height=42,
+                                            alignment=ft.Alignment(0, 0),
+                                            bgcolor="#FFF2E8",
+                                            border_radius=11,
+                                            content=ft.Icon(
+                                                ft.Icons.LIST_ALT_OUTLINED,
+                                                size=23,
+                                                color=COLOR_NARANJA,
+                                            ),
+                                        ),
+                                        ft.Column(
+                                            spacing=2,
+                                            controls=[
+                                                ft.Text(
+                                                    "Historial de cotizaciones",
+                                                    size=19,
+                                                    weight=ft.FontWeight.BOLD,
+                                                    color=COLOR_BANNER,
+                                                ),
+                                                ft.Text(
+                                                    subtitulo,
+                                                    size=12,
+                                                    color=COLOR_GRIS,
+                                                ),
+                                            ],
+                                        ),
+                                        ft.Container(expand=True),
+                                        ft.GestureDetector(
+                                            on_tap_down=self._marcar_clic_en_boton_menu,
+                                            on_tap_up=self._limpiar_clic_en_boton_menu,
+                                            on_tap_cancel=self._limpiar_clic_en_boton_menu,
+                                            content=self._boton_exportar,
+                                        ),
+                                    ],
                                 ),
-                            ),
-                            ft.Column(
-                                spacing=2,
-                                controls=[
-                                    ft.Text(
-                                        "Historial de cotizaciones",
-                                        size=19,
-                                        weight=ft.FontWeight.BOLD,
-                                        color=COLOR_BANNER,
+                                ft.Container(
+                                    expand=True,
+                                    border=ft.Border.all(1, "#E2EDF9"),
+                                    border_radius=12,
+                                    bgcolor=COLOR_BLANCO,
+                                    clip_behavior=ft.ClipBehavior.HARD_EDGE,
+                                    content=(
+                                        self._tabla_historial()
+                                        if self.registros_actuales
+                                        else ft.Container(
+                                            height=190,
+                                            alignment=ft.Alignment(0, 0),
+                                            content=ft.Column(
+                                                alignment=ft.MainAxisAlignment.CENTER,
+                                                horizontal_alignment=ft.CrossAxisAlignment.CENTER,
+                                                spacing=8,
+                                                controls=[
+                                                    ft.Icon(
+                                                        ft.Icons.REQUEST_QUOTE_OUTLINED,
+                                                        size=42,
+                                                        color=COLOR_GRIS,
+                                                    ),
+                                                    ft.Text(
+                                                        "No hay cotizaciones registradas",
+                                                        size=16,
+                                                        weight=ft.FontWeight.W_600,
+                                                        color=COLOR_BANNER,
+                                                    ),
+                                                    ft.Text(
+                                                        "Las proformas guardadas aparecerán aquí.",
+                                                        size=12,
+                                                        color=COLOR_GRIS,
+                                                    ),
+                                                ],
+                                            ),
+                                        )
                                     ),
-                                    ft.Text(
-                                        subtitulo,
-                                        size=12,
-                                        color=COLOR_GRIS,
-                                    ),
-                                ],
-                            ),
-                            ft.Container(expand=True),
-                            boton_exportar,
-                        ],
+                                ),
+                                ft.Row(
+                                    alignment=ft.MainAxisAlignment.SPACE_BETWEEN,
+                                    vertical_alignment=ft.CrossAxisAlignment.CENTER,
+                                    controls=[
+                                        ft.Text(
+                                            f"Mostrando {cantidad_mostrada} de {total_mostrar} cotizaciones",
+                                            size=12,
+                                            color=COLOR_GRIS,
+                                        ),
+                                        paginacion(
+                                            total_registros=max(1, total_mostrar),
+                                            registros_por_pagina=self.registros_por_pagina,
+                                            pagina_actual=self.pagina_actual,
+                                            on_change=self._cambiar_pagina,
+                                        ),
+                                    ],
+                                ),
+                            ],
+                        ),
                     ),
-                    self._tabla_historial(),
-                    ft.Row(
-                        alignment=ft.MainAxisAlignment.SPACE_BETWEEN,
-                        vertical_alignment=ft.CrossAxisAlignment.CENTER,
-                        controls=[
-                            ft.Text(
-                                f"Mostrando {cantidad_mostrada} de {total_mostrar} cotizaciones",
-                                size=12,
-                                color=COLOR_GRIS,
-                            ),
-                            paginacion(
-                                total_registros=max(1, total_mostrar),
-                                registros_por_pagina=self.registros_por_pagina,
-                                pagina_actual=self.pagina_actual,
-                                on_change=self._cambiar_pagina,
-                            ),
-                        ],
-                    ),
+                    self._menu_exportacion,
                 ],
             ),
             padding=14,
@@ -413,6 +446,482 @@ class PantallaCotizaciones(ft.Container):
             shadow=sombra_suave(),
             expand=True,
         )
+
+    def alternar_menu_exportacion(self, e=None):
+        self._clic_en_boton_menu = False
+        self._menu_exportacion_abierto = not self._menu_exportacion_abierto
+        self._menu_exportacion.visible = self._menu_exportacion_abierto
+        self._menu_exportacion.update()
+
+    def cerrar_menu_exportacion(self, e=None):
+        if not self._menu_exportacion_abierto:
+            return
+        self._menu_exportacion_abierto = False
+        self._menu_exportacion.visible = False
+        self._menu_exportacion.update()
+
+    def _marcar_clic_en_boton_menu(self, e=None):
+        self._clic_en_boton_menu = True
+
+    def _limpiar_clic_en_boton_menu(self, e=None):
+        self._clic_en_boton_menu = False
+
+    def _clic_fondo_exportacion(self, e=None):
+        if not self._clic_en_boton_menu:
+            self.cerrar_menu_exportacion()
+
+    def _obtener_registros_exportacion(self) -> list[dict[str, str]]:
+        if self.controlador is None:
+            return []
+
+        registros = []
+        pagina = 1
+        total = 0
+        while pagina == 1 or len(registros) < total:
+            lote, total = self.controlador.obtener_historial_cotizaciones(
+                pagina=pagina,
+                limite=100,
+                texto=self.busqueda,
+            )
+            if not lote:
+                break
+            registros.extend(self._normalizar_fila_tabla(item) for item in lote)
+            pagina += 1
+        return registros
+
+    @staticmethod
+    def _columnas_exportacion() -> dict[str, str]:
+        return {
+            "Folio": "folio",
+            "Fecha": "fecha",
+            "Nombre del buque": "buque",
+            "Cliente": "cliente",
+            "Monto total": "monto",
+            "Estado": "estado",
+        }
+
+    async def _exportar_cotizaciones_excel(self, e=None):
+        self.cerrar_menu_exportacion()
+        try:
+            filas = self._obtener_registros_exportacion()
+            if not validar_registros_exportacion(
+                self.main_page, filas, "cotizaciones"
+            ):
+                return
+            guardado = await exportar_excel(
+                self.main_page,
+                filas,
+                self._columnas_exportacion(),
+                "proformas.xlsx",
+                nombre_hoja="Proformas",
+            )
+            if guardado:
+                mostrar_notificacion(
+                    self.main_page,
+                    f"Se exportaron {len(filas)} proformas a Excel.",
+                    COLOR_VERDE,
+                )
+        except Exception as error:
+            mostrar_notificacion(
+                self.main_page,
+                f"No se pudieron exportar las proformas a Excel: {error}",
+                COLOR_ROJO,
+            )
+
+    async def _exportar_cotizaciones_pdf(self, e=None):
+        self.cerrar_menu_exportacion()
+        try:
+            filas = self._obtener_registros_exportacion()
+            if not validar_registros_exportacion(
+                self.main_page, filas, "cotizaciones"
+            ):
+                return
+            guardado = await exportar_pdf(
+                self.main_page,
+                filas,
+                self._columnas_exportacion(),
+                "proformas.pdf",
+                titulo="Historial de proformas",
+                subtitulo="Gestión de cotizaciones PDA",
+                etiqueta_registros=f"Proformas registradas: {len(filas)}",
+                orientacion="landscape",
+                nombre_registro="proformas",
+            )
+            if guardado:
+                mostrar_notificacion(
+                    self.main_page,
+                    f"Se exportaron {len(filas)} proformas a PDF.",
+                    COLOR_VERDE,
+                )
+        except Exception as error:
+            mostrar_notificacion(
+                self.main_page,
+                f"No se pudieron exportar las proformas a PDF: {error}",
+                COLOR_ROJO,
+            )
+
+    @staticmethod
+    def _valor_enum(valor, predeterminado=""):
+        return getattr(valor, "value", valor) or predeterminado
+
+    @staticmethod
+    def _formatear_fecha(valor):
+        return valor.strftime("%d/%m/%Y") if hasattr(valor, "strftime") else "—"
+
+    @staticmethod
+    def _formatear_importe(valor, moneda):
+        return f"$ {Decimal(str(valor or '0.00')):,.2f} {moneda}"
+
+    def _campo_detalle(self, etiqueta, valor):
+        return ft.Container(
+            width=210,
+            padding=10,
+            bgcolor=COLOR_BLANCO,
+            border=ft.Border.all(1, "#E4ECF5"),
+            border_radius=9,
+            content=ft.Column(
+                spacing=3,
+                controls=[
+                    ft.Text(
+                        etiqueta,
+                        size=10,
+                        color=COLOR_GRIS,
+                        weight=ft.FontWeight.W_600,
+                    ),
+                    ft.Text(
+                        str(valor or "—"),
+                        size=12,
+                        color=COLOR_BANNER,
+                        weight=ft.FontWeight.W_600,
+                        selectable=True,
+                    ),
+                ],
+            ),
+        )
+
+    def _tarjeta_detalle_proforma(self, cotizacion):
+        cliente = getattr(cotizacion, "cliente", None)
+        buque = getattr(cotizacion, "buque", None)
+        categoria_buque = getattr(buque, "categoria_buque", None)
+        moneda = self._valor_enum(getattr(cotizacion, "moneda", None), "MXN")
+        filas_detalle = []
+        for indice, detalle in enumerate(
+            getattr(cotizacion, "detalles", None) or [], start=1
+        ):
+            concepto = getattr(detalle, "concepto", None)
+            categoria = getattr(
+                getattr(concepto, "categoria_pda", None), "nombre", "—"
+            )
+            proveedores = getattr(concepto, "proveedores", None) or []
+            proveedor = ", ".join(
+                p.nombre for p in proveedores if getattr(p, "nombre", None)
+            ) or "—"
+            descripcion = getattr(concepto, "nombre_es", None) or (
+                f"Concepto #{getattr(detalle, 'concepto_id', '')}"
+            )
+            filas_detalle.append(
+                ft.Container(
+                    padding=12,
+                    border=ft.Border.all(1, "#E1EAF4"),
+                    border_radius=10,
+                    bgcolor=COLOR_BLANCO,
+                    content=ft.Column(
+                        spacing=8,
+                        controls=[
+                            ft.Row(
+                                spacing=10,
+                                controls=[
+                                    ft.Container(
+                                        width=27,
+                                        height=27,
+                                        alignment=ft.Alignment(0, 0),
+                                        bgcolor="#FFF2E8",
+                                        border_radius=7,
+                                        content=ft.Text(
+                                            str(indice),
+                                            size=12,
+                                            weight=ft.FontWeight.BOLD,
+                                            color=COLOR_NARANJA,
+                                        ),
+                                    ),
+                                    ft.Column(
+                                        expand=True,
+                                        spacing=2,
+                                        controls=[
+                                            ft.Text(
+                                                descripcion,
+                                                size=13,
+                                                weight=ft.FontWeight.BOLD,
+                                                color=COLOR_BANNER,
+                                            ),
+                                            ft.Text(
+                                                f"{categoria} · {proveedor}",
+                                                size=10,
+                                                color=COLOR_GRIS,
+                                            ),
+                                        ],
+                                    ),
+                                    ft.Text(
+                                        self._formatear_importe(
+                                            getattr(detalle, "total", 0), moneda
+                                        ),
+                                        size=13,
+                                        weight=ft.FontWeight.BOLD,
+                                        color=COLOR_AZUL,
+                                    ),
+                                ],
+                            ),
+                            ft.Row(
+                                wrap=True,
+                                spacing=8,
+                                controls=[
+                                    self._campo_detalle(
+                                        "Cantidad",
+                                        getattr(detalle, "cantidad", "—"),
+                                    ),
+                                    self._campo_detalle(
+                                        "Precio unitario",
+                                        self._formatear_importe(
+                                            getattr(detalle, "precio_unitario", 0),
+                                            moneda,
+                                        ),
+                                    ),
+                                    self._campo_detalle(
+                                        "Subtotal",
+                                        self._formatear_importe(
+                                            getattr(detalle, "subtotal", 0), moneda
+                                        ),
+                                    ),
+                                    self._campo_detalle(
+                                        "IVA / TAX",
+                                        self._formatear_importe(
+                                            getattr(detalle, "iva", 0), moneda
+                                        ),
+                                    ),
+                                    self._campo_detalle(
+                                        "Factura / Invoice",
+                                        getattr(detalle, "factura", None),
+                                    ),
+                                    self._campo_detalle(
+                                        "Observaciones / Observations",
+                                        getattr(detalle, "observaciones", None),
+                                    ),
+                                ],
+                            ),
+                        ],
+                    ),
+                )
+            )
+
+        fecha_creacion = getattr(cotizacion, "creado_en", None)
+        fecha = self._formatear_fecha(fecha_creacion or cotizacion.fecha_arribo)
+        direccion = getattr(cliente, "direccion", None)
+        tipo_buque = getattr(categoria_buque, "categoria", "—")
+        subtipo = getattr(buque, "subtipo_descripcion", None)
+        if subtipo:
+            tipo_buque = f"{tipo_buque} · {subtipo}"
+        return ft.Column(
+            scroll=ft.ScrollMode.AUTO,
+            height=560,
+            spacing=12,
+            controls=[
+                ft.Row(
+                    wrap=True,
+                    spacing=10,
+                    controls=[
+                        self._campo_detalle(
+                            "Cliente / Customer",
+                            getattr(cliente, "razon_social", None),
+                        ),
+                        self._campo_detalle(
+                            "Dirección / Address",
+                            direccion,
+                        ),
+                        self._campo_detalle(
+                            "Fecha / Date",
+                            fecha,
+                        ),
+                        self._campo_detalle(
+                            "Arribo / ETA",
+                            self._formatear_fecha(
+                                getattr(cotizacion, "fecha_arribo", None)
+                            ),
+                        ),
+                        self._campo_detalle(
+                            "Zarpe / ETD",
+                            self._formatear_fecha(
+                                getattr(cotizacion, "fecha_zarpe", None)
+                            ),
+                        ),
+                    ],
+                ),
+                ft.Container(
+                    padding=12,
+                    bgcolor="#F4F8FC",
+                    border=ft.Border.all(1, "#E1EAF4"),
+                    border_radius=10,
+                    content=ft.Column(
+                        spacing=8,
+                        controls=[
+                            ft.Text(
+                                "Información del buque / Vessel's Information",
+                                size=13,
+                                weight=ft.FontWeight.BOLD,
+                                color=COLOR_BANNER,
+                            ),
+                            ft.Row(
+                                wrap=True,
+                                spacing=8,
+                                controls=[
+                                    self._campo_detalle(
+                                        "Buque / Vessel",
+                                        getattr(buque, "nombre", None),
+                                    ),
+                                    self._campo_detalle(
+                                        "Tipo de buque / Type of vessel",
+                                        tipo_buque,
+                                    ),
+                                    self._campo_detalle(
+                                        "IMO",
+                                        getattr(buque, "numero_imo", None),
+                                    ),
+                                    self._campo_detalle(
+                                        "UAB / GRT",
+                                        getattr(buque, "trb", None),
+                                    ),
+                                    self._campo_detalle(
+                                        "Eslora / LOA (m)",
+                                        getattr(buque, "eslora", None),
+                                    ),
+                                    self._campo_detalle(
+                                        "Calado / Draft (m)",
+                                        getattr(buque, "calado", None),
+                                    ),
+                                ],
+                            ),
+                        ],
+                    ),
+                ),
+                ft.Text(
+                    "Servicios y conceptos / Services and items",
+                    size=14,
+                    weight=ft.FontWeight.BOLD,
+                    color=COLOR_BANNER,
+                ),
+                *filas_detalle,
+                ft.Row(
+                    alignment=ft.MainAxisAlignment.END,
+                    controls=[
+                        self._campo_detalle(
+                            "Subtotal",
+                            self._formatear_importe(
+                                getattr(cotizacion, "subtotal", 0), moneda
+                            ),
+                        ),
+                        self._campo_detalle(
+                            "IVA / TAX",
+                            self._formatear_importe(
+                                getattr(cotizacion, "iva", 0), moneda
+                            ),
+                        ),
+                        self._campo_detalle(
+                            "Total / Total",
+                            self._formatear_importe(
+                                getattr(cotizacion, "total", 0), moneda
+                            ),
+                        ),
+                        self._campo_detalle(
+                            "Estado / Status",
+                            self._valor_enum(
+                                getattr(cotizacion, "estado", None)
+                            ),
+                        ),
+                    ],
+                ),
+            ],
+        )
+
+    def ver_cotizacion(self, cotizacion):
+        if isinstance(cotizacion, dict):
+            mostrar_notificacion(
+                self.main_page,
+                "El detalle solo está disponible para proformas guardadas en la base de datos.",
+                COLOR_ROJO,
+            )
+            return
+
+        async def descargar(e=None):
+            await self._descargar_proforma(cotizacion)
+
+        self.dialogo_cotizacion = ft.AlertDialog(
+            modal=True,
+            bgcolor="#F4F8FC",
+            shape=ft.RoundedRectangleBorder(radius=16),
+            title=ft.Row(
+                spacing=10,
+                controls=[
+                    ft.Icon(
+                        ft.Icons.REQUEST_QUOTE_OUTLINED,
+                        color=COLOR_NARANJA,
+                    ),
+                    ft.Column(
+                        spacing=1,
+                        controls=[
+                            ft.Text(
+                                "Proforma",
+                                size=19,
+                                weight=ft.FontWeight.BOLD,
+                                color=COLOR_BANNER,
+                            ),
+                            ft.Text(
+                                getattr(cotizacion, "folio", ""),
+                                size=12,
+                                color=COLOR_GRIS,
+                            ),
+                        ],
+                    ),
+                ],
+            ),
+            content=ft.Container(
+                width=1050,
+                height=590,
+                content=self._tarjeta_detalle_proforma(cotizacion),
+            ),
+            actions=[
+                boton(
+                    texto="Cerrar",
+                    tipo="secundario",
+                    on_click=lambda e: self.main_page.pop_dialog(),
+                ),
+                boton(
+                    texto="Descargar proforma",
+                    icono=ft.Icons.DOWNLOAD_OUTLINED,
+                    tipo="principal",
+                    on_click=descargar,
+                ),
+            ],
+            actions_alignment=ft.MainAxisAlignment.END,
+        )
+        self.main_page.show_dialog(self.dialogo_cotizacion)
+
+    async def _descargar_proforma(self, cotizacion):
+        try:
+            guardado = await exportar_proforma_pdf(
+                self.main_page,
+                cotizacion,
+            )
+            if guardado:
+                mostrar_notificacion(
+                    self.main_page,
+                    f"Se descargó la proforma {cotizacion.folio}.",
+                    COLOR_VERDE,
+                )
+        except Exception as error:
+            mostrar_notificacion(
+                self.main_page,
+                f"No se pudo descargar la proforma: {error}",
+                COLOR_ROJO,
+            )
 
     def _boton_nueva_cotizacion(self):
         return boton(
@@ -460,11 +969,7 @@ class PantallaCotizaciones(ft.Container):
         }
 
     def _tabla_historial(self):
-        origen = (
-            self.registros_actuales
-            if self.controlador is not None
-            else self.COTIZACIONES_DEMO
-        )
+        origen = self.registros_actuales
         filas = []
         for registro in origen:
             cotizacion = self._normalizar_fila_tabla(registro)
@@ -511,7 +1016,7 @@ class PantallaCotizaciones(ft.Container):
                                 self._estado_visual(cotizacion["estado"]),
                             )
                         ),
-                        ft.DataCell(self._acciones_fila()),
+                        ft.DataCell(self._acciones_fila(registro)),
                     ],
                 )
             )
@@ -524,7 +1029,7 @@ class PantallaCotizaciones(ft.Container):
                 ("Cliente", 190),
                 ("Monto total", 170),
                 ("Estado", 125),
-                ("Acciones", 100),
+                ("Acciones", 58),
             ],
             filas=filas,
             column_spacing=6,
@@ -557,23 +1062,13 @@ class PantallaCotizaciones(ft.Container):
             "CANCELADA": "inactivo",
         }.get(str(estado), "info")
 
-    @staticmethod
-    def _acciones_fila():
-        return ft.Row(
-            alignment=ft.MainAxisAlignment.CENTER,
-            spacing=2,
-            controls=[
-                boton(
-                    icono=ft.Icons.VISIBILITY_OUTLINED,
-                    texto="Ver cotización",
-                    tipo="accion",
-                ),
-                boton(
-                    icono=ft.Icons.MORE_VERT,
-                    texto="Más acciones",
-                    tipo="accion",
-                ),
-            ],
+    def _acciones_fila(self, cotizacion):
+        return boton(
+            icono=ft.Icons.VISIBILITY_OUTLINED,
+            texto="Ver cotización",
+            tipo="accion",
+            tooltip="Ver proforma",
+            on_click=lambda e: self.ver_cotizacion(cotizacion),
         )
 
     def abrir_nueva_cotizacion(self):

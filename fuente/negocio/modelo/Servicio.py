@@ -6,9 +6,11 @@ from sqlalchemy import (
     CheckConstraint,
     Enum as SqlEnum,
     ForeignKey,
+    Index,
     Integer,
     JSON,
     Numeric,
+    String,
     text,
 )
 from sqlalchemy.dialects.postgresql import JSONB
@@ -28,6 +30,9 @@ class Servicio(Concepto):
         ForeignKey("concepto.id", ondelete="CASCADE"),
         primary_key=True,
     )
+
+    sku: Mapped[str | None] = mapped_column(String(50), nullable=True)
+    imagen_path: Mapped[str | None] = mapped_column(String(1000), nullable=True)
 
     caracter: Mapped[CaracterServicio] = mapped_column(
         SqlEnum(CaracterServicio, name="caracter_servicio_enum", native_enum=True),
@@ -51,6 +56,7 @@ class Servicio(Concepto):
     )
 
     __table_args__ = (
+        Index("uq_servicio_sku", "sku", unique=True),
         CheckConstraint(
             "(caracter != 'CONDICIONAL') OR (regla_obligatoriedad IS NOT NULL)",
             name="chk_reglas_si_condicional",

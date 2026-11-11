@@ -2,7 +2,7 @@ import flet as ft
 from decimal import Decimal
 from fuente.presentacion.PantallaPrincipal import PantallaPrincipal
 from fuente.utilidades.Colores import *
-from sqlalchemy import create_engine
+from sqlalchemy import create_engine, select, text
 from sqlalchemy.orm import sessionmaker
 from fuente.persistencia.uow.UnitOFWork import AlchemyUnitOfWork
 from fuente.negocio.modelo.Base import Base
@@ -14,6 +14,7 @@ from fuente.negocio.modelo.CategoriaProducto import CategoriaProducto
 from fuente.negocio.modelo.CategoriaBuque import CategoriaBuque
 from fuente.negocio.modelo.Buque import Buque
 from fuente.negocio.modelo.Concepto import Concepto, concepto_proveedor
+from fuente.negocio.modelo.ENUMs import TipoProveedor
 from fuente.negocio.modelo.Producto import Producto
 from fuente.negocio.modelo.Servicio import (
     Servicio,
@@ -42,6 +43,48 @@ IMAGENES_ESTATICAS = (
     "fondo_menulateral.jpg",
     "oplcompleto.png",
 )
+
+CATALOGOS_PDA_INICIALES = {
+    "categorias": (
+        "SERVICIOS GENERALES",
+        "ASIPONA",
+        "MIGRACION",
+        "SEMAR",
+        "AGENCIA",
+    ),
+    "proveedores": (
+        "Administración del Sistema Portuario Nacional Puerto Chiapas",
+        "Sindicato Nacional de Pilotos de Puertos",
+        "Servicios Marítimos de Puerto Chiapas",
+        "Francisco Enrique Aguilar Trinidad",
+        "Servicios Marítimos y Logísticos del Istmo",
+        "INM",
+        "SEMAR",
+    ),
+}
+
+
+def inicializar_catalogos_pda(session_factory):
+    with session_factory.begin() as session:
+        categorias_existentes = {
+            nombre.strip().casefold()
+            for nombre in session.scalars(select(CategoriaPDA.nombre)).all()
+        }
+        session.add_all(
+            CategoriaPDA(nombre=nombre)
+            for nombre in CATALOGOS_PDA_INICIALES["categorias"]
+            if nombre.casefold() not in categorias_existentes
+        )
+
+        proveedores_existentes = {
+            nombre.strip().casefold()
+            for nombre in session.scalars(select(Proveedor.nombre)).all()
+        }
+        session.add_all(
+            Proveedor(nombre=nombre, tipo_proveedor=TipoProveedor.SERVICIOS)
+            for nombre in CATALOGOS_PDA_INICIALES["proveedores"]
+            if nombre.casefold() not in proveedores_existentes
+        )
 
 
 def main(
@@ -120,6 +163,23 @@ def run():
 
     base = Base()
     base.metadata.create_all(engine)
+    if engine.dialect.name == "postgresql":
+        with engine.begin() as connection:
+            connection.execute(
+                text("ALTER TABLE servicio ADD COLUMN IF NOT EXISTS sku VARCHAR(50)")
+            )
+            connection.execute(
+                text(
+                    "ALTER TABLE servicio "
+                    "ADD COLUMN IF NOT EXISTS imagen_path VARCHAR(1000)"
+                )
+            )
+            connection.execute(
+                text(
+                    "CREATE UNIQUE INDEX IF NOT EXISTS uq_servicio_sku "
+                    "ON servicio (sku)"
+                )
+            )
 
     """datos_buque = {
         'cliente_id': 1,
@@ -148,6 +208,7 @@ def run():
     }
 
     sessionFactory = sessionmaker(bind=engine, expire_on_commit=False)
+    inicializar_catalogos_pda(sessionFactory)
     uow = AlchemyUnitOfWork(sessionFactory)
 
     serv_cliente = ServicioCliente(uow=uow)

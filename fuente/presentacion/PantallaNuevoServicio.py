@@ -1,8 +1,20 @@
 from __future__ import annotations
 
+import logging
+
 import flet as ft
+from sqlalchemy.exc import SQLAlchemyError
+
 from fuente.negocio.modelo.ENUMs import TipoConcepto, VariableMedida
+from fuente.utilidades.ExportacionArchivos import obtener_selector_archivos
 from fuente.utilidades.Colores import COLOR_NARANJA, COLOR_BLANCO, COLOR_GRIS
+from fuente.utilidades.inputs import (
+    campo_con_mensaje_error,
+    crear_mensaje_validacion,
+    validar_campos,
+    validador_requerido,
+    vincular_validacion_campo,
+)
 
 
 COLOR_NARANJA = "#ff6600"     
@@ -37,34 +49,6 @@ ETIQUETAS_VARIABLES_MEDIDA: list[tuple[str, str]] = [
     (VariableMedida.CANTIDAD_EVENTOS.value, "Cantidad de Maniobras / Eventos"),
 ]
 
-CATEGORIAS_PDA_DEMO: list[tuple[str, str]] = [
-    ("1", "Derechos de Puerto (Port Dues)"),
-    ("2", "Practicaje y Pilotaje (Pilotage)"),
-    ("3", "Remolcadores (Towage Services)"),
-    ("4", "Amarre y Desamarre de Cabos (Mooring)"),
-    ("5", "Lanchaje y Transporte Marítimo (Launch Hire)"),
-    ("6", "Agenciamiento y Despacho (Agency Fee)"),
-    ("7", "Maniobras y Almacenaje Portuario"),
-]
-
-CATEGORIAS_BUQUE_DEMO: list[tuple[str, str]] = [
-    ("TODAS", "General — Aplica a todas las categorías"),
-    ("1", "Portacontenedores (Container Vessel)"),
-    ("2", "Granelero (Bulk Carrier)"),
-    ("3", "Buque Tanque / Quimiquero (Tanker)"),
-    ("4", "Carga General / Multipropósito"),
-    ("5", "Crucero / Pasajeros (Cruise Ship)"),
-    ("6", "Ro-Ro / Car Carrier"),
-]
-
-PROVEEDORES_DEMO: list[tuple[str, str, str]] = [
-    ("1", "ASIPONA Pacífico Sur S.A. de C.V.", "SERVICIOS"),
-    ("2", "Sindicato Nacional de Pilotos de Puerto", "SERVICIOS"),
-    ("3", "Remolcadores del Pacífico S.A.", "SERVICIOS"),
-    ("4", "Operadora Portuaria Marítima OPL", "MIXTO"),
-    ("5", "Terminales y Maniobras del Sur S.A.", "MIXTO"),
-]
-
 UNIDADES_MEDIDA_DEMO: list[tuple[str, str]] = [
     ("SERVICIO", "Servicio / Operación"),
     ("MANIOBRA", "Maniobra Portuaria"),
@@ -95,7 +79,13 @@ class PantallaNuevoServicio(ft.Container):
         `servicio_lineal_mixto` y `servicio_factor_compuesto`.
     """
 
-    def __init__(self, main_page: ft.Page | None = None, vista_anterior=None):
+    def __init__(
+        self,
+        main_page: ft.Page | None = None,
+        vista_anterior=None,
+        controlador=None,
+        servicio_edicion=None,
+    ):
         super().__init__(
             expand=True,
             bgcolor=COLOR_FONDO,
@@ -103,11 +93,38 @@ class PantallaNuevoServicio(ft.Container):
         )
         self.main_page = main_page
         self.vista_anterior = vista_anterior
+        self.controlador = controlador
+        self.servicio_edicion = servicio_edicion
+        self.es_edicion = servicio_edicion is not None
+        self._imagen_path = (
+            getattr(servicio_edicion, "imagen_path", None)
+            if self.es_edicion
+            else None
+        )
+        self._archivo_imagen = None
+        self._selector_archivos = (
+            obtener_selector_archivos(main_page)
+            if main_page is not None
+            else None
+        )
+        self._error_catalogos = None
+        self._catalogos = {
+            "categorias_pda": [],
+            "categorias_buque": [],
+            "proveedores": [],
+        }
+        if self.controlador is not None:
+            try:
+                self._catalogos = self.controlador.obtener_catalogos_registro()
+            except SQLAlchemyError as error:
+                logging.exception("No se pudieron cargar catálogos de servicios.")
+                self._error_catalogos = error
 
-        
-        self._proveedores_seleccionados: list[tuple[str, str, str]] = [
-            PROVEEDORES_DEMO[0]
-        ]
+        self._proveedores_por_id = {
+            str(proveedor.id): proveedor
+            for proveedor in self._catalogos["proveedores"]
+        }
+        self._proveedores_seleccionados = []
         self._filas_rangos: list[dict] = []
         self._filas_tramos: list[dict] = []
 
@@ -115,8 +132,17 @@ class PantallaNuevoServicio(ft.Container):
         self._inicializar_controles_fase1()
         self._inicializar_controles_fase2()
         self._inicializar_controles_fase3()
+        self._inicializar_validaciones()
+        if self.es_edicion:
+            self.dd_tipo_cobro.disabled = True
 
         self.content = self._construir_layout()
+        if self.es_edicion:
+            self._cargar_servicio_edicion()
+        if self._error_catalogos is not None:
+            self._mostrar_aviso(
+                "No se pudieron cargar categorías y proveedores desde la base de datos."
+            )
 
     
     
@@ -235,6 +261,223 @@ class PantallaNuevoServicio(ft.Container):
             ),
         )
 
+    def _inicializar_validaciones(self):
+        self._validaciones_formulario = {}
+        self._mensajes_validacion = {}
+        controles = {
+            "nombre_es": (
+                self.txt_nombre_es,
+                validador_requerido("el nombre en español"),
+                "on_change",
+            ),
+            "unidad_medida": (
+                self.dd_unidad_medida,
+                validador_requerido("la unidad de medida"),
+                "on_select",
+            ),
+            "tasa_iva": (
+                self.dd_tasa_iva,
+                validador_requerido("la tasa de IVA"),
+                "on_select",
+            ),
+            "categoria_pda": (
+                self.dd_categoria_pda,
+                validador_requerido("una categoría PDA"),
+                "on_select",
+            ),
+            "tipo_cobro": (
+                self.dd_tipo_cobro,
+                validador_requerido("un método de cobro"),
+                "on_select",
+            ),
+        }
+        for clave, (control, validador, evento) in controles.items():
+            mensaje = crear_mensaje_validacion(reservar_espacio=True)
+            self._mensajes_validacion[clave] = mensaje
+            self._validaciones_formulario[clave] = (
+                control,
+                mensaje,
+                validador,
+            )
+            vincular_validacion_campo(
+                control,
+                mensaje,
+                validador,
+                page=self.main_page,
+                evento=evento,
+            )
+
+    def _cargar_servicio_edicion(self):
+        servicio = self.servicio_edicion
+        self.txt_nombre_es.value = servicio.nombre_es
+        self.txt_nombre_en.value = servicio.nombre_en or ""
+        self.txt_sku.value = servicio.sku or ""
+        self.dd_unidad_medida.value = servicio.unidad_medida
+        self.dd_tasa_iva.value = str(servicio.tasa_iva)
+        self.dd_categoria_pda.value = str(servicio.categoria_pda_id)
+        self.dd_categoria_buque.value = (
+            str(servicio.categoria_buque_id)
+            if servicio.categoria_buque_id is not None
+            else "TODAS"
+        )
+        self._proveedores_seleccionados = [
+            self._proveedores_por_id[str(proveedor.id)]
+            for proveedor in servicio.proveedores
+            if str(proveedor.id) in self._proveedores_por_id
+        ]
+        self._renderizar_chips_proveedores()
+        self.boton_imagen.content = self._contenido_boton_imagen()
+
+        tipo = servicio.tipo_concepto
+        tipo = tipo.value if hasattr(tipo, "value") else str(tipo)
+        tipos_cobro = {
+            TipoConcepto.SERVICIO_CUOTA_FIJA.value: "CUOTA_FIJA",
+            TipoConcepto.SERVICIO_FACTOR_UNITARIO.value: "FACTOR_UNITARIO",
+            TipoConcepto.SERVICIO_LINEAL_MIXTO.value: "FACTOR_UNITARIO",
+            TipoConcepto.SERVICIO_FACTOR_COMPUESTO.value: "FACTOR_UNITARIO",
+            TipoConcepto.SERVICIO_RANGO.value: "POR_RANGOS",
+            TipoConcepto.SERVICIO_INCREMENTAL.value: "INCREMENTAL",
+        }
+        self.dd_tipo_cobro.value = tipos_cobro[tipo]
+
+        if tipo == TipoConcepto.SERVICIO_CUOTA_FIJA.value:
+            self.txt_cuota_fija.value = str(servicio.cuota)
+        elif tipo in {
+            TipoConcepto.SERVICIO_FACTOR_UNITARIO.value,
+            TipoConcepto.SERVICIO_LINEAL_MIXTO.value,
+            TipoConcepto.SERVICIO_FACTOR_COMPUESTO.value,
+        }:
+            self.dd_variable_primaria.value = servicio.variable_primaria.value
+            self.txt_factor_mxn.value = str(servicio.factor_mxn)
+            self.txt_unidades_minimas.value = str(servicio.unidades_minimas)
+            self.sw_lineal_mixto.value = (
+                tipo == TipoConcepto.SERVICIO_LINEAL_MIXTO.value
+            )
+            self.sw_factor_compuesto.value = (
+                tipo == TipoConcepto.SERVICIO_FACTOR_COMPUESTO.value
+            )
+            if self.sw_lineal_mixto.value:
+                self.txt_cuota_base.value = str(servicio.cuota_base)
+            if self.sw_factor_compuesto.value:
+                self.dd_variable_secundaria.value = (
+                    servicio.variable_secundaria.value
+                )
+        elif tipo == TipoConcepto.SERVICIO_RANGO.value:
+            self.dd_variable_rangos.value = servicio.variable_rangos.value
+            self._filas_rangos.clear()
+            self.columna_filas_rangos.controls.clear()
+            for rango in servicio.rangos:
+                self._agregar_fila_rango(
+                    str(rango.limite_inferior),
+                    (
+                        str(rango.limite_superior)
+                        if rango.limite_superior is not None
+                        else ""
+                    ),
+                    str(rango.cuota_mxn),
+                    actualizar=False,
+                )
+        elif tipo == TipoConcepto.SERVICIO_INCREMENTAL.value:
+            self.dd_variable_cantidad.value = servicio.variable_cantidad.value
+            self.dd_variable_dias.value = servicio.variable_dias.value
+            self.txt_bloque_redondeo.value = str(servicio.bloque_redondeo)
+            self._filas_tramos.clear()
+            self.columna_filas_tramos.controls.clear()
+            for tramo in servicio.tramos:
+                self._agregar_fila_tramo(
+                    str(tramo.dia_inicio),
+                    str(tramo.dia_fin) if tramo.dia_fin is not None else "",
+                    str(tramo.cuota_diaria_mxn),
+                    actualizar=False,
+                )
+
+        self.on_change_tipo_cobro()
+        self._actualizar_vista()
+
+    def _campo_validado(self, clave: str, control: ft.Control) -> ft.Control:
+        return campo_con_mensaje_error(
+            control,
+            self._mensajes_validacion[clave],
+        )
+
+    def _contenido_boton_imagen(self):
+        if self._imagen_path:
+            return ft.Row(
+                spacing=6,
+                alignment=ft.MainAxisAlignment.CENTER,
+                vertical_alignment=ft.CrossAxisAlignment.CENTER,
+                controls=[
+                    ft.Image(
+                        src=self._imagen_path,
+                        width=30,
+                        height=30,
+                        fit=ft.BoxFit.COVER,
+                        border_radius=6,
+                    ),
+                    ft.Column(
+                        expand=True,
+                        spacing=0,
+                        alignment=ft.MainAxisAlignment.CENTER,
+                        horizontal_alignment=ft.CrossAxisAlignment.START,
+                        controls=[
+                            ft.Text(
+                                self._nombre_imagen(),
+                                size=10,
+                                color=COLOR_AZUL_OSCURO,
+                                max_lines=1,
+                                overflow=ft.TextOverflow.ELLIPSIS,
+                            ),
+                            ft.Text("Cambiar imagen", size=9, color=COLOR_GRIS),
+                        ],
+                    ),
+                ],
+            )
+        return ft.Row(
+            spacing=6,
+            alignment=ft.MainAxisAlignment.CENTER,
+            vertical_alignment=ft.CrossAxisAlignment.CENTER,
+            controls=[
+                ft.Icon(ft.Icons.IMAGE_OUTLINED, size=18, color=COLOR_AZUL_OSCURO),
+                ft.Text("Subir imagen", size=11, color=COLOR_AZUL_OSCURO),
+            ],
+        )
+
+    def _nombre_imagen(self):
+        if self._archivo_imagen is not None:
+            return self._archivo_imagen.name
+        if self._imagen_path:
+            return self._imagen_path.replace("\\", "/").rsplit("/", 1)[-1]
+        return ""
+
+    async def seleccionar_imagen(self, e=None):
+        if self._selector_archivos is None:
+            self._mostrar_aviso("El selector de archivos no está disponible.")
+            return
+        archivos = await self._selector_archivos.pick_files(
+            dialog_title="Seleccionar imagen del servicio",
+            file_type=ft.FilePickerFileType.CUSTOM,
+            allowed_extensions=["jpg", "jpeg", "png"],
+            allow_multiple=False,
+        )
+        if not archivos:
+            return
+
+        archivo = archivos[0]
+        ruta = archivo.path
+        error = self.controlador.validar_imagen(
+            archivo.name,
+            archivo.size,
+            ruta,
+        )
+        if error:
+            self._mostrar_aviso(error)
+            return
+
+        self._archivo_imagen = archivo
+        self._imagen_path = ruta
+        self.boton_imagen.content = self._contenido_boton_imagen()
+        self._actualizar_vista()
+
     def _tarjeta_seccion(
         self,
         numero_paso: str,
@@ -243,6 +486,47 @@ class PantallaNuevoServicio(ft.Container):
         contenido: ft.Control,
         borde_destacado: bool = False,
     ) -> ft.Container:
+        controles_encabezado = [
+            ft.Container(
+                width=36,
+                height=36,
+                border_radius=9,
+                bgcolor=(
+                    COLOR_NARANJA
+                    if borde_destacado
+                    else COLOR_NARANJA_SUAVE
+                ),
+                alignment=ft.Alignment(0, 0),
+                content=ft.Icon(
+                    icono,
+                    size=19,
+                    color=COLOR_BLANCO if borde_destacado else COLOR_NARANJA,
+                ),
+            ),
+            ft.Row(
+                spacing=8,
+                expand=True,
+                vertical_alignment=ft.CrossAxisAlignment.CENTER,
+                controls=[
+                    ft.Text(
+                        f"PASO {numero_paso}",
+                        size=10,
+                        weight=ft.FontWeight.BOLD,
+                        color=COLOR_NARANJA,
+                    ),
+                    ft.Text("•", size=10, color=COLOR_GRIS),
+                    ft.Text(
+                        titulo,
+                        size=15,
+                        weight=ft.FontWeight.BOLD,
+                        color=COLOR_AZUL_OSCURO,
+                    ),
+                ],
+            ),
+        ]
+        if titulo == "Datos Generales":
+            controles_encabezado.append(self.boton_imagen)
+
         return ft.Container(
             bgcolor=COLOR_BLANCO,
             border_radius=12,
@@ -263,52 +547,7 @@ class PantallaNuevoServicio(ft.Container):
                     ft.Row(
                         spacing=12,
                         vertical_alignment=ft.CrossAxisAlignment.CENTER,
-                        controls=[
-                            ft.Container(
-                                width=36,
-                                height=36,
-                                border_radius=9,
-                                bgcolor=(
-                                    COLOR_NARANJA
-                                    if borde_destacado
-                                    else COLOR_NARANJA_SUAVE
-                                ),
-                                alignment=ft.Alignment(0, 0),
-                                content=ft.Icon(
-                                    icono,
-                                    size=19,
-                                    color=(
-                                        COLOR_BLANCO
-                                        if borde_destacado
-                                        else COLOR_NARANJA
-                                    ),
-                                ),
-                            ),
-                            ft.Row(
-                                spacing=8,
-                                expand=True,
-                                vertical_alignment=ft.CrossAxisAlignment.CENTER,
-                                controls=[
-                                    ft.Text(
-                                        f"PASO {numero_paso}",
-                                        size=10,
-                                        weight=ft.FontWeight.BOLD,
-                                        color=COLOR_NARANJA,
-                                    ),
-                                    ft.Text(
-                                        "•",
-                                        size=10,
-                                        color=COLOR_GRIS,
-                                    ),
-                                    ft.Text(
-                                        titulo,
-                                        size=15,
-                                        weight=ft.FontWeight.BOLD,
-                                        color=COLOR_AZUL_OSCURO,
-                                    ),
-                                ],
-                            ),
-                        ],
+                        controls=controles_encabezado,
                     ),
                     ft.Divider(height=1, color=COLOR_BORDE_SUAVE),
                     contenido,
@@ -332,6 +571,17 @@ class PantallaNuevoServicio(ft.Container):
             placeholder="Ej. SRV-PDA-001",
             icono=ft.Icons.QR_CODE_2_OUTLINED,
         )
+        self.boton_imagen = ft.OutlinedButton(
+            content=self._contenido_boton_imagen(),
+            on_click=self.seleccionar_imagen,
+            width=190,
+            height=42,
+            style=ft.ButtonStyle(
+                side=ft.BorderSide(1, "#B8D3F8"),
+                shape=ft.RoundedRectangleBorder(radius=9),
+                padding=ft.Padding(6, 3, 6, 3),
+            ),
+        )
         self.dd_unidad_medida = self._crear_dropdown(
             placeholder="Selecciona unidad",
             opciones=UNIDADES_MEDIDA_DEMO,
@@ -347,21 +597,32 @@ class PantallaNuevoServicio(ft.Container):
 
         self.dd_categoria_pda = self._crear_dropdown(
             placeholder="Selecciona categoría PDA...",
-            opciones=CATEGORIAS_PDA_DEMO,
-            valor_inicial="1",
+            opciones=[
+                (str(categoria.id), categoria.nombre)
+                for categoria in self._catalogos["categorias_pda"]
+            ],
             icono=ft.Icons.FOLDER_OUTLINED,
         )
         self.dd_categoria_buque = self._crear_dropdown(
             placeholder="Aplica a categoría de buque...",
-            opciones=CATEGORIAS_BUQUE_DEMO,
+            opciones=[
+                ("TODAS", "General — Aplica a todas las categorías"),
+                *[
+                    (str(categoria.id), categoria.categoria)
+                    for categoria in self._catalogos["categorias_buque"]
+                ],
+            ],
             valor_inicial="TODAS",
             icono=ft.Icons.SAILING_OUTLINED,
         )
         self.dd_proveedor = self._crear_dropdown(
             placeholder="Vincular proveedor autorizado...",
             opciones=[
-                (pid, f"{nombre} ({tipo})")
-                for pid, nombre, tipo in PROVEEDORES_DEMO
+                (
+                    str(proveedor.id),
+                    f"{proveedor.nombre} ({proveedor.tipo_proveedor.value})",
+                )
+                for proveedor in self._catalogos["proveedores"]
             ],
             icono=ft.Icons.BUSINESS_OUTLINED,
             on_select=self.on_change_agregar_proveedor,
@@ -385,7 +646,7 @@ class PantallaNuevoServicio(ft.Container):
             return
 
         chips = []
-        for pid, nombre, tipo in self._proveedores_seleccionados:
+        for proveedor in self._proveedores_seleccionados:
             chips.append(
                 ft.Container(
                     padding=ft.Padding(10, 5, 6, 5),
@@ -403,7 +664,7 @@ class PantallaNuevoServicio(ft.Container):
                                 color=COLOR_NARANJA,
                             ),
                             ft.Text(
-                                nombre,
+                                proveedor.nombre,
                                 size=11,
                                 weight=ft.FontWeight.W_600,
                                 color=COLOR_AZUL_OSCURO,
@@ -413,7 +674,7 @@ class PantallaNuevoServicio(ft.Container):
                                 border_radius=4,
                                 bgcolor=COLOR_NARANJA_SUAVE,
                                 content=ft.Text(
-                                    tipo,
+                                proveedor.tipo_proveedor.value,
                                     size=9,
                                     weight=ft.FontWeight.BOLD,
                                     color=COLOR_NARANJA,
@@ -427,7 +688,7 @@ class PantallaNuevoServicio(ft.Container):
                                 height=22,
                                 padding=0,
                                 tooltip="Quitar proveedor",
-                                on_click=lambda e, p_id=pid: self._quitar_proveedor(p_id),
+                                on_click=lambda e, p_id=str(proveedor.id): self._quitar_proveedor(p_id),
                             ),
                         ],
                     ),
@@ -439,7 +700,7 @@ class PantallaNuevoServicio(ft.Container):
         pid = self.dd_proveedor.value
         if not pid:
             return
-        encontrado = next((p for p in PROVEEDORES_DEMO if p[0] == pid), None)
+        encontrado = self._proveedores_por_id.get(str(pid))
         if encontrado and encontrado not in self._proveedores_seleccionados:
             self._proveedores_seleccionados.append(encontrado)
             self._renderizar_chips_proveedores()
@@ -448,7 +709,9 @@ class PantallaNuevoServicio(ft.Container):
 
     def _quitar_proveedor(self, proveedor_id: str):
         self._proveedores_seleccionados = [
-            p for p in self._proveedores_seleccionados if p[0] != proveedor_id
+            proveedor
+            for proveedor in self._proveedores_seleccionados
+            if str(proveedor.id) != proveedor_id
         ]
         self._renderizar_chips_proveedores()
         self._actualizar_vista()
@@ -600,12 +863,8 @@ class PantallaNuevoServicio(ft.Container):
             icono=ft.Icons.STACKED_BAR_CHART_OUTLINED,
         )
         self.columna_filas_rangos = ft.Column(spacing=8)
-        self._agregar_fila_rango(
-            limite_inf="0.00", limite_sup="5000.00", cuota="4500.00", actualizar=False
-        )
-        self._agregar_fila_rango(
-            limite_inf="5000.01", limite_sup="", cuota="8200.00", actualizar=False
-        )
+        self._agregar_fila_rango(actualizar=False)
+        self._agregar_fila_rango(actualizar=False)
         self.panel_por_rangos = self._construir_subformulario_por_rangos()
 
        
@@ -627,12 +886,8 @@ class PantallaNuevoServicio(ft.Container):
             icono=ft.Icons.GRID_VIEW_OUTLINED,
         )
         self.columna_filas_tramos = ft.Column(spacing=8)
-        self._agregar_fila_tramo(
-            dia_ini="1", dia_fin="5", cuota_diaria="120.00", actualizar=False
-        )
-        self._agregar_fila_tramo(
-            dia_ini="6", dia_fin="", cuota_diaria="185.00", actualizar=False
-        )
+        self._agregar_fila_tramo(actualizar=False)
+        self._agregar_fila_tramo(actualizar=False)
         self.panel_incremental = self._construir_subformulario_incremental()
 
         # Estado vacío inicial antes de elegir el método de cobro
@@ -1529,7 +1784,11 @@ class PantallaNuevoServicio(ft.Container):
                                         color=COLOR_GRIS,
                                     ),
                                     ft.Text(
-                                        "Nuevo Servicio",
+                                        (
+                                            "Editar Servicio"
+                                            if self.es_edicion
+                                            else "Nuevo Servicio"
+                                        ),
                                         size=11,
                                         weight=ft.FontWeight.W_600,
                                         color=COLOR_NARANJA,
@@ -1537,7 +1796,11 @@ class PantallaNuevoServicio(ft.Container):
                                 ],
                             ),
                             ft.Text(
-                                "Registro y Configuración Tarifaria de Servicio",
+                                (
+                                    "Actualiza los datos y la tarifa del servicio"
+                                    if self.es_edicion
+                                    else "Registro y Configuración Tarifaria de Servicio"
+                                ),
                                 size=22,
                                 weight=ft.FontWeight.BOLD,
                                 color=COLOR_AZUL_OSCURO,
@@ -1555,31 +1818,34 @@ class PantallaNuevoServicio(ft.Container):
             controls=[
                 self._campo_con_etiqueta(
                     etiqueta="Nombre en Español",
-                    control=self.txt_nombre_es,
+                    control=self._campo_validado("nombre_es", self.txt_nombre_es),
                     obligatorio=True,
-                    expand=3,
+                    expand=5,
                 ),
                 self._campo_con_etiqueta(
                     etiqueta="Nombre en Inglés",
                     control=self.txt_nombre_en,
-                    expand=3,
+                    expand=5,
                 ),
                 self._campo_con_etiqueta(
                     etiqueta="SKU / Código",
                     control=self.txt_sku,
-                    expand=2,
+                    expand=3,
                 ),
                 self._campo_con_etiqueta(
                     etiqueta="Unidad de Medida",
-                    control=self.dd_unidad_medida,
+                    control=self._campo_validado(
+                        "unidad_medida",
+                        self.dd_unidad_medida,
+                    ),
                     obligatorio=True,
-                    expand=2,
+                    expand=3,
                 ),
                 self._campo_con_etiqueta(
                     etiqueta="Tasa de IVA",
-                    control=self.dd_tasa_iva,
+                    control=self._campo_validado("tasa_iva", self.dd_tasa_iva),
                     obligatorio=True,
-                    expand=2,
+                    expand=3,
                 ),
             ],
         )
@@ -1590,7 +1856,10 @@ class PantallaNuevoServicio(ft.Container):
             controls=[
                 self._campo_con_etiqueta(
                     etiqueta="Categoría PDA",
-                    control=self.dd_categoria_pda,
+                    control=self._campo_validado(
+                        "categoria_pda",
+                        self.dd_categoria_pda,
+                    ),
                     obligatorio=True,
                     expand=2,
                 ),
@@ -1640,7 +1909,10 @@ class PantallaNuevoServicio(ft.Container):
             controls=[
                 self._campo_con_etiqueta(
                     etiqueta="Método de Cobro",
-                    control=self.dd_tipo_cobro,
+                    control=self._campo_validado(
+                        "tipo_cobro",
+                        self.dd_tipo_cobro,
+                    ),
                     obligatorio=True,
                     expand=2,
                 ),
@@ -1702,6 +1974,7 @@ class PantallaNuevoServicio(ft.Container):
                             ft.Button(
                                 content="Limpiar Formulario",
                                 icon=ft.Icons.RESTART_ALT_OUTLINED,
+                                visible=not self.es_edicion,
                                 bgcolor=COLOR_BLANCO,
                                 color=COLOR_GRIS,
                                 elevation=0,
@@ -1728,7 +2001,11 @@ class PantallaNuevoServicio(ft.Container):
                                 on_click=self.cancelar,
                             ),
                             ft.Button(
-                                content="Guardar Servicio",
+                                content=(
+                                    "Guardar cambios"
+                                    if self.es_edicion
+                                    else "Guardar Servicio"
+                                ),
                                 icon=ft.Icons.SAVE_OUTLINED,
                                 bgcolor=COLOR_NARANJA,
                                 color=COLOR_BLANCO,
@@ -1776,10 +2053,15 @@ class PantallaNuevoServicio(ft.Container):
         self.txt_nombre_es.value = ""
         self.txt_nombre_en.value = ""
         self.txt_sku.value = ""
+        self._imagen_path = None
+        self._archivo_imagen = None
+        self.boton_imagen.content = self._contenido_boton_imagen()
         self.dd_unidad_medida.value = "SERVICIO"
         self.dd_tasa_iva.value = "0.1600"
-        self.dd_categoria_pda.value = "1"
+        self.dd_categoria_pda.value = None
         self.dd_categoria_buque.value = "TODAS"
+        self._proveedores_seleccionados.clear()
+        self._renderizar_chips_proveedores()
 
         self.dd_tipo_cobro.value = None
         self.txt_cuota_fija.value = ""
@@ -1794,17 +2076,106 @@ class PantallaNuevoServicio(ft.Container):
         self.on_change_tipo_cobro()
 
     def guardar_servicio(self, e: ft.ControlEvent | None = None):
-        if not (self.txt_nombre_es.value or "").strip():
-            self._mostrar_aviso("Por favor ingresa el Nombre en Español.")
-            return
-        if not self.dd_tipo_cobro.value:
+        if self.controlador is None:
             self._mostrar_aviso(
-                "Selecciona un Método de Cobro para continuar."
+                "El controlador de servicios no está conectado a la base de datos."
+            )
+            return
+        if not validar_campos(self._validaciones_formulario):
+            self._actualizar_vista()
+            return
+        if self._archivo_imagen is not None:
+            error_imagen = self.controlador.validar_imagen(
+                self._archivo_imagen.name,
+                self._archivo_imagen.size,
+                self._imagen_path,
+            )
+            if error_imagen:
+                self._mostrar_aviso(error_imagen)
+                return
+
+        datos = {
+            "nombre_es": self.txt_nombre_es.value,
+            "nombre_en": self.txt_nombre_en.value,
+            "sku": self.txt_sku.value,
+            "imagen_path": self._imagen_path,
+            "unidad_medida": self.dd_unidad_medida.value,
+            "tasa_iva": self.dd_tasa_iva.value,
+            "categoria_pda_id": self.dd_categoria_pda.value,
+            "categoria_buque_id": self.dd_categoria_buque.value,
+            "proveedor_ids": [
+                proveedor.id for proveedor in self._proveedores_seleccionados
+            ],
+            "tipo_cobro": self.dd_tipo_cobro.value,
+            "cuota_fija": self.txt_cuota_fija.value,
+            "variable_primaria": self.dd_variable_primaria.value,
+            "factor_mxn": self.txt_factor_mxn.value,
+            "unidades_minimas": self.txt_unidades_minimas.value,
+            "lineal_mixto": self.sw_lineal_mixto.value,
+            "cuota_base": self.txt_cuota_base.value,
+            "factor_compuesto": self.sw_factor_compuesto.value,
+            "variable_secundaria": self.dd_variable_secundaria.value,
+            "variable_rangos": self.dd_variable_rangos.value,
+            "rangos": [
+                {
+                    "limite_inferior": fila["limite_inferior"].value,
+                    "limite_superior": fila["limite_superior"].value,
+                    "cuota_mxn": fila["cuota_mxn"].value,
+                }
+                for fila in self._filas_rangos
+            ],
+            "variable_cantidad": self.dd_variable_cantidad.value,
+            "variable_dias": self.dd_variable_dias.value,
+            "bloque_redondeo": self.txt_bloque_redondeo.value,
+            "tramos": [
+                {
+                    "dia_inicio": fila["dia_inicio"].value,
+                    "dia_fin": fila["dia_fin"].value,
+                    "cuota_diaria_mxn": fila["cuota_diaria_mxn"].value,
+                }
+                for fila in self._filas_tramos
+            ],
+        }
+        try:
+            if self.es_edicion:
+                servicio = self.controlador.modificar_servicio(
+                    self.servicio_edicion.id,
+                    datos,
+                )
+            else:
+                servicio = self.controlador.registrar_servicio(datos)
+        except ValueError as error:
+            self._mostrar_aviso(str(error))
+            return
+        except SQLAlchemyError:
+            logging.exception("No se pudo guardar el servicio en la base de datos.")
+            self._mostrar_aviso(
+                "No se pudo guardar el servicio. Revisa la conexión y los datos de la base."
             )
             return
 
+        if self.vista_anterior is not None and hasattr(
+            self.vista_anterior, "recargar_catalogo"
+        ):
+            try:
+                self.vista_anterior.recargar_catalogo()
+            except SQLAlchemyError:
+                logging.exception(
+                    "El servicio se guardó, pero no se pudo actualizar el catálogo."
+                )
+                self._mostrar_aviso(
+                    "El servicio se guardó, pero no se pudo actualizar el catálogo."
+                )
+                return
+
+        if self.es_edicion:
+            self.cancelar()
         self._mostrar_aviso(
-            f"Servicio '{self.txt_nombre_es.value}' guardado correctamente.",
+            (
+                f"Servicio '{servicio.nombre_es}' actualizado correctamente."
+                if self.es_edicion
+                else f"Servicio '{servicio.nombre_es}' guardado correctamente."
+            ),
             exito=True,
         )
 
@@ -1827,7 +2198,7 @@ class PantallaNuevoServicio(ft.Container):
                 self._actualizar_vista()
 
     def _mostrar_aviso(self, mensaje: str, exito: bool = False):
-        pagina = self.main_page or getattr(self, "page", None)
+        pagina = self._obtener_pagina()
         if pagina is None:
             return
         pagina.show_dialog(
@@ -1842,9 +2213,15 @@ class PantallaNuevoServicio(ft.Container):
         )
         pagina.update()
 
+    def _obtener_pagina(self):
+        if self.main_page is not None:
+            return self.main_page
+        try:
+            return self.page
+        except RuntimeError:
+            return None
+
     def _actualizar_vista(self):
-        pagina = self.main_page or getattr(self, "page", None)
+        pagina = self._obtener_pagina()
         if pagina is not None:
             pagina.update()
-        elif self.page is not None:
-            self.update()

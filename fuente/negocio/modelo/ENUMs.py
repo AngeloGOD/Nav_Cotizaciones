@@ -91,9 +91,25 @@ class Moneda(str, enum.Enum):
 
 
 class EstadoCotizacion(str, enum.Enum):
-    PENDIENTE = "PENDIENTE"
-    APROBADA = "APROBADA"
-    RECHAZADA = "RECHAZADA"
+    BORRADOR = "BORRADOR"
+    PROFORMA = "PROFORMA"
+    ANTICIPO_RECIBIDO = "ANTICIPO_RECIBIDO"
+    EN_OPERACION = "EN_OPERACION"
+    LIQUIDADA_FDA = "LIQUIDADA_FDA"
+    CANCELADA = "CANCELADA"
+
+    PENDIENTE = "PROFORMA"
+    APROBADA = "EN_OPERACION"
+    RECHAZADA = "CANCELADA"
+
+    @classmethod
+    def _missing_(cls, value):
+        equivalencias_anteriores = {
+            "PENDIENTE": cls.PROFORMA,
+            "APROBADA": cls.EN_OPERACION,
+            "RECHAZADA": cls.CANCELADA,
+        }
+        return equivalencias_anteriores.get(str(value).strip().upper())
 
 
 class EtapaCobro(str, enum.Enum):

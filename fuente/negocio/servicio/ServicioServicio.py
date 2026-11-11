@@ -25,14 +25,18 @@ class ServicioServicio:
     def __init__(self, uow: AbstractUnitOfWork):
         self.uow = uow
 
-    def registrar_servicio(self, servicio: Servicio):
+    def registrar_servicio(
+        self, servicio: Servicio, proveedor_ids: list[int] | None = None
+    ):
         with self.uow as uow:
-            uow.servicio.insertar(servicio)
+            uow.servicio.insertar(servicio, proveedor_ids=proveedor_ids)
             uow.commit()
 
-    def modificar_servicio(self, servicio: Servicio):
+    def modificar_servicio(
+        self, servicio: Servicio, proveedor_ids: list[int] | None = None
+    ):
         with self.uow as uow:
-            uow.servicio.modificar(servicio)
+            uow.servicio.modificar(servicio, proveedor_ids=proveedor_ids)
             uow.commit()
 
     def eliminar_servicio(self, servicio: Servicio):
@@ -60,6 +64,10 @@ class ServicioServicio:
     def obtener_cantidad_registros(self) -> int:
         with self.uow as uow:
             return uow.servicio.contar_registros()
+
+    def obtener_catalogos_registro(self):
+        with self.uow as uow:
+            return uow.catalogos_servicio.obtener_catalogos_registro()
 
     def cumple_condicion_obligatoriedad(
         self, servicio: Servicio, contexto: ContextoEscala

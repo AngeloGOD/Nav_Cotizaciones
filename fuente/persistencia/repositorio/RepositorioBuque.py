@@ -141,7 +141,6 @@ class RepositorioBuque(Repositorio):
         stmt = (
             select(Buque)
             .options(
-                selectinload(Buque.cliente),
                 selectinload(Buque.categoria_buque),
             )
             .where(Buque.id == id)

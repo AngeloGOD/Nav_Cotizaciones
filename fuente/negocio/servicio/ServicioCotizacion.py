@@ -1,8 +1,11 @@
 from __future__ import annotations
 
 from decimal import Decimal, ROUND_HALF_UP
+import logging
 import math
 import uuid
+
+from sqlalchemy.exc import SQLAlchemyError
 
 from fuente.negocio.especificaciones.EspecificacionBase import ContextoEscala
 from fuente.negocio.modelo.Buque import Buque
@@ -513,36 +516,40 @@ class ServicioCotizacion:
 
         folio_actual = (cotizacion.folio or "").strip()
 
-        with self.uow as uow:
-            id_sugerido = uow.cotizacion.obtener_siguiente_id()
-            folio_sugerido = f"PDA.-{int(id_sugerido):04d}"
+        try:
+            with self.uow as uow:
+                id_sugerido = uow.cotizacion.obtener_siguiente_id()
+                folio_sugerido = f"PDA.-{int(id_sugerido):04d}"
 
-            es_folio_provisional = (
-                not folio_actual
-                or folio_actual.upper() in ("PROVISIONAL", "AUTO", "PENDIENTE")
-                or folio_actual == folio_sugerido
-            )
+                es_folio_provisional = (
+                    not folio_actual
+                    or folio_actual.upper() in ("PROVISIONAL", "AUTO", "PENDIENTE")
+                    or folio_actual == folio_sugerido
+                )
 
-            if not es_folio_provisional:
-                existente = uow.cotizacion.buscar_por_folio(folio_actual)
-                if existente is not None:
-                    raise ValueError(
-                        f"Ya existe una cotización registrada con el folio '{folio_actual}'."
-                    )
-                cotizacion.folio = folio_actual
-            else:
-                cotizacion.folio = f"__PROVISIONAL_{uuid.uuid4().hex[:10]}__"
+                if not es_folio_provisional:
+                    existente = uow.cotizacion.buscar_por_folio(folio_actual)
+                    if existente is not None:
+                        raise ValueError(
+                            f"Ya existe una cotización registrada con el folio '{folio_actual}'."
+                        )
+                    cotizacion.folio = folio_actual
+                else:
+                    cotizacion.folio = f"__PROVISIONAL_{uuid.uuid4().hex[:10]}__"
 
-            tasas = self._obtener_tasas_iva_conceptos(uow, cotizacion)
-            self.recalcular_cotizacion(cotizacion, tasas_iva_por_concepto=tasas)
-            uow.cotizacion.insertar(cotizacion)
+                tasas = self._obtener_tasas_iva_conceptos(uow, cotizacion)
+                self.recalcular_cotizacion(cotizacion, tasas_iva_por_concepto=tasas)
+                uow.cotizacion.insertar(cotizacion)
 
-            if es_folio_provisional and cotizacion.id is not None:
-                cotizacion.folio = f"PDA.-{int(cotizacion.id):04d}"
-                uow.session.flush()
+                if es_folio_provisional and cotizacion.id is not None:
+                    cotizacion.folio = f"PDA.-{int(cotizacion.id):04d}"
+                    uow.session.flush()
 
-            uow.commit()
-            return uow.cotizacion.buscar_por_id(cotizacion.id)
+                uow.commit()
+                return uow.cotizacion.buscar_por_id(cotizacion.id)
+        except SQLAlchemyError:
+            logging.exception("No se pudo persistir la cotización.")
+            raise
 
     def modificar_cotizacion(self, cotizacion: Cotizacion) -> Cotizacion:
         if cotizacion is None or cotizacion.id is None:

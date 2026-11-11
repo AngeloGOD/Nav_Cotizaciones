@@ -1,5 +1,6 @@
 from collections.abc import Callable, Iterable, Mapping, Sequence
 from datetime import date, datetime
+from decimal import Decimal
 from enum import Enum
 from html import escape, unescape
 from io import BytesIO
@@ -8,14 +9,16 @@ from typing import Any
 
 import flet as ft
 from reportlab.lib import colors
-from reportlab.lib.enums import TA_CENTER, TA_LEFT
-from reportlab.lib.pagesizes import A4, landscape
+from reportlab.lib.enums import TA_CENTER, TA_LEFT, TA_RIGHT
+from reportlab.lib.pagesizes import A4, landscape, legal
 from reportlab.lib.styles import ParagraphStyle
 from reportlab.lib.units import mm
 from reportlab.pdfbase.pdfmetrics import stringWidth
 from reportlab.pdfgen import canvas
+from reportlab.lib.utils import ImageReader
 from reportlab.platypus import (
     Flowable,
+    KeepTogether,
     LongTable,
     PageBreak,
     Paragraph,
@@ -750,6 +753,482 @@ async def exportar_pdf(
     selector = obtener_selector_archivos(page)
     ruta = await selector.save_file(
         dialog_title="Exportar a PDF",
+        file_name=nombre_archivo,
+        file_type=ft.FilePickerFileType.CUSTOM,
+        allowed_extensions=["pdf"],
+        src_bytes=contenido,
+    )
+    return ruta is not None
+
+
+def crear_pdf_proforma(cotizacion: Any) -> bytes:
+    if cotizacion is None:
+        raise ValueError("La proforma no puede ser nula.")
+
+    logo_proforma = (
+        Path(__file__).resolve().parents[2] / "assets" / "logo_opl.png"
+    )
+    if not logo_proforma.is_file():
+        raise FileNotFoundError(
+            f"No se encontró el logo para la proforma: {logo_proforma}"
+        )
+
+    salida = BytesIO()
+    documento = SimpleDocTemplate(
+        salida,
+        pagesize=legal,
+        leftMargin=12 * mm,
+        rightMargin=12 * mm,
+        topMargin=8 * mm,
+        bottomMargin=8 * mm,
+        title=f"Proforma {getattr(cotizacion, 'folio', '')}",
+        author="OPL Pacífico Sur",
+    )
+    ancho = documento.width
+    estilo_seccion = ParagraphStyle(
+        "SeccionProforma",
+        fontName="Helvetica-Bold",
+        fontSize=8,
+        leading=10,
+        textColor=COLOR_BLANCO,
+    )
+    estilo_celda = ParagraphStyle(
+        "CeldaProforma",
+        fontName="Helvetica",
+        fontSize=7,
+        leading=8.5,
+        textColor=COLOR_SIDEBAR,
+        splitLongWords=True,
+    )
+    estilo_celda_negrita = ParagraphStyle(
+        "CeldaProformaNegrita",
+        parent=estilo_celda,
+        fontName="Helvetica-Bold",
+    )
+    estilo_celda_centrada = ParagraphStyle(
+        "CeldaProformaCentrada",
+        parent=estilo_celda,
+        alignment=TA_CENTER,
+    )
+    estilo_encabezado_tabla = ParagraphStyle(
+        "EncabezadoTablaProforma",
+        fontName="Helvetica-Bold",
+        fontSize=5.8,
+        leading=7,
+        textColor=COLOR_BLANCO,
+        alignment=TA_CENTER,
+    )
+    estilo_adicional_titulo = ParagraphStyle(
+        "TituloAdicionalProforma",
+        fontName="Helvetica-Bold",
+        fontSize=6.7,
+        leading=8,
+        textColor=COLOR_NARANJA,
+        spaceBefore=1.5 * mm,
+        spaceAfter=0.5 * mm,
+    )
+    estilo_adicional_texto = ParagraphStyle(
+        "TextoAdicionalProforma",
+        fontName="Helvetica",
+        fontSize=6.2,
+        leading=7.3,
+        textColor=COLOR_SIDEBAR,
+        spaceAfter=0.5 * mm,
+    )
+
+    def parrafo(valor: object, estilo=estilo_celda) -> Paragraph:
+        return Paragraph(_texto(valor), estilo)
+
+    def fecha_proforma(valor: object) -> str:
+        if isinstance(valor, (date, datetime)):
+            return valor.strftime("%d/%m/%Y")
+        return _texto(valor)
+
+    def seccion(texto: str) -> Table:
+        tabla_seccion = Table(
+            [[Paragraph(_texto(texto), estilo_seccion)]],
+            colWidths=[ancho],
+        )
+        tabla_seccion.setStyle(
+            TableStyle(
+                [
+                    ("BACKGROUND", (0, 0), (-1, -1), COLOR_AZUL_MARINO),
+                    ("LEFTPADDING", (0, 0), (-1, -1), 6),
+                    ("RIGHTPADDING", (0, 0), (-1, -1), 6),
+                    ("TOPPADDING", (0, 0), (-1, -1), 4),
+                    ("BOTTOMPADDING", (0, 0), (-1, -1), 4),
+                ]
+            )
+        )
+        return tabla_seccion
+
+    def tabla_informacion_compacta(
+        filas: list[list[tuple[str, object]]],
+        anchos_columna: list[float],
+    ) -> Table:
+        datos = []
+        for fila in filas:
+            celdas = []
+            for etiqueta, valor in fila:
+                celdas.extend(
+                    [
+                        parrafo(etiqueta, estilo_celda_negrita),
+                        parrafo(valor),
+                    ]
+                )
+            while len(celdas) < len(anchos_columna):
+                celdas.extend([parrafo(""), parrafo("")])
+            datos.append(celdas)
+        tabla_info = Table(datos, colWidths=anchos_columna, hAlign="LEFT")
+        tabla_info.setStyle(
+            TableStyle(
+                [
+                    ("GRID", (0, 0), (-1, -1), 0.4, _aclarar_color(COLOR_AZUL, 0.7)),
+                    (
+                        "BACKGROUND",
+                        (0, 0),
+                        (-1, -1),
+                        _aclarar_color(COLOR_AZUL, 0.96),
+                    ),
+                    ("VALIGN", (0, 0), (-1, -1), "MIDDLE"),
+                    ("LEFTPADDING", (0, 0), (-1, -1), 3),
+                    ("RIGHTPADDING", (0, 0), (-1, -1), 3),
+                    ("TOPPADDING", (0, 0), (-1, -1), 1.5),
+                    ("BOTTOMPADDING", (0, 0), (-1, -1), 1.5),
+                ]
+            )
+        )
+        return tabla_info
+
+    class EncabezadoProforma(Flowable):
+        def __init__(self):
+            super().__init__()
+            self.width = ancho
+            self.height = 27 * mm
+
+        def draw(self):
+            lienzo = self.canv
+            alto = self.height
+            ancho_logo = 49 * mm
+            lienzo.setFillColor(COLOR_AZUL_MARINO)
+            lienzo.roundRect(0, 0, ancho_logo, alto, 2 * mm, fill=1, stroke=0)
+            lienzo.drawImage(
+                ImageReader(str(logo_proforma)),
+                1.5 * mm,
+                1.5 * mm,
+                width=ancho_logo - 3 * mm,
+                height=alto - 3 * mm,
+                preserveAspectRatio=True,
+                anchor="c",
+                mask="auto",
+            )
+
+            x_titulo = 54 * mm
+            lienzo.setFillColor(COLOR_SIDEBAR)
+            lienzo.setFont("Helvetica-Bold", 14)
+            lienzo.drawString(x_titulo, alto - 8 * mm, "PORT DISBURSEMENT")
+            lienzo.drawString(x_titulo, alto - 15 * mm, "ACCOUNT (PDA)")
+            lienzo.setFillColor(COLOR_GRIS)
+            lienzo.setFont("Helvetica", 7)
+            lienzo.drawString(x_titulo, 3 * mm, "Proforma de Gastos Portuarios")
+
+            x_datos = ancho - 43 * mm
+            lienzo.setFillColor(COLOR_SIDEBAR)
+            lienzo.setFont("Helvetica-Bold", 6.5)
+            lienzo.drawString(x_datos, alto - 5 * mm, "Folio / Reference")
+            lienzo.setFillColor(COLOR_NARANJA)
+            lienzo.setFont("Helvetica-Bold", 11)
+            lienzo.drawString(
+                x_datos,
+                alto - 11 * mm,
+                str(getattr(cotizacion, "folio", "") or ""),
+            )
+            lienzo.setFillColor(COLOR_SIDEBAR)
+            lienzo.setFont("Helvetica-Bold", 6.5)
+            lienzo.drawString(x_datos, alto - 17 * mm, "Fecha / Date")
+            lienzo.setFont("Helvetica", 7)
+            lienzo.drawString(
+                x_datos,
+                alto - 23 * mm,
+                fecha_proforma(fecha),
+            )
+
+    cliente = getattr(cotizacion, "cliente", None)
+    buque = getattr(cotizacion, "buque", None)
+    categoria_buque = getattr(buque, "categoria_buque", None)
+    moneda = _texto(getattr(cotizacion, "moneda", "MXN"))
+    fecha = getattr(cotizacion, "creado_en", None) or getattr(
+        cotizacion, "fecha_arribo", None
+    )
+    encabezado = EncabezadoProforma()
+
+    datos_cliente = tabla_informacion_compacta(
+        [
+            [
+                ("Cliente / Customer", getattr(cliente, "razon_social", "—")),
+                ("Fecha / Date", fecha_proforma(fecha)),
+            ],
+            [
+                ("Dirección / Address", getattr(cliente, "direccion", "—")),
+                (
+                    "Arribo / ETA",
+                    fecha_proforma(getattr(cotizacion, "fecha_arribo", None)),
+                ),
+            ],
+            [
+                (
+                    "Zarpe / ETD",
+                    fecha_proforma(getattr(cotizacion, "fecha_zarpe", None)),
+                ),
+                ("", ""),
+            ],
+        ],
+        [25 * mm, 67 * mm, 22 * mm, ancho - 114 * mm],
+    )
+    tipo_buque = getattr(categoria_buque, "categoria", "—")
+    subtipo = getattr(buque, "subtipo_descripcion", None)
+    if subtipo:
+        tipo_buque = f"{tipo_buque} · {subtipo}"
+    datos_buque = tabla_informacion_compacta(
+        [
+            [
+                ("Buque / Vessel", getattr(buque, "nombre", "—")),
+                ("IMO", getattr(buque, "numero_imo", "—")),
+                ("Tipo / Type", tipo_buque),
+            ],
+            [
+                ("UAB / GRT", getattr(buque, "trb", "—")),
+                ("Eslora / LOA (m)", getattr(buque, "eslora", "—")),
+                ("Calado / Draft (m)", getattr(buque, "calado", "—")),
+            ],
+        ],
+        [23 * mm, 44 * mm, 12 * mm, 24 * mm, 22 * mm, ancho - 125 * mm],
+    )
+
+    titulos_detalle = (
+        "#",
+        "Categoría / Category",
+        "Descripción / Description",
+        "Proveedor / Supplier",
+        "Subtotal",
+        "IVA / TAX",
+        "Total",
+        "Factura / Invoice",
+        "Observaciones / Observations",
+    )
+    anchos_columnas = [
+        ancho * proporcion
+        for proporcion in (0.035, 0.105, 0.19, 0.16, 0.105, 0.075, 0.105, 0.09, 0.135)
+    ]
+    filas_detalle = [
+        [Paragraph(_texto(titulo), estilo_encabezado_tabla) for titulo in titulos_detalle]
+    ]
+    for indice, detalle in enumerate(
+        getattr(cotizacion, "detalles", None) or [], start=1
+    ):
+        concepto = getattr(detalle, "concepto", None)
+        categoria = getattr(
+            getattr(concepto, "categoria_pda", None), "nombre", "—"
+        )
+        proveedores = getattr(concepto, "proveedores", None) or []
+        proveedor = ", ".join(
+            p.nombre for p in proveedores if getattr(p, "nombre", None)
+        ) or "—"
+        descripcion = getattr(concepto, "nombre_es", None) or (
+            f"Concepto #{getattr(detalle, 'concepto_id', '')}"
+        )
+        subtotal = Decimal(str(getattr(detalle, "subtotal", 0) or 0))
+        iva = Decimal(str(getattr(detalle, "iva", 0) or 0))
+        total = subtotal + iva
+        filas_detalle.append(
+            [
+                parrafo(indice, estilo_celda_centrada),
+                parrafo(categoria),
+                parrafo(descripcion),
+                parrafo(proveedor),
+                parrafo(f"$ {subtotal:,.2f} {moneda}", estilo_celda_centrada),
+                parrafo(
+                    f"$ {iva:,.2f} {moneda}" if iva else "—",
+                    estilo_celda_centrada,
+                ),
+                parrafo(f"$ {total:,.2f} {moneda}", estilo_celda_centrada),
+                parrafo(getattr(detalle, "factura", None) or "—"),
+                parrafo(getattr(detalle, "observaciones", None) or "—"),
+            ]
+        )
+
+    tabla_detalles = LongTable(
+        filas_detalle,
+        colWidths=anchos_columnas,
+        repeatRows=1,
+        hAlign="LEFT",
+        splitByRow=1,
+    )
+    tabla_detalles.setStyle(
+        TableStyle(
+            [
+                ("BACKGROUND", (0, 0), (-1, 0), COLOR_AZUL_MARINO),
+                (
+                    "ROWBACKGROUNDS",
+                    (0, 1),
+                    (-1, -1),
+                    [COLOR_BLANCO, _aclarar_color(COLOR_AZUL, 0.95)],
+                ),
+                ("GRID", (0, 0), (-1, -1), 0.35, _aclarar_color(COLOR_AZUL, 0.68)),
+                ("VALIGN", (0, 0), (-1, -1), "TOP"),
+                ("LEFTPADDING", (0, 0), (-1, -1), 2),
+                ("RIGHTPADDING", (0, 0), (-1, -1), 2),
+                ("TOPPADDING", (0, 0), (-1, -1), 3),
+                ("BOTTOMPADDING", (0, 0), (-1, -1), 3),
+            ]
+        )
+    )
+
+    total_cotizacion = Decimal(str(getattr(cotizacion, "total", 0) or 0))
+    estilo_total = ParagraphStyle(
+        "TotalProforma",
+        parent=estilo_celda_negrita,
+        fontSize=10,
+        leading=12,
+        alignment=TA_RIGHT,
+    )
+    texto_adicional = [
+        Paragraph("Otros servicios que el puerto ofrece:", estilo_adicional_titulo),
+        Paragraph(
+            _texto(
+                "Tendido de barreras anti-derrames, suministro de diésel y gasolina, "
+                "flete de combustibles, suministro de sal para refrigeración, "
+                "avituallamiento, mantenimiento (soldadura), descarga y lancha para "
+                "embarque y desembarque de tripulación."
+            ),
+            estilo_adicional_texto,
+        ),
+        Paragraph("Other Services Offered by the Port:", estilo_adicional_titulo),
+        Paragraph(
+            _texto(
+                "Boom containment, supply of diesel and gasoline fuel, fuel freight, "
+                "salt for refrigeration, provisioning, maintenance (welding), "
+                "unloading, and crew embarkation and disembarkation boat."
+            ),
+            estilo_adicional_texto,
+        ),
+        Paragraph("Condiciones / Conditions", estilo_adicional_titulo),
+        Paragraph(
+            _texto(
+                "1. Anticipo 100% para procesar pedido / 100% advance payment to "
+                "process the order."
+            ),
+            estilo_adicional_texto,
+        ),
+        Paragraph(
+            _texto(
+                "2. Pago 0% a crédito por 5 días naturales / 0% interest on credit "
+                "for 5 calendar days."
+            ),
+            estilo_adicional_texto,
+        ),
+        Paragraph(
+            "Métodos de pago en MXN / Payment methods in MXN",
+            estilo_adicional_titulo,
+        ),
+        Paragraph(
+            _texto(
+                "Transferencia bancaria / Bank transfer · Banco / Bank: "
+                "SANTANDER MÉXICO, S.A. · Clave interbancaria / Account: "
+                "014133655161133348 · Beneficiario / Beneficiary: "
+                "OPL PACÍFICO SUR S.A.P.I. DE C.V."
+            ),
+            estilo_adicional_texto,
+        ),
+        Paragraph(
+            "Métodos de pago en USD / Payment methods in USD",
+            estilo_adicional_titulo,
+        ),
+        Paragraph(
+            _texto(
+                "Transferencia bancaria / Bank transfer · Banco / Bank: BANCO "
+                "NACIONAL DE MÉXICO, S.A. (BANAMEX) · Cuenta / Account: "
+                "002133055293368042 · Código SWIFT: BNMXMXMMXXX · Beneficiario / "
+                "Beneficiary: OPL PACÍFICO SUR S.A.P.I. DE C.V."
+            ),
+            estilo_adicional_texto,
+        ),
+        Paragraph("Inicio del proyecto", estilo_adicional_titulo),
+        Paragraph(
+            _texto("Una vez confirmado el anticipo."),
+            estilo_adicional_texto,
+        ),
+    ]
+
+    class BloqueFirma(Flowable):
+        def __init__(self):
+            super().__init__()
+            self.width = ancho
+            self.height = 24 * mm
+
+        def draw(self):
+            lienzo = self.canv
+            inicio = ancho * 0.57
+            centro = inicio + (ancho - inicio) / 2
+            lienzo.setStrokeColor(COLOR_SIDEBAR)
+            lienzo.setLineWidth(0.7)
+            lienzo.line(inicio, 18 * mm, ancho, 18 * mm)
+            lienzo.setFillColor(COLOR_SIDEBAR)
+            lienzo.setFont("Helvetica-Bold", 6.5)
+            lienzo.drawCentredString(
+                centro, 14 * mm, "CAPITÁN Y/O ARMADOR DEL BUQUE"
+            )
+            lienzo.drawCentredString(
+                centro, 11 * mm, "CAPTAIN / SHIPOWNER"
+            )
+            lienzo.setFont("Helvetica", 5.2)
+            lienzo.drawCentredString(
+                centro,
+                6.5 * mm,
+                "Se aceptan esta proforma, notas aclaratorias y condiciones de servicio.",
+            )
+            lienzo.drawCentredString(
+                centro,
+                3.5 * mm,
+                "This proforma, explanatory notes and service conditions are accepted.",
+            )
+
+    bloque_final = KeepTogether(
+        [
+            Paragraph(
+                f"TOTAL / TOTAL: $ {total_cotizacion:,.2f} {moneda}",
+                estilo_total,
+            ),
+            Spacer(1, 1 * mm),
+            *texto_adicional,
+            Spacer(1, 2 * mm),
+            BloqueFirma(),
+        ]
+    )
+    historia = [
+        encabezado,
+        Spacer(1, 2 * mm),
+        seccion("Cliente / Customer"),
+        datos_cliente,
+        Spacer(1, 1.5 * mm),
+        seccion("Información del buque / Vessel's Information"),
+        datos_buque,
+        Spacer(1, 1.5 * mm),
+        seccion("Servicios y conceptos / Services and items"),
+        tabla_detalles,
+        Spacer(1, 1 * mm),
+        bloque_final,
+    ]
+    documento.build(historia)
+    return salida.getvalue()
+
+
+async def exportar_proforma_pdf(page: ft.Page, cotizacion: Any) -> bool:
+    contenido = crear_pdf_proforma(cotizacion)
+    nombre_archivo = f"{getattr(cotizacion, 'folio', 'proforma')}.pdf"
+    selector = obtener_selector_archivos(page)
+    ruta = await selector.save_file(
+        dialog_title="Descargar proforma",
         file_name=nombre_archivo,
         file_type=ft.FilePickerFileType.CUSTOM,
         allowed_extensions=["pdf"],

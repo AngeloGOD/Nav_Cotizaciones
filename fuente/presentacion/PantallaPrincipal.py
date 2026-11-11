@@ -104,7 +104,8 @@ class PantallaPrincipal(ft.Container):
             )
         elif ruta == "ruta_servicios":
             self.content_area.content = PantallaServicios(
-                self.main_page
+                self.main_page,
+                servicio_servicio=self.servicio_servicio,
             )
         elif ruta == "ruta_reportes":
             self.content_area.content = PantallaReportes(self.main_page)

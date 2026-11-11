@@ -116,9 +116,12 @@ class ControladorCotizacion:
             return estado
         texto = str(estado or "PENDIENTE").strip().upper()
         mapa = {
-            "PENDIENTE": EstadoCotizacion.PENDIENTE,
-            "PROFORMA": EstadoCotizacion.PENDIENTE,
-            "BORRADOR": EstadoCotizacion.PENDIENTE,
+            "PENDIENTE": EstadoCotizacion.PROFORMA,
+            "PROFORMA": EstadoCotizacion.PROFORMA,
+            "BORRADOR": EstadoCotizacion.BORRADOR,
+            "ANTICIPO_RECIBIDO": EstadoCotizacion.ANTICIPO_RECIBIDO,
+            "EN_OPERACION": EstadoCotizacion.EN_OPERACION,
+            "LIQUIDADA_FDA": EstadoCotizacion.LIQUIDADA_FDA,
             "APROBADA": EstadoCotizacion.APROBADA,
             "RECHAZADA": EstadoCotizacion.RECHAZADA,
             "CANCELADA": EstadoCotizacion.RECHAZADA,

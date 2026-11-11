@@ -1,6 +1,6 @@
 from __future__ import annotations
 
-import threading
+import asyncio
 from typing import Callable, TYPE_CHECKING
 import flet as ft
 
@@ -37,7 +37,7 @@ class SelectorCliente(ft.Stack):
         self.cliente_seleccionado: Cliente | None = None
         self.cliente_id_seleccionado: int | None = None
         self._numero_busqueda = 0
-        self._temporizador: threading.Timer | None = None
+        self._tarea_busqueda = None
 
         self.boton_limpiar = ft.IconButton(
             icon=ft.Icons.CLOSE,
@@ -109,16 +109,16 @@ class SelectorCliente(ft.Stack):
     def value(self, val: str | None) -> None:
         self.campo.value = "" if val is None else str(val)
 
-    def _cancelar_temporizador(self) -> None:
-        if self._temporizador is not None:
-            self._temporizador.cancel()
-            self._temporizador = None
+    def _cancelar_busqueda_pendiente(self) -> None:
+        if self._tarea_busqueda is not None:
+            self._tarea_busqueda.cancel()
+            self._tarea_busqueda = None
 
     def _al_limpiar_click(self, e=None) -> None:
         self.limpiar(notificar=True)
 
     def _al_cambiar_texto(self, e=None) -> None:
-        self._cancelar_temporizador()
+        self._cancelar_busqueda_pendiente()
         self._numero_busqueda += 1
         numero_actual = self._numero_busqueda
 
@@ -138,21 +138,24 @@ class SelectorCliente(ft.Stack):
         if len(termino) < 2:
             return
 
-        self._temporizador = threading.Timer(
-            0.35,
-            self._ejecutar_busqueda,
-            args=(termino, numero_actual),
-        )
-        self._temporizador.daemon = True
-        self._temporizador.start()
+        if self.page is not None:
+            self._tarea_busqueda = self.page.run_task(
+                self._buscar_con_demora,
+                termino,
+                numero_actual,
+            )
 
-    def _ejecutar_busqueda(self, termino: str, numero_actual: int) -> None:
+    async def _buscar_con_demora(self, termino: str, numero_actual: int) -> None:
+        await asyncio.sleep(0.2)
         if numero_actual != self._numero_busqueda:
             return
 
         try:
             if self.servicio_cliente is not None:
-                clientes = self.servicio_cliente.buscar_por_nombre(termino)
+                clientes = await asyncio.to_thread(
+                    self.servicio_cliente.buscar_por_nombre,
+                    termino,
+                )
             else:
                 clientes = []
         except Exception as error:
@@ -160,6 +163,7 @@ class SelectorCliente(ft.Stack):
 
             if numero_actual == self._numero_busqueda:
                 self._ocultar_resultados()
+                self._tarea_busqueda = None
                 self._actualizar()
 
             return
@@ -171,6 +175,7 @@ class SelectorCliente(ft.Stack):
         if (self.campo.value or "").strip() != termino:
             return
 
+        self._tarea_busqueda = None
         self._mostrar_resultados(clientes)
 
     def _mostrar_resultados(self, clientes) -> None:
@@ -243,7 +248,7 @@ class SelectorCliente(ft.Stack):
         self._actualizar()
 
     def _seleccionar_cliente(self, cliente: Cliente) -> None:
-        self._cancelar_temporizador()
+        self._cancelar_busqueda_pendiente()
         self._numero_busqueda += 1
 
         try:
@@ -272,7 +277,7 @@ class SelectorCliente(ft.Stack):
             self.limpiar(notificar=notificar)
             return
 
-        self._cancelar_temporizador()
+        self._cancelar_busqueda_pendiente()
         self._numero_busqueda += 1
 
         try:
@@ -295,7 +300,7 @@ class SelectorCliente(ft.Stack):
         self._actualizar()
 
     def limpiar(self, notificar: bool = False) -> None:
-        self._cancelar_temporizador()
+        self._cancelar_busqueda_pendiente()
         self._numero_busqueda += 1
 
         self.cliente_seleccionado = None

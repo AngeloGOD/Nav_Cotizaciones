@@ -57,6 +57,14 @@ class RepositorioCliente(Repositorio):
         )
         return self.sesion.scalars(stmt).all()
 
+    def obtener_recientes(self, limite: int = 3):
+        stmt = (
+            select(Cliente)
+            .order_by(Cliente.creado_en.desc(), Cliente.id.desc())
+            .limit(limite)
+        )
+        return list(self.sesion.scalars(stmt).all())
+
     def contar(self, filtros=None):
         stmt = self._aplicar_filtros(
             select(func.count()).select_from(Cliente),

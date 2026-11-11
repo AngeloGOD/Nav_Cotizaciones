@@ -1,6 +1,7 @@
 import flet as ft
 
 from fuente.negocio.servicio.ServicioCotizacion import ServicioCotizacion
+from fuente.negocio.servicio.ServicioReportes import ServicioReportes
 from fuente.negocio.servicio.ServicioServicio import ServicioServicio
 from fuente.presentacion.MenuLateral import MenuLateral
 from fuente.presentacion.BarraSuperior import BarraSuperior
@@ -36,7 +37,7 @@ class PantallaPrincipal(ft.Container):
         self.servicio_categoria_buque = servicio_categoria_buque
         uow = getattr(servicio_buque, "uow", None) or getattr(
             servicio_cliente, "uow", None
-        )
+        ) or getattr(servicio_cotizacion, "uow", None)
         self.servicio_cotizacion = (
             servicio_cotizacion
             if servicio_cotizacion is not None
@@ -47,10 +48,18 @@ class PantallaPrincipal(ft.Container):
             if servicio_servicio is not None
             else (ServicioServicio(uow) if uow is not None else None)
         )
+        self.servicio_reportes = (
+            ServicioReportes(uow) if uow is not None else None
+        )
+        self.informes_generados = []
 
         self.content_area = ft.Container(
             expand=True,
-            content=dashboard(),
+            content=dashboard(
+                servicio_cliente=self.servicio_cliente,
+                servicio_cotizacion=self.servicio_cotizacion,
+                on_navigate=self.cambiar_pantalla,
+            ),
         )
 
         self.menu_lateral = MenuLateral(
@@ -75,7 +84,11 @@ class PantallaPrincipal(ft.Container):
 
     def cambiar_pantalla(self, ruta):
         if ruta == "ruta_dashboard":
-            self.content_area.content = dashboard()
+            self.content_area.content = dashboard(
+                servicio_cliente=self.servicio_cliente,
+                servicio_cotizacion=self.servicio_cotizacion,
+                on_navigate=self.cambiar_pantalla,
+            )
 
         elif ruta == "ruta_clientes":
             self.content_area.content = PantallaClientes(
@@ -108,7 +121,15 @@ class PantallaPrincipal(ft.Container):
                 servicio_servicio=self.servicio_servicio,
             )
         elif ruta == "ruta_reportes":
-            self.content_area.content = PantallaReportes(self.main_page)
+            if self.servicio_reportes is None:
+                raise RuntimeError(
+                    "No se puede abrir Reportes sin una unidad de trabajo configurada."
+                )
+            self.content_area.content = PantallaReportes(
+                self.main_page,
+                self.servicio_reportes,
+                self.informes_generados,
+            )
 
         if self.page is not None:
             self.content_area.update()

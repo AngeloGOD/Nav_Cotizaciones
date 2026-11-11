@@ -5,9 +5,10 @@ from io import BytesIO
 from typing import Any
 
 import flet as ft
-from openpyxl import Workbook
+from openpyxl import Workbook, load_workbook
 from openpyxl.styles import Alignment, Font, PatternFill
 from openpyxl.utils import get_column_letter
+from openpyxl.chart import BarChart, Reference
 
 from fuente.utilidades.Colores import COLOR_BLANCO, COLOR_SIDEBAR
 from fuente.utilidades.ExportacionArchivos import obtener_selector_archivos
@@ -84,6 +85,42 @@ def crear_excel(
 
     hoja.auto_filter.ref = hoja.dimensions
     hoja.row_dimensions[1].height = 24
+
+    archivo = BytesIO()
+    libro.save(archivo)
+    return archivo.getvalue()
+
+
+def crear_excel_con_grafica(
+    registros: Iterable[Any],
+    columnas: Mapping[str, ValorColumna],
+    nombre_hoja: str,
+    grafica: Iterable[tuple[str, int | float]],
+) -> bytes:
+    contenido = crear_excel(registros, columnas, nombre_hoja)
+    libro = load_workbook(BytesIO(contenido))
+    hoja = libro.create_sheet("Gráfica")
+    hoja.append(["Categoría", "Valor"])
+    for categoria, valor in grafica:
+        hoja.append([categoria, valor])
+
+    if hoja.max_row > 1:
+        chart = BarChart()
+        chart.type = "bar"
+        chart.style = 10
+        chart.title = nombre_hoja
+        chart.y_axis.title = "Categoría"
+        chart.x_axis.title = "Valor"
+        chart.height = 9
+        chart.width = 18
+        chart.add_data(
+            Reference(hoja, min_col=2, min_row=1, max_row=hoja.max_row),
+            titles_from_data=True,
+        )
+        chart.set_categories(
+            Reference(hoja, min_col=1, min_row=2, max_row=hoja.max_row)
+        )
+        hoja.add_chart(chart, "D2")
 
     archivo = BytesIO()
     libro.save(archivo)

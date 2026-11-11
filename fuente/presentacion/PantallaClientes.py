@@ -9,6 +9,7 @@ from fuente.utilidades.Componentes import (
     campo_con_mensaje_error,
     crear_feedback_dialogo,
     crear_mensaje_validacion,
+    mostrar_dialogo_seleccionados,
     limpiar_error_campo,
     mostrar_feedback_dialogo,
     ocultar_feedback_dialogo,
@@ -182,7 +183,6 @@ class PantallaClientes(ft.Container):
             if self.busqueda:
                 self.busqueda = ""
                 self.pagina_actual = 1
-                self.clientes_seleccionados.clear()
                 self.actualizar_directorio()
             return
 
@@ -198,7 +198,6 @@ class PantallaClientes(ft.Container):
         self._tarea_busqueda = None
         self.busqueda = texto
         self.pagina_actual = 1
-        self.clientes_seleccionados.clear()
         self.actualizar_directorio()
 
     def abrir_filtros(self, e):
@@ -478,7 +477,6 @@ class PantallaClientes(ft.Container):
         self._actualizar_resumen_filtros()
         self._panel_filtros.update()
         self.pagina_actual = 1
-        self.clientes_seleccionados.clear()
         self.actualizar_directorio()
 
     def _cambio_checkbox_filtro(self, e):
@@ -555,7 +553,6 @@ class PantallaClientes(ft.Container):
 
         self.filtros_seleccionados = filtros
         self.pagina_actual = 1
-        self.clientes_seleccionados.clear()
         self._actualizar_indicador_filtros()
         self.cerrar_filtros()
         self.actualizar_directorio()
@@ -578,7 +575,6 @@ class PantallaClientes(ft.Container):
 
     def cambiar_pagina(self, pagina):
         self.pagina_actual = pagina
-        self.clientes_seleccionados.clear()
         self.actualizar_directorio()
 
     def actualizar_directorio(self):
@@ -1247,6 +1243,18 @@ class PantallaClientes(ft.Container):
                 self.clientes_seleccionados.pop(clave, None)
         self._actualizar_vista_seleccion(claves)
 
+    def abrir_dialogo_seleccionados(self, e=None):
+        if not self.clientes_seleccionados:
+            return
+        mostrar_dialogo_seleccionados(
+            page=self._page,
+            titulo="Clientes seleccionados",
+            obtener_registros=lambda: list(self.clientes_seleccionados.values()),
+            obtener_nombre=lambda cliente: cliente.razon_social
+            or "Cliente sin nombre",
+            on_quitar=lambda cliente: self.seleccionar_cliente(cliente, False),
+        )
+
     def _actualizar_vista_seleccion(self, claves_actualizadas):
         for clave in claves_actualizadas:
             checkbox = self._checkboxes_seleccion_clientes.get(clave)
@@ -1265,7 +1273,7 @@ class PantallaClientes(ft.Container):
         self._checkbox_seleccionar_pagina.update()
 
         cantidad = len(self.clientes_seleccionados)
-        self._texto_seleccionados.value = (
+        self._texto_seleccionados.content.value = (
             f"{cantidad} cliente seleccionado"
             if cantidad == 1
             else f"{cantidad} clientes seleccionados"
@@ -1647,16 +1655,21 @@ class PantallaClientes(ft.Container):
             columnas_compactas=True,
         )
 
-        self._texto_seleccionados = ft.Text(
-            (
-                f"{len(self.clientes_seleccionados)} cliente seleccionado"
-                if len(self.clientes_seleccionados) == 1
-                else f"{len(self.clientes_seleccionados)} clientes seleccionados"
+        self._texto_seleccionados = ft.GestureDetector(
+            content=ft.Text(
+                (
+                    f"{len(self.clientes_seleccionados)} cliente seleccionado"
+                    if len(self.clientes_seleccionados) == 1
+                    else f"{len(self.clientes_seleccionados)} clientes seleccionados"
+                ),
+                size=12,
+                color=COLOR_NEGRO,
+                weight=ft.FontWeight.BOLD,
+                max_lines=1,
             ),
-            size=12,
-            color=COLOR_NEGRO,
-            weight=ft.FontWeight.BOLD,
-            max_lines=1,
+            on_tap=self.abrir_dialogo_seleccionados,
+            mouse_cursor=ft.MouseCursor.CLICK,
+            tooltip="Ver y administrar los clientes seleccionados",
         )
         self._barra_seleccion = ft.Row(
             visible=bool(self.clientes_seleccionados),

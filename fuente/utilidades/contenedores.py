@@ -21,6 +21,100 @@ def quitar_panel_flotante(contenedor, panel):
         contenedor.controls.remove(panel)
 
 
+def mostrar_dialogo_seleccionados(
+    page,
+    titulo,
+    obtener_registros,
+    obtener_nombre,
+    on_quitar,
+):
+    lista_registros = ft.Column(
+        expand=True,
+        spacing=0,
+        scroll=ft.ScrollMode.AUTO,
+    )
+    dialogo = ft.AlertDialog(
+        modal=True,
+        bgcolor=COLOR_BLANCO,
+        shape=ft.RoundedRectangleBorder(radius=16),
+        title=ft.Text(
+            titulo,
+            size=18,
+            weight=ft.FontWeight.BOLD,
+            color=COLOR_BANNER,
+        ),
+        content=ft.Container(
+            width=520,
+            height=360,
+            content=lista_registros,
+        ),
+        actions=[
+            ft.TextButton(
+                "Cerrar",
+                style=ft.ButtonStyle(color=COLOR_AZUL),
+                on_click=lambda e: page.pop_dialog(),
+            )
+        ],
+        actions_alignment=ft.MainAxisAlignment.END,
+    )
+
+    def actualizar_lista():
+        registros = obtener_registros()
+        if not registros:
+            lista_registros.controls = [
+                ft.Container(
+                    expand=True,
+                    alignment=ft.Alignment(0, 0),
+                    content=ft.Text(
+                        "No hay registros en la selección.",
+                        size=13,
+                        color=COLOR_GRIS,
+                    ),
+                )
+            ]
+        else:
+            lista_registros.controls = [
+                ft.Container(
+                    padding=ft.Padding(8, 5, 4, 5),
+                    border=ft.Border(
+                        bottom=ft.BorderSide(1, "#E7EEF6"),
+                    ),
+                    content=ft.Row(
+                        spacing=8,
+                        vertical_alignment=ft.CrossAxisAlignment.CENTER,
+                        controls=[
+                            ft.Text(
+                                obtener_nombre(registro),
+                                expand=True,
+                                size=13,
+                                color=COLOR_BANNER,
+                                max_lines=2,
+                                overflow=ft.TextOverflow.ELLIPSIS,
+                            ),
+                            ft.IconButton(
+                                icon=ft.Icons.CLOSE,
+                                icon_color=COLOR_ROJO,
+                                tooltip="Eliminar de la selección",
+                                on_click=lambda e, item=registro: quitar_registro(
+                                    item
+                                ),
+                            ),
+                        ],
+                    ),
+                )
+                for registro in registros
+            ]
+    def quitar_registro(registro):
+        on_quitar(registro)
+        actualizar_lista()
+        if hasattr(page, "update"):
+            page.update()
+
+    actualizar_lista()
+    page.show_dialog(dialogo)
+    return dialogo
+
+
 def estado_vacio(icono, titulo, descripcion):
     return ft.Container(
         expand=True,

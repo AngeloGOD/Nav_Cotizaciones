@@ -1,18 +1,27 @@
 import math
+from datetime import datetime
 
 import flet as ft
+from sqlalchemy.exc import SQLAlchemyError
 
+from fuente.utilidades.ExportacionArchivos import obtener_selector_archivos
+from fuente.utilidades.ExportacionExcel import crear_excel_con_grafica
+from fuente.utilidades.ExportacionPDF import crear_pdf
+from fuente.utilidades.HistorialInformes import (
+    cargar_historial_informes,
+    guardar_informe_generado,
+    leer_contenido_informe,
+)
 from fuente.utilidades.Colores import (
     COLOR_AZUL,
     COLOR_BANNER,
     COLOR_BLANCO,
     COLOR_FONDO,
     COLOR_GRIS,
-    COLOR_NEGRO,
     COLOR_NARANJA,
-    COLOR_ROJO,
     COLOR_VERDE,
 )
+from fuente.utilidades.feedback import reproducir_sonido
 from fuente.utilidades.Componentes import (
     banner_modulo,
     card,
@@ -22,11 +31,6 @@ from fuente.utilidades.Componentes import (
 
 
 class PantallaReportes(ft.Container):
-    MESES = ("May", "Jun", "Jul", "Ago", "Sep", "Oct")
-    INGRESOS = (54, 80, 68, 98, 103, 128)
-    COTIZACIONES = (142, 175, 186, 218, 241, 286)
-    APROBACIONES = (71, 74, 73, 76, 77, 78)
-    RENTABILIDAD = (11, 12, 14, 15, 17, 18)
     REPORTES_ESPECIALIZADOS = (
         {
             "nombre": "Rendimiento de cotizaciones",
@@ -46,17 +50,20 @@ class PantallaReportes(ft.Container):
             ),
         },
         {
-            "nombre": "Tipos de cotización",
-            "descripcion": "Distribución por categoría.",
+            "nombre": "Cotizaciones por estado",
+            "descripcion": "Distribución de cotizaciones por estado.",
             "icono": ft.Icons.PIE_CHART_OUTLINE,
             "color": "#356AE6",
             "fondo": "#EAF2FF",
-            "filtro": "Tipo",
+            "filtro": "Estado",
             "opciones": (
-                "Todos los tipos",
-                "Proforma Puerto",
-                "Víveres / Proveeduría",
-                "General",
+                "Todos los estados",
+                "Borrador",
+                "Proforma",
+                "Anticipo recibido",
+                "En operación",
+                "Liquidada",
+                "Cancelada",
             ),
         },
         {
@@ -83,93 +90,56 @@ class PantallaReportes(ft.Container):
         },
         {
             "nombre": "Actividad por buque",
-            "descripcion": "Operaciones agrupadas por embarcación.",
+            "descripcion": "Cotizaciones registradas por embarcación.",
             "icono": ft.Icons.DIRECTIONS_BOAT_OUTLINED,
             "color": "#8B35D3",
             "fondo": "#F4ECFF",
             "filtro": "Actividad",
             "opciones": (
                 "Todos los buques",
-                "Con operaciones",
-                "Sin operaciones",
+                "Con cotizaciones",
+                "Sin cotizaciones",
             ),
         },
         {
             "nombre": "Análisis financiero",
-            "descripcion": "Ingresos, costos y utilidad.",
+            "descripcion": "Totales cotizados agrupados por moneda.",
             "icono": ft.Icons.ACCOUNT_BALANCE_WALLET_OUTLINED,
             "color": COLOR_NARANJA,
             "fondo": "#FFF2E8",
-            "filtro": "Concepto",
-            "opciones": ("Todos", "Productos", "Servicios"),
-        },
-    )
-    INFORMES_DEMO = (
-        {
-            "nombre": "Rendimiento de cotizaciones",
-            "periodo": "Octubre 2026",
-            "generado": "10/11/2026 · 09:30",
-            "formato": "PDF",
-            "color": COLOR_ROJO,
-        },
-        {
-            "nombre": "Clientes más activos",
-            "periodo": "Sep – Oct 2026",
-            "generado": "08/11/2026 · 14:15",
-            "formato": "Excel",
-            "color": COLOR_VERDE,
-        },
-        {
-            "nombre": "Análisis financiero",
-            "periodo": "Octubre 2026",
-            "generado": "05/11/2026 · 11:42",
-            "formato": "PDF",
-            "color": COLOR_AZUL,
+            "filtro": "Moneda",
+            "opciones": ("Todas las monedas", "MXN", "USD"),
         },
     )
 
-    def __init__(self, page):
+    def __init__(self, page, servicio_reportes, informes_generados=None):
         super().__init__(expand=True, bgcolor=COLOR_FONDO)
         self._page = page
+        self._servicio_reportes = servicio_reportes
         self._periodo = "Últimos 6 meses"
         self._modulo = "Todos los módulos"
         self._metrica = "Ingresos"
+        self._informes_generados = (
+            informes_generados if informes_generados is not None else []
+        )
         self._mensaje_generacion = ft.Text(
             "",
             size=11,
             color=COLOR_GRIS,
             visible=False,
         )
-        self._datos_metricas = {
-            "Ingresos": {
-                "valores": self.INGRESOS,
-                "total": "$531,000 MXN",
-                "descripcion": "Total ilustrativo · 6 meses",
-                "unidad": "miles de MXN",
-                "color": COLOR_AZUL,
-            },
-            "Cotizaciones": {
-                "valores": self.COTIZACIONES,
-                "total": "1,248",
-                "descripcion": "Cotizaciones ilustrativas · 6 meses",
-                "unidad": "cotizaciones",
-                "color": COLOR_AZUL,
-            },
-            "Aprobaciones": {
-                "valores": self.APROBACIONES,
-                "total": "78%",
-                "descripcion": "Tasa ilustrativa · octubre",
-                "unidad": "porcentaje",
-                "color": COLOR_VERDE,
-            },
-            "Rentabilidad": {
-                "valores": self.RENTABILIDAD,
-                "total": "18%",
-                "descripcion": "Margen ilustrativo · octubre",
-                "unidad": "porcentaje",
-                "color": COLOR_NARANJA,
-            },
-        }
+        if not self._informes_generados:
+            try:
+                self._informes_generados.extend(cargar_historial_informes())
+            except (OSError, ValueError) as error:
+                self._mensaje_generacion.value = (
+                    f"No se pudo cargar el historial de reportes: {error}"
+                )
+                self._mensaje_generacion.visible = True
+        self._resumen = self._servicio_reportes.obtener_resumen(
+            self._periodo, self._modulo
+        )
+        self._datos_metricas = self._crear_datos_metricas()
 
         self._selector_periodo = ft.Dropdown(
             value=self._periodo,
@@ -181,10 +151,7 @@ class PantallaReportes(ft.Container):
             bgcolor=COLOR_BLANCO,
             filled=True,
             fill_color=COLOR_BLANCO,
-            tooltip=(
-                "Filtro de periodo para todo el dashboard; se aplicara a los datos "
-                "cuando se conecte la informacion real."
-            ),
+            tooltip="Periodo que se aplicará a los indicadores y la gráfica.",
             content_padding=ft.Padding(10, 7, 10, 7),
             border=ft.InputBorder.OUTLINE,
             border_color="#C8D5E4",
@@ -212,10 +179,7 @@ class PantallaReportes(ft.Container):
             bgcolor=COLOR_BLANCO,
             filled=True,
             fill_color=COLOR_BLANCO,
-            tooltip=(
-                "Filtro de módulo para todo el dashboard; se aplicará a los datos "
-                "cuando se conecte la informacion real."
-            ),
+            tooltip="Módulo que se aplicará a la gráfica de actividad.",
             content_padding=ft.Padding(10, 7, 10, 7),
             border=ft.InputBorder.OUTLINE,
             border_color="#C8D5E4",
@@ -253,7 +217,7 @@ class PantallaReportes(ft.Container):
                                 "fondo_puerto.jpg",
                                 "Reportes",
                                 "Análisis y Estadísticas",
-                                "Explora indicadores y análisis de ejemplo; los datos reales aún no están conectados.",
+                                "Indicadores y reportes calculados con la información registrada.",
                                 ft.Icons.INSERT_CHART_OUTLINED,
                             ),
                             self._barra_filtros(),
@@ -270,13 +234,83 @@ class PantallaReportes(ft.Container):
             ],
         )
 
+    def _crear_datos_metricas(self):
+        resumen = self._resumen
+        series = resumen["series"]
+        periodo = self._periodo.lower()
+        modulo = self._modulo
+        unidad_actividad = resumen["unidad_grafica"]
+
+        return {
+            "Ingresos": {
+                "etiqueta": "Monto cotizado",
+                "valores": series["Ingresos"],
+                "total": f"${resumen['monto_mxn_periodo']:,.0f} MXN",
+                "descripcion": f"Periodo: {periodo}",
+                "grafica": (
+                    "Importe de cotizaciones en MXN por mes; "
+                    f"eje vertical en miles de MXN · {periodo}"
+                ),
+                "unidad": "miles de MXN",
+                "color": COLOR_AZUL,
+            },
+            "Cotizaciones": {
+                "etiqueta": "Cotizaciones",
+                "valores": series["Cotizaciones"],
+                "total": f"{resumen['cotizaciones_periodo']:,}",
+                "descripcion": f"Generadas en {periodo}",
+                "grafica": f"Cantidad de cotizaciones creadas por mes · {periodo}",
+                "unidad": "cotizaciones",
+                "color": COLOR_AZUL,
+            },
+            "Aprobaciones": {
+                "etiqueta": "Tasa avanzada",
+                "valores": series["Aprobaciones"],
+                "total": f"{resumen['aprobacion_periodo']}%",
+                "descripcion": (
+                    f"Con anticipo, en operación o liquidadas · {periodo}"
+                ),
+                "grafica": (
+                    "Porcentaje de cotizaciones con anticipo recibido, "
+                    f"en operación o liquidadas · {periodo}"
+                ),
+                "unidad": "porcentaje",
+                "color": COLOR_VERDE,
+            },
+            "Actividad": {
+                "etiqueta": "Actividad",
+                "valores": series["Actividad"],
+                "total": f"{sum(series['Actividad']):,.0f} {unidad_actividad}",
+                "descripcion": f"{unidad_actividad.capitalize()} · {periodo}",
+                "grafica": self._descripcion_actividad(
+                    modulo, unidad_actividad, periodo
+                ),
+                "unidad": unidad_actividad,
+                "color": COLOR_NARANJA,
+            },
+        }
+
+    @staticmethod
+    def _descripcion_actividad(modulo, unidad, periodo):
+        if modulo == "Servicios":
+            detalle = "unidades de servicio incluidas en cotizaciones"
+        elif modulo == "Productos":
+            detalle = "unidades de producto incluidas en cotizaciones"
+        elif modulo == "Clientes":
+            detalle = "clientes registrados"
+        elif modulo in ("Buques", "Cotizaciones"):
+            detalle = "cotizaciones creadas"
+        else:
+            detalle = "clientes registrados (actividad predeterminada)"
+        return f"{detalle.capitalize()} por mes · {periodo}; unidad: {unidad}"
+
     def _panel_inferior(self):
         return card(
             ft.Column(
                 spacing=6,
                 controls=[
                     ft.Row(
-                        height=270,
+                        height=350,
                         spacing=10,
                         vertical_alignment=ft.CrossAxisAlignment.STRETCH,
                         controls=[
@@ -351,49 +385,51 @@ class PantallaReportes(ft.Container):
         )
 
     def _tarjetas_metricas(self):
+        resumen = self._resumen
+        series = resumen["series"]
         metricas = (
             (
                 "Clientes",
-                "142",
-                "Registros totales · demo",
+                f"{resumen['totales']['clientes']:,}",
+                "Registros actuales",
                 ft.Icons.GROUPS_OUTLINED,
                 COLOR_AZUL,
                 "#EAF2FF",
                 "#D7E6FF",
-                (4, 7, 5, 9, 8, 12, 10, 15),
+                series["Clientes"],
             ),
             (
-                "Productos",
-                "856",
-                "Registros totales · demo",
-                ft.Icons.INVENTORY_2_OUTLINED,
+                "Servicios",
+                f"{resumen['totales']['servicios']:,}",
+                "Servicios registrados",
+                ft.Icons.HANDYMAN_OUTLINED,
                 COLOR_VERDE,
                 "#EAF8F0",
                 "#D5F0E2",
-                (5, 6, 8, 7, 11, 9, 13, 15),
+                series["Servicios"],
             ),
             (
                 "Buques",
-                "67",
-                "Registros totales · demo",
+                f"{resumen['totales']['buques']:,}",
+                "Registros actuales",
                 ft.Icons.DIRECTIONS_BOAT_OUTLINED,
                 "#8B35D3",
                 "#F4ECFF",
                 "#E5D4F5",
-                (3, 5, 7, 6, 10, 9, 12, 16),
+                series["Cotizaciones"],
             ),
             (
                 "Cotizaciones",
-                "1,248",
-                "Muestra de 6 meses · demo",
+                f"{resumen['cotizaciones_periodo']:,}",
+                f"En {self._periodo.lower()}",
                 ft.Icons.DESCRIPTION_OUTLINED,
                 COLOR_NARANJA,
                 "#FFF2E8",
                 "#FFE1C9",
-                (4, 5, 7, 9, 8, 11, 13, 16),
+                series["Cotizaciones"],
             ),
         )
-        return ft.Row(
+        fila = ft.Row(
             spacing=9,
             controls=[
                 ft.Container(
@@ -421,10 +457,18 @@ class PantallaReportes(ft.Container):
                 ) in metricas
             ],
         )
+        self._tarjetas_metricas_row = fila
+        return fila
 
     def _tarjeta_metrica(
         self, titulo, valor, aclaracion, icono, color, fondo, borde, serie
     ):
+        descripciones_serie = {
+            "Clientes": "Clientes registrados por mes",
+            "Servicios": "Unidades de servicio incluidas en cotizaciones por mes",
+            "Buques": "Cotizaciones creadas por mes",
+            "Cotizaciones": "Cotizaciones creadas por mes",
+        }
         return tarjeta_indicador(
             titulo,
             valor,
@@ -433,16 +477,19 @@ class PantallaReportes(ft.Container):
             color,
             fondo,
             borde,
-            complemento=self._mini_barras(serie, color),
+            complemento=self._mini_barras(
+                serie, color, descripciones_serie[titulo]
+            ),
             tooltip=aclaracion,
         )
 
-    def _mini_barras(self, valores, color):
+    def _mini_barras(self, valores, color, tooltip):
+        maximo = max((float(valor) for valor in valores), default=0) or 1
         return ft.Container(
             width=66,
             height=34,
             alignment=ft.Alignment(0, 1),
-            tooltip="Tendencia ilustrativa; no es una comparación real",
+            tooltip=tooltip,
             content=ft.Row(
                 spacing=3,
                 alignment=ft.MainAxisAlignment.END,
@@ -450,7 +497,7 @@ class PantallaReportes(ft.Container):
                 controls=[
                     ft.Container(
                         width=5,
-                        height=max(5, valor * 1.7),
+                        height=max(5, float(valor) / maximo * 30),
                         bgcolor=color,
                         border_radius=3,
                         opacity=0.45 + (indice / len(valores)) * 0.55,
@@ -462,12 +509,12 @@ class PantallaReportes(ft.Container):
 
     def _crear_panel_grafica(self):
         self._resumen_periodo = ft.Text(
-            "Total ilustrativo · 6 meses",
+            f"Periodo: {self._periodo.lower()}",
             size=12,
             color=COLOR_GRIS,
         )
         self._valor_periodo = ft.Text(
-            "$531,000 MXN",
+            f"${self._resumen['monto_mxn_periodo']:,.0f} MXN",
             size=24,
             weight=ft.FontWeight.BOLD,
             color=COLOR_BANNER,
@@ -476,17 +523,25 @@ class PantallaReportes(ft.Container):
             spacing=8,
             controls=[
                 self._fila_indicador_clave(
-                    "78%", "Aprobadas · demo", COLOR_VERDE
+                    f"{self._resumen['aprobacion_periodo']}%",
+                    "Con anticipo, operación o liquidadas",
+                    COLOR_VERDE,
                 ),
                 self._fila_indicador_clave(
-                    "15", "Pendientes · demo", COLOR_NARANJA
+                    f"{self._resumen['pendientes_periodo']:,}",
+                    "Pendientes",
+                    COLOR_NARANJA,
                 ),
                 self._fila_indicador_clave(
-                    "34", "Liquidadas · demo", COLOR_AZUL
+                    f"{self._resumen['liquidadas_periodo']:,}",
+                    "Liquidadas",
+                    COLOR_AZUL,
                 ),
             ],
         )
-        self._grafica_mensual = self._crear_grafica_mensual(self.INGRESOS)
+        self._grafica_mensual = self._crear_grafica_mensual(
+            self._datos_metricas[self._metrica]["valores"], self._metrica
+        )
         self._grafica_slot = ft.Container(
             expand=True,
             content=self._grafica_mensual,
@@ -526,17 +581,12 @@ class PantallaReportes(ft.Container):
                                         weight=ft.FontWeight.BOLD,
                                         color=COLOR_BANNER,
                                     ),
-                                    ft.Text(
-                                        "Evolución mensual · valores ilustrativos",
-                                        size=11,
-                                        color=COLOR_GRIS,
-                                    ),
                                 ],
                             ),
                             ft.Container(expand=True),
-                            self._botones_metricas(),
                         ],
                     ),
+                    self._botones_metricas(),
                     self._grafica_slot,
                 ],
             ),
@@ -661,7 +711,7 @@ class PantallaReportes(ft.Container):
             "Ingresos": ft.Icons.SHOW_CHART,
             "Cotizaciones": ft.Icons.DESCRIPTION_OUTLINED,
             "Aprobaciones": ft.Icons.CHECK_CIRCLE_OUTLINED,
-            "Rentabilidad": ft.Icons.PERCENT,
+            "Actividad": ft.Icons.QUERY_STATS,
         }
         controles = []
         for titulo in self._datos_metricas:
@@ -674,6 +724,7 @@ class PantallaReportes(ft.Container):
                     COLOR_AZUL if titulo == self._metrica else "#E1E8F0",
                 ),
                 on_click=lambda e, valor=titulo: self._cambiar_metrica(valor),
+                tooltip=self._datos_metricas[titulo]["grafica"],
                 ink=True,
                 content=ft.Row(
                     tight=True,
@@ -689,7 +740,7 @@ class PantallaReportes(ft.Container):
                             ),
                         ),
                         ft.Text(
-                            titulo,
+                            self._datos_metricas[titulo]["etiqueta"],
                             size=12,
                             color=(
                                 COLOR_BLANCO
@@ -703,19 +754,26 @@ class PantallaReportes(ft.Container):
             )
             self._botones_metrica[titulo] = boton
             controles.append(boton)
-        return ft.Row(spacing=6, controls=controles)
+        return ft.Row(
+            wrap=True,
+            spacing=6,
+            run_spacing=6,
+            controls=controles,
+        )
 
     def _crear_grafica_mensual(self, valores, metrica="Ingresos"):
         datos = self._datos_metricas[metrica]
         unidad = datos["unidad"]
         color = datos["color"]
-        maximo_dato = max(valores)
+        maximo_dato = max((float(valor) for valor in valores), default=0)
         if unidad == "porcentaje":
             maximo = 100
         elif unidad == "miles de MXN":
-            maximo = ((maximo_dato + 19) // 20) * 20
+            maximo = max(20, math.ceil(maximo_dato / 20) * 20)
+        elif maximo_dato <= 10:
+            maximo = max(1, math.ceil(maximo_dato))
         else:
-            maximo = ((maximo_dato + 49) // 50) * 50
+            maximo = math.ceil(maximo_dato / 10) * 10
 
         def formatear_eje(valor):
             if unidad == "miles de MXN":
@@ -725,12 +783,13 @@ class PantallaReportes(ft.Container):
             return f"{int(valor)}"
 
         def formatear_tooltip(mes, valor):
-            detalle = (
-                f"${valor * 1000:,.0f} MXN"
-                if unidad == "miles de MXN"
-                else f"{valor}{'%' if unidad == 'porcentaje' else ''}"
-            )
-            return f"{mes}: {detalle} · muestra"
+            if unidad == "miles de MXN":
+                detalle = f"${float(valor) * 1000:,.0f} MXN"
+            elif unidad == "porcentaje":
+                detalle = f"{valor}%"
+            else:
+                detalle = f"{valor} {unidad}"
+            return f"{mes}: {detalle}"
 
         altura_grafica = 165
         altura_trazado = altura_grafica - 6
@@ -740,7 +799,7 @@ class PantallaReportes(ft.Container):
         ancho_paso = max(
             90,
             (((getattr(self._page, "width", None) or 1510) - 274) * 0.8 - 70)
-            / 6,
+            / max(len(valores), 1),
         )
         etiquetas_eje = ft.Column(
             height=altura_grafica,
@@ -754,9 +813,10 @@ class PantallaReportes(ft.Container):
         celdas_tramo = []
         coordenadas = [
             margen_puntos + alto_util * (1 - valor / maximo)
-            for valor in valores
+            for valor in (float(item) for item in valores)
         ]
-        for indice, (mes, valor) in enumerate(zip(self.MESES, valores)):
+        etiquetas = self._resumen["labels"]
+        for indice, (mes, valor) in enumerate(zip(etiquetas, valores)):
             tooltip = formatear_tooltip(mes, valor)
             if indice == 0:
                 continue
@@ -792,7 +852,7 @@ class PantallaReportes(ft.Container):
                                     border=ft.Border.all(3, color),
                                     border_radius=ancho_punto / 2,
                                     tooltip=formatear_tooltip(
-                                        self.MESES[0],
+                                        etiquetas[0],
                                         valores[0],
                                     ),
                                 )
@@ -867,7 +927,7 @@ class PantallaReportes(ft.Container):
                                     alignment=ft.Alignment(0, 0),
                                     content=ft.Text(mes, size=12, color=COLOR_GRIS),
                                 )
-                                for mes in self.MESES
+                                for mes in etiquetas
                             ],
                         ],
                     ),
@@ -886,6 +946,7 @@ class PantallaReportes(ft.Container):
         self._grafica_slot.content = self._grafica_mensual
         for nombre, boton in self._botones_metrica.items():
             seleccionado = nombre == metrica
+            boton.tooltip = self._datos_metricas[nombre]["grafica"]
             boton.bgcolor = COLOR_AZUL if seleccionado else "#F1F5FA"
             boton.border = ft.Border.all(
                 1,
@@ -894,6 +955,7 @@ class PantallaReportes(ft.Container):
             boton.content.controls[0].color = (
                 COLOR_BLANCO if seleccionado else COLOR_AZUL
             )
+            boton.content.controls[1].value = self._datos_metricas[nombre]["etiqueta"]
             boton.content.controls[1].color = (
                 COLOR_BLANCO if seleccionado else COLOR_BANNER
             )
@@ -922,22 +984,13 @@ class PantallaReportes(ft.Container):
                             ),
                             ft.Container(expand=True),
                             ft.TextButton(
-                                "Ver historial completo",
+                                "Ver más reportes",
                                 style=ft.ButtonStyle(color=COLOR_AZUL),
                                 on_click=self.abrir_historial_completo,
                             ),
                         ],
                     ),
-                    ft.Row(
-                        spacing=9,
-                        controls=[
-                            ft.Container(
-                                expand=True,
-                                content=self._tarjeta_informe_demo(informe),
-                            )
-                            for informe in self.INFORMES_DEMO
-                        ],
-                    ),
+                    self._lista_informes_recientes(),
                 ],
             ),
             padding=ft.Padding(8, 6, 8, 11),
@@ -947,7 +1000,29 @@ class PantallaReportes(ft.Container):
             expand=True,
         )
 
-    def _tarjeta_informe_demo(self, informe):
+    def _lista_informes_recientes(self):
+        if not self._informes_generados:
+            return ft.Container(
+                expand=True,
+                alignment=ft.Alignment(0, 0),
+                content=ft.Text(
+                    "Aún no se han generado informes.",
+                    size=12,
+                    color=COLOR_GRIS,
+                ),
+            )
+        return ft.Row(
+            spacing=9,
+            controls=[
+                ft.Container(
+                    expand=True,
+                    content=self._tarjeta_informe(informe),
+                )
+                for informe in self._informes_generados[:3]
+            ],
+        )
+
+    def _tarjeta_informe(self, informe):
         formato = informe["formato"]
         color = informe["color"]
         icono_formato = (
@@ -1003,11 +1078,9 @@ class PantallaReportes(ft.Container):
                         alignment=ft.Alignment(0, 0),
                         bgcolor="#EAF2FF",
                         border_radius=17,
-                        tooltip="Ejemplo; no existe un archivo para descargar",
+                        tooltip="Descargar informe",
                         ink=True,
-                        on_click=lambda e, nombre=informe["nombre"]: (
-                            self._avisar_informe_demo(nombre)
-                        ),
+                        on_click=lambda e, item=informe: self._descargar_informe(item),
                         content=ft.Icon(
                             ft.Icons.DOWNLOAD_OUTLINED,
                             size=18,
@@ -1062,16 +1135,11 @@ class PantallaReportes(ft.Container):
                             ),
                         ],
                     ),
-                    ft.Container(
-                        padding=ft.Padding(7, 4, 7, 4),
-                        bgcolor="#FFF2E8",
-                        border_radius=7,
-                        content=ft.Text(
-                            "DEMO",
-                            size=9,
-                            weight=ft.FontWeight.BOLD,
-                            color=COLOR_NARANJA,
-                        ),
+                    ft.IconButton(
+                        icon=ft.Icons.DOWNLOAD_OUTLINED,
+                        tooltip="Descargar informe",
+                        icon_color=COLOR_AZUL,
+                        on_click=lambda e, item=informe: self._descargar_informe(item),
                     ),
                 ],
             ),
@@ -1082,11 +1150,23 @@ class PantallaReportes(ft.Container):
             modal=True,
             bgcolor="#F7FAFE",
             shape=ft.RoundedRectangleBorder(radius=18),
-            title=ft.Text(
-                "Historial de informes",
-                size=19,
-                weight=ft.FontWeight.BOLD,
-                color=COLOR_BANNER,
+            title=ft.Row(
+                spacing=8,
+                controls=[
+                    ft.Text(
+                        "Ver más reportes",
+                        size=19,
+                        weight=ft.FontWeight.BOLD,
+                        color=COLOR_BANNER,
+                        expand=True,
+                    ),
+                    ft.IconButton(
+                        icon=ft.Icons.CLOSE,
+                        tooltip="Cerrar",
+                        icon_color=COLOR_GRIS,
+                        on_click=lambda e: self._page.pop_dialog(),
+                    ),
+                ],
             ),
             content=ft.Container(
                 width=560,
@@ -1095,50 +1175,63 @@ class PantallaReportes(ft.Container):
                     spacing=8,
                     controls=[
                         ft.Text(
-                            "Ejemplos de informes recientes",
+                            "Informes generados durante esta sesión",
                             size=13,
                             color=COLOR_GRIS,
                         ),
                         ft.Column(
                             expand=True,
                             spacing=0,
-                            controls=[
-                                self._fila_informe_historial(informe)
-                                for informe in self.INFORMES_DEMO
-                            ],
-                        ),
-                        ft.Container(
-                            padding=ft.Padding(9, 7, 9, 7),
-                            bgcolor="#FFF2E8",
-                            border_radius=8,
-                            content=ft.Text(
-                                "Son datos de demostración. El historial real aparecerá cuando se generen y guarden informes.",
-                                size=11,
-                                color=COLOR_BANNER,
+                            scroll=ft.ScrollMode.AUTO,
+                            controls=(
+                                [
+                                    self._fila_informe_historial(informe)
+                                    for informe in self._informes_generados
+                                ]
+                                or [
+                                    ft.Container(
+                                        padding=12,
+                                        content=ft.Text(
+                                            "Todavía no hay informes generados.",
+                                            size=12,
+                                            color=COLOR_GRIS,
+                                        ),
+                                    )
+                                ]
                             ),
                         ),
                     ],
                 ),
             ),
             content_padding=ft.Padding(20, 0, 20, 10),
-            actions=[
-                ft.TextButton(
-                    "Cerrar",
-                    style=ft.ButtonStyle(color=COLOR_AZUL),
-                    on_click=lambda e: self._page.pop_dialog(),
-                )
-            ],
-            actions_alignment=ft.MainAxisAlignment.END,
         )
         self._page.show_dialog(self._dialogo_historial)
 
-    def _avisar_informe_demo(self, nombre):
-        self._mensaje_generacion.value = (
-            f"{nombre} es un ejemplo; todavía no hay archivo para descargar."
-        )
-        self._mensaje_generacion.visible = True
-        if self._page is not None:
-            self._mensaje_generacion.update()
+    async def _descargar_informe(self, informe):
+        try:
+            selector = obtener_selector_archivos(self._page)
+            contenido = leer_contenido_informe(informe)
+            ruta = await selector.save_file(
+                dialog_title="Descargar informe",
+                file_name=informe["archivo"],
+                file_type=ft.FilePickerFileType.CUSTOM,
+                allowed_extensions=[informe["extension"]],
+                src_bytes=contenido,
+            )
+        except (ft.FletException, OSError, ValueError) as error:
+            self._mensaje_generacion.value = (
+                f"No se pudo descargar el informe: {error}"
+            )
+            self._mensaje_generacion.visible = True
+            reproducir_sonido(self._page, "error")
+            self._page.update()
+            return
+
+        if ruta is not None or self._page.web:
+            self._mensaje_generacion.value = "El informe se descargó correctamente."
+            self._mensaje_generacion.visible = True
+            reproducir_sonido(self._page, "documento")
+            self._page.update()
 
     def abrir_selector_reportes(self, e=None):
         opciones = ft.Column(
@@ -1187,7 +1280,7 @@ class PantallaReportes(ft.Container):
                                         color=COLOR_AZUL,
                                     ),
                                     ft.Text(
-                                        "La configuración es visual; los datos aún no están conectados.",
+                                        "El informe usará los registros del periodo y filtro seleccionados.",
                                         size=11,
                                         color=COLOR_BANNER,
                                         expand=True,
@@ -1332,7 +1425,7 @@ class PantallaReportes(ft.Container):
                                 color=COLOR_BANNER,
                             ),
                             ft.Text(
-                                "Configura los parámetros del informe",
+                                "Elige periodo, filtro y formato de descarga.",
                                 size=12,
                                 color=COLOR_GRIS,
                             ),
@@ -1363,7 +1456,7 @@ class PantallaReportes(ft.Container):
                             bgcolor="#FFF2E8",
                             border_radius=9,
                             content=ft.Text(
-                                "La generación estará disponible cuando se conecten los datos del sistema.",
+                                "El PDF incluye una gráfica; Excel agrega los datos y una hoja gráfica.",
                                 size=11,
                                 color=COLOR_BANNER,
                             ),
@@ -1411,24 +1504,129 @@ class PantallaReportes(ft.Container):
         self._page.pop_dialog()
         self.abrir_selector_reportes()
 
-    def _generar_reporte_configurado(self, e):
+    async def _generar_reporte_configurado(self, e):
         reporte = self._reporte_seleccionado["nombre"]
         periodo = self._selector_periodo_reporte.value
         filtro = self._selector_filtro_reporte.value
         formato = self._selector_formato_reporte.value
         self._page.pop_dialog()
-        self._mensaje_generacion.value = (
-            f"{reporte} configurado: {periodo} · {filtro} · {formato}. "
-            "No se generó un archivo porque los datos aún no están conectados."
-        )
-        self._mensaje_generacion.visible = True
-        if self._page is not None:
-            self._mensaje_generacion.update()
+        try:
+            datos = self._servicio_reportes.obtener_informe(
+                reporte, periodo, filtro
+            )
+            nombre_archivo = (
+                f"{reporte.replace(' ', '_').replace('/', '-')}_"
+                f"{periodo.replace(' ', '_')}"
+            )
+            if formato == "PDF":
+                contenido = crear_pdf(
+                    datos["rows"],
+                    datos["columns"],
+                    titulo=reporte,
+                    subtitulo=(
+                        f"Periodo: {periodo} · "
+                        f"{datos['desde']:%d/%m/%Y} – {datos['hasta']:%d/%m/%Y}"
+                    ),
+                    metricas=datos["metrics"],
+                    orientacion="landscape",
+                    grafica=datos["chart"],
+                )
+                extension = "pdf"
+                file_type = ft.FilePickerFileType.CUSTOM
+            else:
+                contenido = crear_excel_con_grafica(
+                    datos["rows"],
+                    datos["columns"],
+                    nombre_hoja=reporte,
+                    grafica=datos["chart"],
+                )
+                extension = "xlsx"
+                file_type = ft.FilePickerFileType.CUSTOM
+
+            archivo = f"{nombre_archivo}.{extension}"
+            selector = obtener_selector_archivos(self._page)
+            ruta = await selector.save_file(
+                dialog_title=f"Exportar {reporte}",
+                file_name=archivo,
+                file_type=file_type,
+                allowed_extensions=[extension],
+                src_bytes=contenido,
+            )
+            if ruta is None and not self._page.web:
+                return
+
+            informe = {
+                "nombre": reporte,
+                "periodo": periodo,
+                "generado": datetime.now().strftime("%d/%m/%Y · %H:%M"),
+                "formato": formato,
+                "color": COLOR_AZUL if formato == "PDF" else COLOR_VERDE,
+                "archivo": archivo,
+                "extension": extension,
+            }
+            informe = guardar_informe_generado(informe, contenido)
+            self._informes_generados.insert(0, informe)
+            lista_anterior = self._panel_recientes.content.controls[1]
+            lista_nueva = self._lista_informes_recientes()
+            indice = self._panel_recientes.content.controls.index(lista_anterior)
+            self._panel_recientes.content.controls[indice] = lista_nueva
+            self._mensaje_generacion.value = (
+                f"{reporte} se exportó correctamente en {formato}."
+            )
+            self._mensaje_generacion.visible = True
+            reproducir_sonido(self._page, "documento")
+            self._page.update()
+        except (SQLAlchemyError, ft.FletException, ValueError, OSError) as error:
+            self._mensaje_generacion.value = f"No se pudo generar el informe: {error}"
+            self._mensaje_generacion.visible = True
+            reproducir_sonido(self._page, "error")
+            self._page.update()
 
     def _cambiar_filtros(self, e):
         self._periodo = self._selector_periodo.value
         self._modulo = self._selector_modulo.value
         self._mensaje_generacion.visible = False
+        try:
+            self._resumen = self._servicio_reportes.obtener_resumen(
+                self._periodo, self._modulo
+            )
+        except (SQLAlchemyError, ValueError) as error:
+            self._mensaje_generacion.value = (
+                f"No se pudieron actualizar los reportes: {error}"
+            )
+            self._mensaje_generacion.visible = True
+            if self._page is not None:
+                self._page.update()
+            return
+        self._datos_metricas = self._crear_datos_metricas()
+        tarjetas_anteriores = self._tarjetas_metricas_row
+        nuevas_tarjetas = self._tarjetas_metricas()
+        tarjetas_anteriores.controls = nuevas_tarjetas.controls
+        self._tarjetas_metricas_row = tarjetas_anteriores
+        self._indicadores_clave.controls = [
+            self._fila_indicador_clave(
+                f"{self._resumen['aprobacion_periodo']}%",
+                "Con anticipo, operación o liquidadas",
+                COLOR_VERDE,
+            ),
+            self._fila_indicador_clave(
+                f"{self._resumen['pendientes_periodo']:,}",
+                "Pendientes",
+                COLOR_NARANJA,
+            ),
+            self._fila_indicador_clave(
+                f"{self._resumen['liquidadas_periodo']:,}",
+                "Liquidadas",
+                COLOR_AZUL,
+            ),
+        ]
+        self._valor_periodo.value = (
+            f"${self._resumen['monto_mxn_periodo']:,.0f} MXN"
+        )
+        self._resumen_periodo.value = f"Periodo: {self._periodo.lower()}"
+        if self._page is not None:
+            self._panel_indicadores.update()
+        self._cambiar_metrica(self._metrica)
         if self._page is not None:
             self._page.update()
 

@@ -16,6 +16,8 @@ from reportlab.lib.units import mm
 from reportlab.pdfbase.pdfmetrics import stringWidth
 from reportlab.pdfgen import canvas
 from reportlab.lib.utils import ImageReader
+from reportlab.graphics.charts.barcharts import VerticalBarChart
+from reportlab.graphics.shapes import Drawing
 from reportlab.platypus import (
     Flowable,
     KeepTogether,
@@ -501,6 +503,7 @@ def crear_pdf(
     columnas_centradas: Iterable[str] = (),
     nombre_registro: str = "registros",
     envolver_texto_celdas: bool = True,
+    grafica: Sequence[tuple[str, int | float]] | None = None,
 ) -> bytes:
     if not columnas:
         raise ValueError("Debe especificarse al menos una columna.")
@@ -636,6 +639,44 @@ def crear_pdf(
             )
         )
         historia.extend([tabla_metricas, Spacer(1, 4 * mm)])
+
+    datos_grafica = list(grafica or [])
+    if datos_grafica:
+        historia.extend(
+            [
+                Paragraph("Gráfica", ParagraphStyle(
+                    "TituloGraficaPDF",
+                    fontName="Helvetica-Bold",
+                    fontSize=11,
+                    leading=14,
+                    textColor=COLOR_SIDEBAR,
+                )),
+                Spacer(1, 2 * mm),
+            ]
+        )
+        dibujo = Drawing(ancho_tabla, 42 * mm)
+        grafica_barras = VerticalBarChart()
+        grafica_barras.x = 24
+        grafica_barras.y = 12
+        grafica_barras.width = ancho_tabla - 42
+        grafica_barras.height = 30 * mm
+        grafica_barras.data = [tuple(float(valor) for _, valor in datos_grafica)]
+        grafica_barras.categoryAxis.categoryNames = [
+            str(etiqueta)[:24] for etiqueta, _ in datos_grafica
+        ]
+        grafica_barras.categoryAxis.labels.fontName = "Helvetica"
+        grafica_barras.categoryAxis.labels.fontSize = 7
+        grafica_barras.categoryAxis.labels.angle = 25
+        grafica_barras.categoryAxis.labels.dy = -8
+        grafica_barras.valueAxis.valueMin = 0
+        valor_maximo = max(float(valor) for _, valor in datos_grafica)
+        grafica_barras.valueAxis.valueMax = max(1, valor_maximo * 1.15)
+        grafica_barras.valueAxis.valueStep = max(
+            1, grafica_barras.valueAxis.valueMax / 5
+        )
+        grafica_barras.bars[0].fillColor = colors.HexColor(COLOR_AZUL)
+        dibujo.add(grafica_barras)
+        historia.extend([dibujo, Spacer(1, 4 * mm)])
 
     grupos_filas = [
         filas[inicio:inicio + TAMANO_PAGINA_REGISTROS]

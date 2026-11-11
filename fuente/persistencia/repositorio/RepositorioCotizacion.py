@@ -203,6 +203,26 @@ class RepositorioCotizacion(Repositorio):
         )
         return list(self.sesion.scalars(stmt).all())
 
+    def obtener_recientes(self, limite: int = 3) -> list[Cotizacion]:
+        stmt = (
+            select(Cotizacion)
+            .options(*self._opciones_carga())
+            .order_by(Cotizacion.creado_en.desc(), Cotizacion.id.desc())
+            .limit(limite)
+        )
+        return list(self.sesion.scalars(stmt).all())
+
+    def sumar_totales_por_moneda_creados_entre(self, desde, hasta):
+        stmt = (
+            select(Cotizacion.moneda, func.coalesce(func.sum(Cotizacion.total), 0))
+            .where(Cotizacion.creado_en >= desde, Cotizacion.creado_en < hasta)
+            .group_by(Cotizacion.moneda)
+        )
+        return {
+            moneda: total
+            for moneda, total in self.sesion.execute(stmt).all()
+        }
+
     def contar_registros(self, filtros: dict | None = None) -> int:
         stmt = select(func.count(Cotizacion.id)).select_from(Cotizacion)
         stmt = self._aplicar_filtros(stmt, filtros)

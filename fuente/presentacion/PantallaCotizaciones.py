@@ -30,6 +30,7 @@ from fuente.utilidades.Componentes import (
     agregar_panel_flotante,
     crear_mensaje_validacion,
     dialogo_confirmacion,
+    mostrar_dialogo_seleccionados,
     limpiar_error_campo,
     paginacion,
     panel_filtros,
@@ -332,7 +333,6 @@ class PantallaCotizaciones(ft.Container):
         if len(texto) < 3:
             if self.busqueda:
                 self.busqueda = ""
-                self.cotizaciones_seleccionadas.clear()
                 self.pagina_actual = 1
                 self.actualizar_historial()
                 self._actualizar_vista_seleccion(
@@ -358,7 +358,6 @@ class PantallaCotizaciones(ft.Container):
     def _aplicar_busqueda(self, texto):
         self.busqueda = texto
         self.pagina_actual = 1
-        self.cotizaciones_seleccionadas.clear()
         self.actualizar_historial()
         self._actualizar_vista_seleccion(
             set(self._claves_cotizaciones_pagina)
@@ -701,7 +700,6 @@ class PantallaCotizaciones(ft.Container):
             "fecha_desde": None,
             "fecha_hasta": None,
         }
-        self.cotizaciones_seleccionadas.clear()
         self._validar_fechas_filtro()
         self._actualizar_resumen_filtros()
         self._actualizar_indicador_filtros()
@@ -726,7 +724,6 @@ class PantallaCotizaciones(ft.Container):
             if checkbox.value:
                 filtros[grupo].add(valor)
         self.filtros_seleccionados = filtros
-        self.cotizaciones_seleccionadas.clear()
         self._actualizar_indicador_filtros()
         self.pagina_actual = 1
         self.cerrar_filtros()
@@ -815,12 +812,17 @@ class PantallaCotizaciones(ft.Container):
             ),
             height=42,
         )
-        self._texto_seleccionadas = ft.Text(
-            self._texto_seleccion_cotizaciones(),
-            size=12,
-            color=COLOR_NEGRO,
-            weight=ft.FontWeight.BOLD,
-            max_lines=1,
+        self._texto_seleccionadas = ft.GestureDetector(
+            content=ft.Text(
+                self._texto_seleccion_cotizaciones(),
+                size=12,
+                color=COLOR_NEGRO,
+                weight=ft.FontWeight.BOLD,
+                max_lines=1,
+            ),
+            on_tap=self.abrir_dialogo_seleccionados,
+            mouse_cursor=ft.MouseCursor.CLICK,
+            tooltip="Ver y administrar las cotizaciones seleccionadas",
         )
         self._barra_seleccion = ft.Row(
             visible=bool(self.cotizaciones_seleccionadas),
@@ -1722,6 +1724,28 @@ class PantallaCotizaciones(ft.Container):
             else f"{cantidad} cotizaciones seleccionadas"
         )
 
+    def abrir_dialogo_seleccionados(self, e=None):
+        if not self.cotizaciones_seleccionadas:
+            return
+
+        def nombre_cotizacion(cotizacion):
+            datos = self._normalizar_fila_tabla(cotizacion)
+            return (
+                f"{datos['folio']} · {datos['cliente']} · {datos['buque']}"
+            )
+
+        mostrar_dialogo_seleccionados(
+            page=self.main_page,
+            titulo="Cotizaciones seleccionadas",
+            obtener_registros=lambda: list(
+                self.cotizaciones_seleccionadas.values()
+            ),
+            obtener_nombre=nombre_cotizacion,
+            on_quitar=lambda cotizacion: self.seleccionar_cotizacion(
+                cotizacion, False
+            ),
+        )
+
     def cancelar_seleccion(self, e=None):
         claves = set(self.cotizaciones_seleccionadas)
         self.cotizaciones_seleccionadas.clear()
@@ -1809,7 +1833,9 @@ class PantallaCotizaciones(ft.Container):
             )
         )
         self._checkbox_seleccionar_pagina.update()
-        self._texto_seleccionadas.value = self._texto_seleccion_cotizaciones()
+        self._texto_seleccionadas.content.value = (
+            self._texto_seleccion_cotizaciones()
+        )
         self._barra_seleccion.visible = bool(self.cotizaciones_seleccionadas)
         self._barra_seleccion.update()
         self._actualizar_descripcion_exportacion()

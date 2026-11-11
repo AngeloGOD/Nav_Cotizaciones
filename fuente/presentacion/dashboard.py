@@ -20,51 +20,27 @@ from fuente.utilidades.Componentes import (
 
 
 class dashboard(ft.Container):
-    ACTIVIDAD_DEMO = (
-        {
-            "icono": ft.Icons.DESCRIPTION_OUTLINED,
-            "color": COLOR_AZUL,
-            "fondo": "#EAF2FF",
-            "titulo": "Cotización COT-2026-0048 registrada",
-            "fecha": "04/11/2026 · 09:45 a. m.",
-        },
-        {
-            "icono": ft.Icons.CHECK_CIRCLE_OUTLINED,
-            "color": COLOR_VERDE,
-            "fondo": "#EAF8F0",
-            "titulo": "Cotización COT-2026-0046 aprobada",
-            "fecha": "03/11/2026 · 04:20 p. m.",
-        },
-        {
-            "icono": ft.Icons.PERSON_OUTLINE,
-            "color": COLOR_AZUL,
-            "fondo": "#EAF2FF",
-            "titulo": "Cliente MSC Shipping S.A. actualizado",
-            "fecha": "03/11/2026 · 11:15 a. m.",
-        },
-        {
-            "icono": ft.Icons.INVENTORY_2_OUTLINED,
-            "color": COLOR_NARANJA,
-            "fondo": "#FFF2E8",
-            "titulo": "Producto de servicio actualizado",
-            "fecha": "02/11/2026 · 05:30 p. m.",
-        },
-    )
-    CLIENTES_DEMO = (
-        ("MSC Shipping S.A.", "04/11/2026"),
-        ("Maersk México", "03/11/2026"),
-        ("Navios South American", "01/11/2026"),
-    )
-
-    def __init__(self):
+    def __init__(
+        self,
+        servicio_cliente=None,
+        servicio_cotizacion=None,
+        on_navigate=None,
+    ):
         super().__init__(
             expand=True,
             bgcolor=COLOR_FONDO,
             padding=ft.Padding(14, 8, 14, 16),
         )
-        self.controlador = ControladorDashboard()
-        self.metricas = self.controlador.obtener_metricas()
-        self.lista_cotizaciones = self.controlador.obtener_ultimas_cotizaciones()
+        self.controlador = ControladorDashboard(
+            servicio_cliente=servicio_cliente,
+            servicio_cotizacion=servicio_cotizacion,
+        )
+        self.on_navigate = on_navigate
+        datos = self.controlador.obtener_datos_dashboard()
+        self.metricas = datos["metricas"]
+        self.lista_cotizaciones = datos["cotizaciones"]
+        self.lista_clientes = datos["clientes"]
+        self.lista_actividades = datos["actividades"]
 
         self.content = ft.Column(
             expand=True,
@@ -81,8 +57,8 @@ class dashboard(ft.Container):
         return banner_modulo(
             "fondo_puerto.jpg",
             "OPL Pacífico Sur",
-            "Bienvenido, Alexis",
-            "Resumen de cotizaciones y actividad · datos ilustrativos.",
+            "Resumen operativo",
+            "Cotizaciones, clientes y actividad reciente.",
             ft.Icons.HOME_OUTLINED,
         )
 
@@ -90,7 +66,7 @@ class dashboard(ft.Container):
         resumenes = (
             (
                 "Cotizaciones pendientes",
-                self.metricas["pendientes"],
+                str(self.metricas["pendientes"]),
                 ft.Icons.DESCRIPTION_OUTLINED,
                 COLOR_AZUL,
                 "#EAF2FF",
@@ -98,7 +74,7 @@ class dashboard(ft.Container):
             ),
             (
                 "Cotizaciones aprobadas",
-                self.metricas["aprobadas"],
+                str(self.metricas["aprobadas"]),
                 ft.Icons.CHECK_CIRCLE_OUTLINED,
                 COLOR_VERDE,
                 "#EAF8F0",
@@ -106,7 +82,7 @@ class dashboard(ft.Container):
             ),
             (
                 "Cotizaciones canceladas",
-                self.metricas["rechazadas"],
+                str(self.metricas["rechazadas"]),
                 ft.Icons.CANCEL_OUTLINED,
                 COLOR_ROJO,
                 "#FDECEE",
@@ -144,7 +120,7 @@ class dashboard(ft.Container):
         tarjeta = tarjeta_indicador(
             titulo,
             valor,
-            "Periodo actual · demo",
+            "Actualizado al entrar",
             icono,
             color,
             fondo,
@@ -165,12 +141,6 @@ class dashboard(ft.Container):
                             self._titulo_panel(
                                 ft.Icons.DASHBOARD_OUTLINED,
                                 "Actividad y desempeño",
-                            ),
-                            ft.Container(expand=True),
-                            ft.Text(
-                                "Resumen de ejemplo",
-                                size=11,
-                                color=COLOR_GRIS,
                             ),
                         ],
                     ),
@@ -362,10 +332,6 @@ class dashboard(ft.Container):
                                 "Actividad reciente",
                             ),
                             ft.Container(expand=True),
-                            ft.TextButton(
-                                "Ver historial →",
-                                style=ft.ButtonStyle(color=COLOR_AZUL),
-                            ),
                         ],
                     ),
                     ft.Column(
@@ -373,8 +339,9 @@ class dashboard(ft.Container):
                         spacing=3,
                         controls=[
                             self._fila_actividad(actividad)
-                            for actividad in self.ACTIVIDAD_DEMO
-                        ],
+                            for actividad in self.lista_actividades
+                        ]
+                        or [self._sin_registros("No hay actividad registrada.")],
                     ),
                 ],
             ),
@@ -387,6 +354,19 @@ class dashboard(ft.Container):
 
     @staticmethod
     def _fila_actividad(actividad):
+        estilos = {
+            "cotizacion": (
+                ft.Icons.DESCRIPTION_OUTLINED,
+                COLOR_AZUL,
+                "#EAF2FF",
+            ),
+            "cliente": (
+                ft.Icons.PERSON_OUTLINE,
+                COLOR_VERDE,
+                "#EAF8F0",
+            ),
+        }
+        icono, color, fondo = estilos[actividad["icono"]]
         return ft.Row(
             spacing=9,
             vertical_alignment=ft.CrossAxisAlignment.CENTER,
@@ -395,12 +375,12 @@ class dashboard(ft.Container):
                     width=32,
                     height=32,
                     alignment=ft.Alignment(0, 0),
-                    bgcolor=actividad["fondo"],
+                    bgcolor=fondo,
                     border_radius=16,
                     content=ft.Icon(
-                        actividad["icono"],
+                        icono,
                         size=17,
-                        color=actividad["color"],
+                        color=color,
                     ),
                 ),
                 ft.Column(
@@ -429,25 +409,35 @@ class dashboard(ft.Container):
 
     def _panel_cotizaciones(self):
         encabezados = ("Folio", "Fecha", "Buque", "Cliente", "Monto", "Estado")
+        filas = [
+            self._fila_tabla_cotizacion(
+                (
+                    cot["folio"],
+                    cot["fecha"],
+                    cot["buque"],
+                    cot["cliente"],
+                    cot["monto"],
+                    cot["estado"],
+                ),
+                estado=cot["estado"],
+            )
+            for cot in self.lista_cotizaciones
+        ] or [
+            ft.Container(
+                padding=ft.Padding(8, 12, 8, 12),
+                content=ft.Text(
+                    "No hay cotizaciones registradas.",
+                    size=11,
+                    color=COLOR_GRIS,
+                ),
+            )
+        ]
         tabla = ft.Column(
             spacing=0,
             controls=[
                 self._fila_tabla_cotizacion(encabezados, encabezado=True),
                 ft.Divider(height=1, color="#E7EEF6"),
-                *[
-                    self._fila_tabla_cotizacion(
-                        (
-                            cot["folio"],
-                            cot["fecha"],
-                            cot["buque"],
-                            cot["cliente"],
-                            cot["monto"],
-                            cot["estado"],
-                        ),
-                        estado=cot["estado"],
-                    )
-                    for cot in self.lista_cotizaciones
-                ],
+                *filas,
             ],
         )
         return card(
@@ -465,13 +455,9 @@ class dashboard(ft.Container):
                             ft.TextButton(
                                 "Ver historial →",
                                 style=ft.ButtonStyle(color=COLOR_AZUL),
+                                on_click=lambda e: self._navegar("ruta_cotizaciones"),
                             ),
                         ],
-                    ),
-                    ft.Text(
-                        "Muestra de registros · datos ilustrativos",
-                        size=10,
-                        color=COLOR_GRIS,
                     ),
                     tabla,
                 ],
@@ -530,11 +516,6 @@ class dashboard(ft.Container):
         )
 
     def _panel_clientes(self):
-        clientes = [
-            (nombre, f"Registro demo · {fecha}")
-            for nombre, fecha in self.CLIENTES_DEMO
-        ]
-
         return card(
             ft.Column(
                 expand=True,
@@ -551,6 +532,7 @@ class dashboard(ft.Container):
                             ft.TextButton(
                                 "Ver todos →",
                                 style=ft.ButtonStyle(color=COLOR_AZUL),
+                                on_click=lambda e: self._navegar("ruta_clientes"),
                             ),
                         ],
                     ),
@@ -584,9 +566,13 @@ class dashboard(ft.Container):
                         expand=True,
                         spacing=0,
                         controls=[
-                            self._fila_cliente(nombre, detalle)
-                            for nombre, detalle in clientes
-                        ],
+                            self._fila_cliente(
+                                cliente["nombre"],
+                                cliente["detalle"],
+                            )
+                            for cliente in self.lista_clientes
+                        ]
+                        or [self._sin_registros("No hay clientes registrados.")],
                     ),
                 ],
             ),
@@ -629,6 +615,23 @@ class dashboard(ft.Container):
                         overflow=ft.TextOverflow.ELLIPSIS,
                     ),
                 ],
+            ),
+        )
+
+    def _navegar(self, ruta):
+        if self.on_navigate is not None:
+            self.on_navigate(ruta)
+
+    @staticmethod
+    def _sin_registros(mensaje):
+        return ft.Container(
+            expand=True,
+            alignment=ft.Alignment(0, 0),
+            content=ft.Text(
+                mensaje,
+                size=11,
+                color=COLOR_GRIS,
+                text_align=ft.TextAlign.CENTER,
             ),
         )
 

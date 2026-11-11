@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+from datetime import datetime
 from decimal import Decimal, ROUND_HALF_UP
 import logging
 import math
@@ -652,6 +653,18 @@ class ServicioCotizacion:
         with self.uow as uow:
             return uow.cotizacion.consultar_pagina(
                 desplazamiento, limite, filtros
+            )
+
+    def obtener_recientes(self, limite: int = 3) -> list[Cotizacion]:
+        with self.uow as uow:
+            return uow.cotizacion.obtener_recientes(limite)
+
+    def sumar_totales_por_moneda_creados_entre(
+        self, desde: datetime, hasta: datetime
+    ) -> dict[Moneda, Decimal]:
+        with self.uow as uow:
+            return uow.cotizacion.sumar_totales_por_moneda_creados_entre(
+                desde, hasta
             )
 
     def obtener_cantidad_registros(self, filtros: dict | None = None) -> int:

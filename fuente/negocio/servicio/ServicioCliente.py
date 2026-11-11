@@ -148,6 +148,10 @@ class ServicioCliente():
             total = self.uow.cliente.contar(filtros_limpios)
         return registros, total
 
+    def obtener_recientes(self, limite=3):
+        with self.uow:
+            return self.uow.cliente.obtener_recientes(limite)
+
     def modificar_cliente(self, cliente: Cliente):
         with self.uow:
             self.uow.cliente.modificar(cliente)

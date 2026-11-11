@@ -11,6 +11,7 @@ from fuente.utilidades.Componentes import (
     estado_vacio,
     limpiar_error_campo,
     menu_exportacion,
+    mostrar_dialogo_seleccionados,
     mostrar_feedback_dialogo,
     mostrar_notificacion,
     ocultar_feedback_dialogo,
@@ -203,7 +204,6 @@ class PantallaBuques(ft.Container):
     def buscar(self, e):
         self.busqueda = e.control.value or ""
         self.pagina_actual = 1
-        self.buques_seleccionados.clear()
         self.actualizar_directorio()
 
     # ---------------------------------------------------------
@@ -488,7 +488,6 @@ class PantallaBuques(ft.Container):
         if hasattr(self, "_panel_filtros") and self._panel_filtros_abierto:
             self._panel_filtros.update()
         self.pagina_actual = 1
-        self.buques_seleccionados.clear()
         self.actualizar_directorio()
 
     def aplicar_filtros(self, e=None):
@@ -505,7 +504,6 @@ class PantallaBuques(ft.Container):
         for clave, campo in self._campos_rango_filtros.items():
             self.filtros_seleccionados[clave] = (campo.value or "").strip()
         self.pagina_actual = 1
-        self.buques_seleccionados.clear()
         self._actualizar_indicador_filtros()
         self.cerrar_filtros()
         self.actualizar_directorio()
@@ -530,7 +528,6 @@ class PantallaBuques(ft.Container):
 
     def cambiar_pagina(self, pagina):
         self.pagina_actual = pagina
-        self.buques_seleccionados.clear()
         self.actualizar_directorio()
 
     def actualizar_directorio(self):
@@ -1390,6 +1387,17 @@ class PantallaBuques(ft.Container):
                 self.buques_seleccionados.pop(clave, None)
         self.actualizar_directorio()
 
+    def abrir_dialogo_buques_seleccionados(self, e=None):
+        if not self.buques_seleccionados:
+            return
+        mostrar_dialogo_seleccionados(
+            page=self._page,
+            titulo="Buques seleccionados",
+            obtener_registros=lambda: list(self.buques_seleccionados.values()),
+            obtener_nombre=lambda buque: buque.nombre or "Buque sin nombre",
+            on_quitar=lambda buque: self.seleccionar_buque(buque, False),
+        )
+
     def cancelar_seleccion_buques(self, e=None):
         self.buques_seleccionados.clear()
         self.actualizar_directorio()
@@ -1813,16 +1821,21 @@ class PantallaBuques(ft.Container):
         tabla_buques = self.crear_tabla_buques(buques)
 
         cantidad = len(self.buques_seleccionados)
-        self._texto_seleccionados = ft.Text(
-            (
-                f"{cantidad} buque seleccionado"
-                if cantidad == 1
-                else f"{cantidad} buques seleccionados"
+        self._texto_seleccionados = ft.GestureDetector(
+            content=ft.Text(
+                (
+                    f"{cantidad} buque seleccionado"
+                    if cantidad == 1
+                    else f"{cantidad} buques seleccionados"
+                ),
+                size=12,
+                color=COLOR_NEGRO,
+                weight=ft.FontWeight.BOLD,
+                max_lines=1,
             ),
-            size=12,
-            color=COLOR_NEGRO,
-            weight=ft.FontWeight.BOLD,
-            max_lines=1,
+            on_tap=self.abrir_dialogo_buques_seleccionados,
+            mouse_cursor=ft.MouseCursor.CLICK,
+            tooltip="Ver y administrar los buques seleccionados",
         )
         self._barra_seleccion = ft.Row(
             visible=bool(self.buques_seleccionados),

@@ -14,7 +14,7 @@ class SelectorCliente(ft.Stack):
     def __init__(self, servicio_cliente):
         super().__init__(
             expand=True,
-            height=55,
+            height=58,
             clip_behavior=ft.ClipBehavior.NONE,
         )
 
@@ -25,15 +25,17 @@ class SelectorCliente(ft.Stack):
         # Campo de búsqueda con expand=True
         self.campo = ft.TextField(
             expand=True,
+            width=float("inf"),
             label="Cliente (opcional)",
             hint_text="Buscar cliente por razón social...",
-            height=52,
-            text_size=12,
-            border_radius=8,
+            height=58,
+            text_size=14,
+            border=ft.InputBorder.OUTLINE,
+            border_radius=9,
             border_color=COLOR_GRIS_CLARO,
             focused_border_color=COLOR_NARANJA,
             prefix_icon=ft.Icons.PERSON_SEARCH,
-            content_padding=ft.Padding(12, 8, 12, 8),
+            content_padding=ft.Padding(14, 12, 14, 12),
             on_change=self._al_cambiar_texto,
         )
 
@@ -215,8 +217,17 @@ class SelectorCliente(ft.Stack):
 
         self._numero_busqueda += 1
 
-        self.cliente_id_seleccionado = int(cliente.id)
-        self.campo.value = cliente.razon_social or ""
+        try:
+            cliente_id = getattr(cliente, "id", None)
+            razon_social = getattr(cliente, "razon_social", "") or ""
+        except Exception:
+            cliente_id = None
+            razon_social = ""
+
+        self.cliente_id_seleccionado = (
+            int(cliente_id) if cliente_id is not None else None
+        )
+        self.campo.value = razon_social
 
         self._ocultar_resultados()
         self._actualizar()

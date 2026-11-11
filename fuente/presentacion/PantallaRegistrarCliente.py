@@ -447,7 +447,7 @@ class PantallaRegistrarCliente(ft.Container):
         activo = bool(self.activo.value)
 
         try:
-            self.controlador.registrar_cliente(
+            cliente = self.controlador.registrar_cliente(
                 razon_social=razon_social,
                 tipo_persona=tipo_persona,
                 direccion=direccion,
@@ -471,5 +471,32 @@ class PantallaRegistrarCliente(ft.Container):
         )
         if self.vista_anterior:
             self.vista_anterior.build_ui()
-            self.vista_anterior.actualizar_directorio()
+            if hasattr(self.vista_anterior, "cliente_busqueda"):
+                cliente_seleccionado = cliente
+                try:
+                    cliente_id = getattr(cliente_seleccionado, "id", None)
+                except Exception:
+                    cliente_id = None
+                if cliente_id is None and hasattr(
+                    self.controlador, "servicio_cliente"
+                ):
+                    try:
+                        encontrados = (
+                            self.controlador.servicio_cliente.buscar_por_rfc(
+                                (rfc or "").strip().upper()
+                            )
+                        )
+                        if encontrados:
+                            cliente_seleccionado = encontrados[-1]
+                    except Exception:
+                        pass
+                try:
+                    if getattr(cliente_seleccionado, "id", None) is not None:
+                        self.vista_anterior.cliente_busqueda.establecer_cliente(
+                            cliente_seleccionado
+                        )
+                except Exception:
+                    pass
+            if hasattr(self.vista_anterior, "actualizar_directorio"):
+                self.vista_anterior.actualizar_directorio()
         self._page.update()

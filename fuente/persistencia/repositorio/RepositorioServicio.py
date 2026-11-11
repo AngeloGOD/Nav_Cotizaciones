@@ -51,7 +51,8 @@ class RepositorioServicio(Repositorio):
         if sku:
             existente = self.sesion.scalar(
                 select(Servicio.__table__.c.id).where(
-                    Servicio.__table__.c.sku == sku
+                    func.upper(func.trim(Servicio.__table__.c.sku))
+                    == sku.upper()
                 )
             )
             if existente is not None:
@@ -107,7 +108,8 @@ class RepositorioServicio(Repositorio):
         if sku:
             existente = self.sesion.scalar(
                 select(Servicio.__table__.c.id).where(
-                    Servicio.__table__.c.sku == sku,
+                    func.upper(func.trim(Servicio.__table__.c.sku))
+                    == sku.upper(),
                     Servicio.__table__.c.id != servicio.id,
                 )
             )

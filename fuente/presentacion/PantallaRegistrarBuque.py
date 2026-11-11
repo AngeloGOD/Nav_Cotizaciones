@@ -84,7 +84,6 @@ class PantallaRegistrarBuque(ft.Container):
 
         self.categoria_buque = ft.Dropdown(
             expand=True,
-            width=float("inf"),
             height=58,
             label="Tipo / categoría del buque *",
             hint_text="Selecciona un tipo de buque",

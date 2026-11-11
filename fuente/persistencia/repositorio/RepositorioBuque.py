@@ -13,7 +13,31 @@ class RepositorioBuque(Repositorio):
     def __init__(self, sesion: Session):
         super().__init__(sesion=sesion)
 
+    def existe_numero_imo(
+        self, numero_imo: str | None, excluir_id: int | None = None
+    ) -> bool:
+        numero_imo_normalizado = (numero_imo or "").strip().upper()
+        if not numero_imo_normalizado:
+            return False
+        stmt = select(Buque.id).where(
+            func.upper(func.trim(Buque.numero_imo)) == numero_imo_normalizado
+        )
+        if excluir_id is not None:
+            stmt = stmt.where(Buque.id != excluir_id)
+        return self.sesion.scalar(stmt.limit(1)) is not None
+
+    def _validar_numero_imo_disponible(
+        self, numero_imo: str | None, excluir_id: int | None = None
+    ) -> str | None:
+        numero_imo = (numero_imo or "").strip() or None
+        if numero_imo and self.existe_numero_imo(numero_imo, excluir_id):
+            raise ValueError(
+                f"El número IMO '{numero_imo}' ya está registrado en otro buque."
+            )
+        return numero_imo
+
     def insertar(self, buque: Buque):
+        buque.numero_imo = self._validar_numero_imo_disponible(buque.numero_imo)
         self.sesion.add(buque)
 
     @staticmethod
@@ -118,6 +142,9 @@ class RepositorioBuque(Repositorio):
         return self.sesion.scalar(select(func.count()).select_from(Buque)) or 0
 
     def modificar(self, buque: Buque):
+        buque.numero_imo = self._validar_numero_imo_disponible(
+            buque.numero_imo, excluir_id=buque.id
+        )
         stmt = update(Buque).where(Buque.id == buque.id).values(
             cliente_id=buque.cliente_id,
             nombre=buque.nombre,

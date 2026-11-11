@@ -275,6 +275,14 @@ class ControladorBuque:
             activo=activo,
         )
         ControladorRegistrarBuques._validar_campos_obligatorios(datos)
+        if datos["numero_imo"] and self.servicio_buque.existe_numero_imo(
+            datos["numero_imo"], excluir_id=getattr(buque, "id", None)
+        ):
+            raise ValueError(
+                ControladorRegistrarBuques._mensaje_imo_duplicado(
+                    datos["numero_imo"]
+                )
+            )
 
         for atributo, valor in datos.items():
             setattr(buque, atributo, valor)

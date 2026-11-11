@@ -29,6 +29,12 @@ class ServicioBuque:
         with self.uow:
             return self.uow.buque.contar_registros()
 
+    def existe_numero_imo(
+        self, numero_imo: str | None, excluir_id: int | None = None
+    ) -> bool:
+        with self.uow:
+            return self.uow.buque.existe_numero_imo(numero_imo, excluir_id)
+
     def modificar_buque(self, buque: Buque):
         with self.uow:
             self.uow.buque.modificar(buque)

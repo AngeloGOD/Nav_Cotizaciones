@@ -56,6 +56,7 @@ class ControladorRegistrarBuques:
             activo=activo,
         )
         self._validar_campos_obligatorios(datos)
+        self._validar_numero_imo_disponible(datos["numero_imo"])
 
         buque = Buque(**datos)
         try:
@@ -97,6 +98,9 @@ class ControladorRegistrarBuques:
             activo=activo,
         )
         self._validar_campos_obligatorios(datos)
+        self._validar_numero_imo_disponible(
+            datos["numero_imo"], excluir_id=getattr(buque, "id", None)
+        )
 
         for atributo, valor in datos.items():
             setattr(buque, atributo, valor)
@@ -195,10 +199,28 @@ class ControladorRegistrarBuques:
         if datos["calado"] is not None and datos["calado"] <= 0:
             raise ValueError("El calado debe ser mayor que 0.")
 
+    def _validar_numero_imo_disponible(
+        self, numero_imo: str | None, excluir_id: int | None = None
+    ):
+        if numero_imo and self.servicio_buque.existe_numero_imo(
+            numero_imo, excluir_id
+        ):
+            raise ValueError(self._mensaje_imo_duplicado(numero_imo))
+
+    @staticmethod
+    def _mensaje_imo_duplicado(numero_imo: str) -> str:
+        return f"El número IMO '{numero_imo}' ya está registrado en otro buque."
+
     @staticmethod
     def _mensaje_error_bd(error):
-        detalle = str(error).lower()
-        if "numero_imo" in detalle or "buque_numero_imo_key" in detalle:
+        origen = getattr(error, "orig", error)
+        diagnostico = getattr(origen, "diag", None)
+        constraint = getattr(diagnostico, "constraint_name", None)
+        detalle = str(origen).lower()
+        if (
+            constraint == "buque_numero_imo_key"
+            or "unique constraint failed: buque.numero_imo" in detalle
+        ):
             return "Ya existe un buque registrado con ese número IMO."
         return "Ocurrió un error al guardar el buque en la base de datos."
 

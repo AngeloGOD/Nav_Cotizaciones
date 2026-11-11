@@ -1,10 +1,11 @@
+import asyncio
 import logging
 
 import flet as ft
 from sqlalchemy.exc import SQLAlchemyError
 
 from fuente.negocio.controlador.ControladorServicios import ControladorServicios
-from fuente.negocio.modelo.ENUMs import TipoConcepto
+from fuente.negocio.modelo.ENUMs import CaracterServicio, TipoConcepto
 from fuente.negocio.servicio.ServicioServicio import ServicioServicio
 from fuente.presentacion.PantallaNuevoServicio import PantallaNuevoServicio
 from fuente.utilidades.Colores import (
@@ -25,6 +26,10 @@ from fuente.utilidades.Componentes import (
     dialogo_confirmacion,
     estado_vacio,
     fila_catalogo,
+    panel_filtros,
+    seccion_opciones_filtro,
+    agregar_panel_flotante,
+    quitar_panel_flotante,
     mostrar_notificacion,
     sombra_suave,
     tarjeta_detalle,
@@ -53,8 +58,22 @@ class PantallaServicios(ft.Container):
         self._vista_servicios = "catalogo"
         self.registros_por_pagina = 8
         self.pagina_actual = 1
+        self.busqueda = ""
         self.servicios_catalogo = []
         self.total_servicios = 0
+        self.filtros_seleccionados = {
+            "tipos": set(),
+            "caracteres": set(),
+            "estados": set(),
+            "categorias_pda": set(),
+        }
+        self._opciones_categoria_pda = []
+        self._categorias_pda_cargadas = False
+        self._checks_filtros = {}
+        self._panel_filtros_abierto = False
+        self._clic_en_boton_filtros = False
+        self._tarea_busqueda = None
+        self._texto_busqueda_pendiente = ""
         self._error_catalogo = None
         if self.controlador_servicios is not None:
             try:
@@ -73,8 +92,21 @@ class PantallaServicios(ft.Container):
 
         buscador_servicios = barra_busqueda(
             hint="Buscar servicio por nombre o categoría...",
+            on_change=self.buscar_servicios,
         )
         buscador_servicios.height = 44
+        buscador_servicios.value = self.busqueda
+        self._campo_busqueda = buscador_servicios
+        self._boton_filtros = boton(
+            texto="Filtros",
+            icono=ft.Icons.TUNE,
+            tipo="secundario",
+            width=160,
+            height=44,
+            border_color="#C9DDF7",
+            on_click=self.abrir_filtros,
+        )
+        self._actualizar_indicador_filtros()
 
         barra_herramientas = card(
             ft.Row(
@@ -82,14 +114,11 @@ class PantallaServicios(ft.Container):
                 vertical_alignment=ft.CrossAxisAlignment.CENTER,
                 controls=[
                     buscador_servicios,
-                    boton(
-                        texto="Filtros",
-                        icono=ft.Icons.TUNE,
-                        tipo="secundario",
-                        width=160,
-                        height=44,
-                        border_color="#C9DDF7",
-                        on_click=lambda e: print("Abrir filtros"),
+                    ft.GestureDetector(
+                        on_tap_down=self._marcar_clic_en_boton_filtros,
+                        on_tap_up=self._limpiar_clic_en_boton_filtros,
+                        on_tap_cancel=self._limpiar_clic_en_boton_filtros,
+                        content=self._boton_filtros,
                     ),
                     boton(
                         texto="Agregar servicio",
@@ -304,7 +333,7 @@ class PantallaServicios(ft.Container):
         self._texto_paginacion = pie_catalogo.controls[1].controls[0]
         self._texto_numero_pagina = pie_catalogo.controls[1].controls[1].content
 
-        self.content = ft.Column(
+        contenido_principal = ft.Column(
             expand=True,
             scroll=ft.ScrollMode.AUTO,
             horizontal_alignment=ft.CrossAxisAlignment.STRETCH,
@@ -330,18 +359,282 @@ class PantallaServicios(ft.Container):
                 )
             ],
         )
+        self._layout_principal = ft.Stack(
+            expand=True,
+            clip_behavior=ft.ClipBehavior.NONE,
+            controls=[
+                ft.GestureDetector(
+                    expand=True,
+                    on_tap_down=self._clic_fondo_filtros,
+                    content=contenido_principal,
+                )
+            ],
+        )
+        self.content = self._layout_principal
 
     def _cargar_servicios_catalogo(self):
         if self.controlador_servicios is None:
             return
-        self.total_servicios = self.controlador_servicios.obtener_cantidad_registros()
+        if not self._categorias_pda_cargadas:
+            self._opciones_categoria_pda = [
+                (categoria.id, categoria.nombre)
+                for categoria in self.controlador_servicios.obtener_categorias_pda()
+            ]
+            self._categorias_pda_cargadas = True
+        filtros = self._filtros_repositorio()
+        self.total_servicios = self.controlador_servicios.obtener_cantidad_registros(
+            filtros
+        )
         registros = self.controlador_servicios.obtener_servicios(
             pagina=1,
             limite=max(self.total_servicios, 1),
+            filtros=filtros,
         )
         self.servicios_catalogo = [
             self._adaptar_servicio(servicio) for servicio in registros
         ]
+
+    def _filtros_repositorio(self):
+        estados = self.filtros_seleccionados["estados"]
+        activos = [
+            valor == "ACTIVO"
+            for valor in ("ACTIVO", "INACTIVO")
+            if valor in estados
+        ]
+        return {
+            "tipo_concepto": self.filtros_seleccionados["tipos"],
+            "caracter": self.filtros_seleccionados["caracteres"],
+            "activo": activos,
+            "categoria_pda_id": self.filtros_seleccionados["categorias_pda"],
+            "nombre": self.busqueda,
+        }
+
+    def buscar_servicios(self, e):
+        texto = (e.control.value or "").strip()
+        self._texto_busqueda_pendiente = texto
+        if self._tarea_busqueda is not None:
+            self._tarea_busqueda.cancel()
+            self._tarea_busqueda = None
+
+        if len(texto) < 3:
+            if self.busqueda:
+                self._aplicar_busqueda("")
+            return
+        if self.main_page is None:
+            self._aplicar_busqueda(texto)
+            return
+        self._tarea_busqueda = self.main_page.run_task(
+            self._buscar_con_demora,
+            texto,
+        )
+
+    async def _buscar_con_demora(self, texto):
+        await asyncio.sleep(0.2)
+        if texto != self._texto_busqueda_pendiente:
+            return
+        self._tarea_busqueda = None
+        self._aplicar_busqueda(texto)
+
+    def _aplicar_busqueda(self, texto):
+        self.busqueda = texto
+        self.pagina_actual = 1
+        self.recargar_catalogo()
+
+    def _seccion_filtro(self, titulo, opciones, clave, icono):
+        seleccionados = self.filtros_seleccionados[clave]
+        seccion, checkboxes = seccion_opciones_filtro(
+            titulo,
+            opciones,
+            seleccionados,
+            self._cambio_checkbox_filtro,
+            icono=icono,
+        )
+        self._checks_filtros.update(
+            {(clave, valor): checkbox for valor, checkbox in checkboxes.items()}
+        )
+        return seccion
+
+    def abrir_filtros(self, e=None):
+        if self._panel_filtros_abierto:
+            self.cerrar_filtros()
+            return
+
+        self._checks_filtros = {}
+        tipos = (
+            (TipoConcepto.SERVICIO_CUOTA_FIJA, "Cuota fija"),
+            (TipoConcepto.SERVICIO_FACTOR_UNITARIO, "Factor unitario"),
+            (TipoConcepto.SERVICIO_LINEAL_MIXTO, "Lineal mixto"),
+            (TipoConcepto.SERVICIO_FACTOR_COMPUESTO, "Factor compuesto"),
+            (TipoConcepto.SERVICIO_RANGO, "Por rangos"),
+            (TipoConcepto.SERVICIO_INCREMENTAL, "Por tramos"),
+        )
+        caracteres = (
+            (CaracterServicio.OBLIGATORIO, "Obligatorio"),
+            (CaracterServicio.CONDICIONAL, "Condicional"),
+            (CaracterServicio.OPCIONAL, "Opcional"),
+        )
+        estados = (("ACTIVO", "Activo"), ("INACTIVO", "Inactivo"))
+        categorias = [
+            (str(categoria_id), nombre)
+            for categoria_id, nombre in self._opciones_categoria_pda
+        ]
+        categoria_ids_seleccionados = {
+            str(valor) for valor in self.filtros_seleccionados["categorias_pda"]
+        }
+        secciones = [
+            self._seccion_filtro(
+                "Tipo de cobro",
+                [(tipo.value, etiqueta) for tipo, etiqueta in tipos],
+                "tipos",
+                ft.Icons.ATTACH_MONEY,
+            ),
+            ft.Divider(height=1, color="#E2EDF9"),
+            self._seccion_filtro(
+                "Carácter del servicio",
+                [(caracter.value, etiqueta) for caracter, etiqueta in caracteres],
+                "caracteres",
+                ft.Icons.RULE_OUTLINED,
+            ),
+            ft.Divider(height=1, color="#E2EDF9"),
+            self._seccion_filtro(
+                "Estado",
+                estados,
+                "estados",
+                ft.Icons.CHECK_CIRCLE_OUTLINED,
+            ),
+        ]
+        if categorias:
+            self.filtros_seleccionados["categorias_pda"] = categoria_ids_seleccionados
+            secciones.extend(
+                [
+                    ft.Divider(height=1, color="#E2EDF9"),
+                    self._seccion_filtro(
+                        "Categoría PDA",
+                        categorias,
+                        "categorias_pda",
+                        ft.Icons.CATEGORY_OUTLINED,
+                    ),
+                ]
+            )
+
+        self._panel_filtros, self._texto_resumen_filtros = panel_filtros(
+            titulo="Filtrar servicios",
+            secciones=secciones,
+            resumen=self._resumen_filtros_actual(),
+            on_limpiar=self.limpiar_filtros,
+            on_aplicar=self.aplicar_filtros,
+            on_cerrar=self.cerrar_filtros,
+            top=220,
+            right=155,
+            width=360,
+            height=500,
+        )
+        agregar_panel_flotante(self._layout_principal, self._panel_filtros)
+        self._panel_filtros_abierto = True
+        self.update()
+
+    def _resumen_filtros_actual(self):
+        cantidad = sum(
+            len(valores) for valores in self.filtros_seleccionados.values()
+        )
+        return (
+            "Sin filtros seleccionados"
+            if cantidad == 0
+            else "1 filtro seleccionado"
+            if cantidad == 1
+            else f"{cantidad} filtros seleccionados"
+        )
+
+    def _actualizar_indicador_filtros(self):
+        cantidad = sum(
+            len(valores) for valores in self.filtros_seleccionados.values()
+        )
+        controles = [
+            ft.Icon(ft.Icons.TUNE, size=18, color=COLOR_AZUL),
+            ft.Text("Filtros", size=14, color=COLOR_AZUL, max_lines=1),
+        ]
+        if cantidad:
+            controles.append(
+                ft.Container(
+                    width=20,
+                    height=20,
+                    alignment=ft.Alignment(0, 0),
+                    bgcolor="#E8F2FF",
+                    border_radius=10,
+                    content=ft.Text(
+                        str(cantidad),
+                        size=11,
+                        color=COLOR_AZUL,
+                        weight=ft.FontWeight.BOLD,
+                    ),
+                )
+            )
+        self._boton_filtros.content = ft.Row(
+            tight=True,
+            spacing=7,
+            alignment=ft.MainAxisAlignment.CENTER,
+            controls=controles,
+        )
+
+    def _cambio_checkbox_filtro(self, e=None):
+        cantidad = sum(
+            bool(checkbox.value) for checkbox in self._checks_filtros.values()
+        )
+        self._texto_resumen_filtros.value = (
+            "Sin filtros seleccionados"
+            if cantidad == 0
+            else "1 filtro seleccionado"
+            if cantidad == 1
+            else f"{cantidad} filtros seleccionados"
+        )
+        self._texto_resumen_filtros.update()
+
+    def limpiar_filtros(self, e=None):
+        for checkbox in self._checks_filtros.values():
+            checkbox.value = False
+        self.filtros_seleccionados = {
+            "tipos": set(),
+            "caracteres": set(),
+            "estados": set(),
+            "categorias_pda": set(),
+        }
+        self._actualizar_indicador_filtros()
+        self._texto_resumen_filtros.value = "Sin filtros seleccionados"
+        self._texto_resumen_filtros.update()
+        self.pagina_actual = 1
+        self.recargar_catalogo()
+
+    def aplicar_filtros(self, e=None):
+        filtros = {clave: set() for clave in self.filtros_seleccionados}
+        for (grupo, valor), checkbox in self._checks_filtros.items():
+            if checkbox.value:
+                filtros[grupo].add(valor)
+        filtros["categorias_pda"] = {
+            int(valor) for valor in filtros["categorias_pda"]
+        }
+        self.filtros_seleccionados = filtros
+        self._actualizar_indicador_filtros()
+        self.pagina_actual = 1
+        self.cerrar_filtros()
+        self.recargar_catalogo()
+
+    def cerrar_filtros(self, e=None):
+        if self._panel_filtros_abierto:
+            quitar_panel_flotante(self._layout_principal, self._panel_filtros)
+            self._panel_filtros_abierto = False
+            self.update()
+
+    def _marcar_clic_en_boton_filtros(self, e=None):
+        self._clic_en_boton_filtros = True
+
+    def _limpiar_clic_en_boton_filtros(self, e=None):
+        self._clic_en_boton_filtros = False
+
+    def _clic_fondo_filtros(self, e=None):
+        if self._clic_en_boton_filtros:
+            self._clic_en_boton_filtros = False
+            return
+        self.cerrar_filtros()
 
     @staticmethod
     def _adaptar_servicio(servicio):
@@ -375,9 +668,12 @@ class PantallaServicios(ft.Container):
                 if servicio.categoria_pda is not None
                 else "Sin categoría"
             ),
+            "categoria_pda_id": servicio.categoria_pda_id,
             "descripcion": servicio.nombre_en or f"Unidad: {servicio.unidad_medida}",
             "detalle": detalle,
             "tipo": tipo,
+            "caracter": getattr(servicio.caracter, "value", servicio.caracter),
+            "activo": bool(servicio.activo),
             "sku": servicio.sku,
             "proveedores": [proveedor.nombre for proveedor in servicio.proveedores],
             "imagen": servicio.imagen_path,
@@ -477,7 +773,7 @@ class PantallaServicios(ft.Container):
 
     def _crear_vista_servicios(self):
         if self._error_catalogo is not None:
-            return estado_vacio(
+            return self._contenedor_estado_catalogo(
                 ft.Icons.ERROR_OUTLINE,
                 "No se pudo cargar el catálogo",
                 "Revisa la conexión con la base de datos e inténtalo de nuevo.",
@@ -485,10 +781,21 @@ class PantallaServicios(ft.Container):
 
         servicios = self.servicios_catalogo[:self.registros_por_pagina]
         if not servicios:
-            return estado_vacio(
-                ft.Icons.WORK_OUTLINE,
-                "Aún no hay servicios registrados",
-                "Registra un servicio para que esté disponible al crear cotizaciones.",
+            con_filtros = bool(self.busqueda) or any(
+                self.filtros_seleccionados.values()
+            )
+            return self._contenedor_estado_catalogo(
+                ft.Icons.SEARCH_OFF if con_filtros else ft.Icons.WORK_OUTLINE,
+                (
+                    "No se encontraron servicios"
+                    if con_filtros
+                    else "Aún no hay servicios registrados"
+                ),
+                (
+                    "Ajusta los filtros o la búsqueda e inténtalo de nuevo."
+                    if con_filtros
+                    else "Registra un servicio para que esté disponible al crear cotizaciones."
+                ),
             )
 
         if self._vista_servicios == "lista":
@@ -553,6 +860,13 @@ class PantallaServicios(ft.Container):
             )
             filas.append(ft.Row(spacing=8, controls=controles_fila))
         return ft.Column(expand=True, spacing=8, controls=filas)
+
+    def _contenedor_estado_catalogo(self, icono, titulo, descripcion):
+        return ft.Container(
+            height=220 if self._vista_servicios == "catalogo" else 120,
+            alignment=ft.Alignment(0, 0),
+            content=estado_vacio(icono, titulo, descripcion),
+        )
 
     def _crear_botones_vista(self):
         return [

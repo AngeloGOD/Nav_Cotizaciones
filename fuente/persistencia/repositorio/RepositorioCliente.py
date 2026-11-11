@@ -107,6 +107,17 @@ class RepositorioCliente(Repositorio):
         )
         return self.sesion.scalars(stmt).all()
 
+    def existe_rfc(self, rfc: str, excluir_id: int | None = None) -> bool:
+        rfc_normalizado = (rfc or "").strip().upper()
+        if not rfc_normalizado:
+            return False
+        stmt = select(func.count()).select_from(Cliente).where(
+            func.upper(func.trim(Cliente.rfc)) == rfc_normalizado
+        )
+        if excluir_id is not None:
+            stmt = stmt.where(Cliente.id != excluir_id)
+        return bool(self.sesion.scalar(stmt))
+
     def contar_registros(self):
         stmt = select(func.count()).select_from(Cliente)
         return self.sesion.scalar(stmt)

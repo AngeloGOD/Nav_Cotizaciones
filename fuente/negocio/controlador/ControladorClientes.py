@@ -4,6 +4,7 @@ from fuente.negocio.controlador.ControladorRegistrarCliente import (
     ControladorRegistrarCliente,
 )
 from fuente.negocio.modelo.ENUMs import TipoPersona
+from fuente.utilidades.inputs import validar_rfc_mexicano
 
 
 class ControladorClientes:
@@ -280,6 +281,12 @@ class ControladorClientes:
             raise ValueError(
                 "La razón social y el tipo de persona son obligatorios."
             )
+        error_rfc = validar_rfc_mexicano(datos["rfc"], datos["tipo_persona"])
+        if error_rfc:
+            raise ValueError(error_rfc)
+        cliente_id = getattr(cliente, "id", None)
+        if self.servicio_cliente.existe_rfc(datos["rfc"], excluir_id=cliente_id):
+            raise ValueError("Ya existe otro cliente registrado con ese RFC.")
         for atributo, valor in datos.items():
             setattr(cliente, atributo, valor)
 

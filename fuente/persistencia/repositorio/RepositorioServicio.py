@@ -174,6 +174,11 @@ class RepositorioServicio(Repositorio):
                 or_(
                     entidad.nombre_es.ilike(patron),
                     entidad.nombre_en.ilike(patron),
+                    entidad.categoria_pda_id.in_(
+                        select(CategoriaPDA.id).where(
+                            CategoriaPDA.nombre.ilike(patron)
+                        )
+                    ),
                 )
             )
             .order_by(entidad.id)
@@ -185,39 +190,62 @@ class RepositorioServicio(Repositorio):
         self, desplazamiento: int, limite: int, filtros: dict | None = None
     ) -> list[Servicio]:
         entidad = self._entidad_polimorfica
-        filtros = filtros or {}
-        condiciones = []
-
-        if "activo" in filtros and filtros["activo"] is not None:
-            condiciones.append(entidad.activo.is_(bool(filtros["activo"])))
-
-        if "caracter" in filtros and filtros["caracter"]:
-            caracter = filtros["caracter"]
-            if isinstance(caracter, (list, tuple, set)):
-                condiciones.append(entidad.caracter.in_(list(caracter)))
-            else:
-                condiciones.append(entidad.caracter == caracter)
-
-        if "categoria_buque_id" in filtros and filtros["categoria_buque_id"] is not None:
-            condiciones.append(entidad.categoria_buque_id == int(filtros["categoria_buque_id"]))
-
-        if "nombre" in filtros and isinstance(filtros["nombre"], str) and filtros["nombre"].strip():
-            patron = f"%{filtros['nombre'].strip()}%"
-            condiciones.append(
-                or_(
-                    entidad.nombre_es.ilike(patron),
-                    entidad.nombre_en.ilike(patron),
-                )
-            )
-
         stmt = self._consulta_base_polimorfica()
+        condiciones = self._condiciones_filtro(entidad, filtros or {})
         if condiciones:
             stmt = stmt.where(and_(*condiciones))
         stmt = stmt.order_by(entidad.id).limit(limite).offset(desplazamiento)
         return list(self.sesion.scalars(stmt).all())
 
-    def contar_registros(self) -> int:
+    @staticmethod
+    def _valores_filtro(valor):
+        if valor is None:
+            return []
+        if isinstance(valor, (list, tuple, set)):
+            return list(valor)
+        return [valor]
+
+    @classmethod
+    def _condiciones_filtro(cls, entidad, filtros):
+        condiciones = []
+
+        activos = cls._valores_filtro(filtros.get("activo"))
+        if len(set(activos)) == 1:
+            condiciones.append(entidad.activo.is_(bool(activos[0])))
+
+        for clave in ("caracter", "tipo_concepto"):
+            valores = cls._valores_filtro(filtros.get(clave))
+            if valores:
+                columna = getattr(entidad, clave)
+                condiciones.append(columna.in_(valores))
+
+        for clave in ("categoria_buque_id", "categoria_pda_id"):
+            valores = [int(valor) for valor in cls._valores_filtro(filtros.get(clave))]
+            if valores:
+                columna = getattr(entidad, clave)
+                condiciones.append(columna.in_(valores))
+
+        nombre = filtros.get("nombre")
+        if isinstance(nombre, str) and nombre.strip():
+            patron = f"%{nombre.strip()}%"
+            condiciones.append(
+                or_(
+                    entidad.nombre_es.ilike(patron),
+                    entidad.nombre_en.ilike(patron),
+                    entidad.categoria_pda_id.in_(
+                        select(CategoriaPDA.id).where(
+                            CategoriaPDA.nombre.ilike(patron)
+                        )
+                    ),
+                )
+            )
+        return condiciones
+
+    def contar_registros(self, filtros: dict | None = None) -> int:
         stmt = select(func.count()).select_from(Servicio)
+        condiciones = self._condiciones_filtro(Servicio, filtros or {})
+        if condiciones:
+            stmt = stmt.where(and_(*condiciones))
         return self.sesion.scalar(stmt) or 0
 
     def obtener_candidatos_obligatorios_y_condicionales(

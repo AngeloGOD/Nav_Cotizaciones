@@ -26,6 +26,9 @@ class ControladorServicios:
     def obtener_catalogos_registro(self):
         return self.servicio.obtener_catalogos_registro()
 
+    def obtener_categorias_pda(self):
+        return self.servicio.obtener_categorias_pda()
+
     @staticmethod
     def _decimal(valor, etiqueta, permitir_vacio=False):
         texto = str("" if valor is None else valor).strip()
@@ -315,8 +318,8 @@ class ControladorServicios:
     def obtener_servicios(self, pagina=1, limite=10, filtros=None):
         return self.servicio.obtener_pagina(pagina, limite, filtros)
 
-    def obtener_cantidad_registros(self):
-        return self.servicio.obtener_cantidad_registros()
+    def obtener_cantidad_registros(self, filtros=None):
+        return self.servicio.obtener_cantidad_registros(filtros)
 
     def buscar_por_id(self, servicio_id: int) -> Servicio | None:
         return self.servicio.buscar_por_id(servicio_id)

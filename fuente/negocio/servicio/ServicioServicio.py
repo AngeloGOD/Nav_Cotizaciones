@@ -61,13 +61,17 @@ class ServicioServicio:
                 desplazamiento, limite, filtros or {}
             )
 
-    def obtener_cantidad_registros(self) -> int:
+    def obtener_cantidad_registros(self, filtros: dict | None = None) -> int:
         with self.uow as uow:
-            return uow.servicio.contar_registros()
+            return uow.servicio.contar_registros(filtros or {})
 
     def obtener_catalogos_registro(self):
         with self.uow as uow:
             return uow.catalogos_servicio.obtener_catalogos_registro()
+
+    def obtener_categorias_pda(self):
+        with self.uow as uow:
+            return uow.catalogos_servicio.obtener_categorias_pda()
 
     def cumple_condicion_obligatoriedad(
         self, servicio: Servicio, contexto: ContextoEscala

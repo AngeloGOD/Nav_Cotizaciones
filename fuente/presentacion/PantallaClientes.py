@@ -18,6 +18,7 @@ from fuente.utilidades.Componentes import (
     validar_registros_exportacion,
     validador_correo,
     validador_requerido,
+    validador_rfc,
     validador_telefono,
     vincular_validacion_campo,
 )
@@ -899,7 +900,13 @@ class PantallaClientes(ft.Container):
                     "razon_social": validador_requerido(
                         "el nombre o razón social"
                     ),
-                    "rfc": validador_requerido("el RFC"),
+                    "rfc": validador_rfc(
+                        lambda: (
+                            self.campos_ficha["tipo_persona"].value
+                            if self.campos_ficha.get("tipo_persona")
+                            else None
+                        )
+                    ),
                     "telefono": validador_telefono(),
                     "correo_elect": validador_correo(),
                     "direccion": validador_requerido("la dirección fiscal"),

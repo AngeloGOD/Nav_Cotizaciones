@@ -82,7 +82,7 @@ class PantallaRegistrarCliente(ft.Container):
             "rfc": (
                 self.rfc,
                 self._errores_validacion["rfc"],
-                validador_requerido("el RFC"),
+                validador_rfc(lambda: self.tipo_persona.value),
             ),
             "tipo_persona": (
                 self.tipo_persona,

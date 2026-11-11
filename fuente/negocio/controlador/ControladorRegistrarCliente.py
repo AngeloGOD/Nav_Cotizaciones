@@ -2,6 +2,7 @@ from sqlalchemy.exc import SQLAlchemyError
 
 from fuente.negocio.modelo.Cliente import Cliente
 from fuente.negocio.modelo.ENUMs import TipoPersona
+from fuente.utilidades.inputs import validar_rfc_mexicano
 
 
 class ErrorRegistroCliente(Exception):
@@ -43,6 +44,11 @@ class ControladorRegistrarCliente:
             activo,
         )
         self._validar_campos_obligatorios(datos)
+        error_rfc = validar_rfc_mexicano(datos["rfc"], datos["tipo_persona"])
+        if error_rfc:
+            raise ValueError(error_rfc)
+        if self.servicio_cliente.existe_rfc(datos["rfc"]):
+            raise ValueError("Ya existe un cliente registrado con ese RFC.")
 
         cliente = Cliente(**datos)
         try:

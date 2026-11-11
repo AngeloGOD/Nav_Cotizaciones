@@ -176,6 +176,10 @@ class ServicioCliente():
             resultado = self.uow.cliente.buscar_por_rfc(rfc)
         return resultado
 
+    def existe_rfc(self, rfc: str, excluir_id: int | None = None) -> bool:
+        with self.uow:
+            return self.uow.cliente.existe_rfc(rfc, excluir_id)
+
     def obtener_cantidad_registros(self):
         resultado = 0
         with self.uow:

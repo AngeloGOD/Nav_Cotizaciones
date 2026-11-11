@@ -11,10 +11,15 @@ class RepositorioCatalogosServicio:
     def __init__(self, sesion: Session):
         self.sesion = sesion
 
+    def obtener_categorias_pda(self):
+        return list(
+            self.sesion.scalars(
+                select(CategoriaPDA).order_by(CategoriaPDA.nombre)
+            ).all()
+        )
+
     def obtener_catalogos_registro(self):
-        categorias_pda = self.sesion.scalars(
-            select(CategoriaPDA).order_by(CategoriaPDA.nombre)
-        ).all()
+        categorias_pda = self.obtener_categorias_pda()
         categorias_buque = self.sesion.scalars(
             select(CategoriaBuque).order_by(CategoriaBuque.categoria)
         ).all()

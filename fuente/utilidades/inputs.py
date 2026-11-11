@@ -6,6 +6,13 @@ import flet as ft
 from .Colores import *
 
 
+_ALFABETO_RFC = "0123456789ABCDEFGHIJKLMN&OPQRSTUVWXYZ Ñ"
+_PATRONES_RFC = {
+    12: _re.compile(r"^[A-ZÑ&]{3}\d{6}[A-Z0-9]{2}[A-Z0-9]$"),
+    13: _re.compile(r"^[A-ZÑ&]{4}\d{6}[A-Z0-9]{2}[A-Z0-9]$"),
+}
+
+
 class Herramientas:
     @staticmethod
     def limpiar_controles(controles, valores_iniciales=None):
@@ -178,6 +185,68 @@ def validador_requerido(etiqueta):
         if valor is None or not str(valor).strip():
             return f"Completa {etiqueta}."
         return None
+
+    return validar
+
+
+def validar_rfc_mexicano(valor, tipo_persona=None):
+    if valor is None or not str(valor).strip():
+        return "El RFC es obligatorio."
+
+    rfc = str(valor).strip().upper()
+    tipo = getattr(tipo_persona, "value", tipo_persona)
+    tipo = str(tipo or "").strip().upper()
+    longitud_esperada = {"FISICA": 13, "MORAL": 12}.get(tipo)
+
+    if tipo in {"FISICA", "MORAL"} and len(rfc) != longitud_esperada:
+        return (
+            "El RFC de una persona física debe tener 13 caracteres."
+            if tipo == "FISICA"
+            else "El RFC de una persona moral debe tener 12 caracteres."
+        )
+    if tipo not in {"", "FISICA", "MORAL", "EXTRANJERO"}:
+        return "Selecciona un tipo de persona válido para validar el RFC."
+    if len(rfc) not in _PATRONES_RFC or not _PATRONES_RFC[len(rfc)].fullmatch(rfc):
+        return "El RFC debe tener una estructura válida de 12 o 13 caracteres."
+
+    fecha_texto = rfc[-9:-3]
+    anio_corto = int(fecha_texto[:2])
+    mes = int(fecha_texto[2:4])
+    dia = int(fecha_texto[4:6])
+    if not any(
+        _fecha_rfc_valida(anio, mes, dia)
+        for anio in (1900 + anio_corto, 2000 + anio_corto)
+    ):
+        return "La fecha incluida en el RFC no es válida."
+
+    suma = 0
+    try:
+        for indice, caracter in enumerate(rfc[:-1]):
+            suma += _ALFABETO_RFC.index(caracter) * (len(rfc) - indice)
+    except ValueError:
+        return "El RFC contiene caracteres no válidos."
+
+    residuo = suma % 11
+    digito_esperado = (
+        "0" if residuo == 0 else "A" if residuo == 1 else str(11 - residuo)
+    )
+    if rfc[-1] != digito_esperado:
+        return "El dígito verificador del RFC no es válido."
+    return None
+
+
+def _fecha_rfc_valida(anio, mes, dia):
+    try:
+        _date(anio, mes, dia)
+    except ValueError:
+        return False
+    return True
+
+
+def validador_rfc(tipo_persona=None):
+    def validar(valor):
+        tipo = tipo_persona() if callable(tipo_persona) else tipo_persona
+        return validar_rfc_mexicano(valor, tipo)
 
     return validar
 

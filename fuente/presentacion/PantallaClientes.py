@@ -4,7 +4,7 @@ from datetime import datetime
 import flet as ft
 
 from fuente.utilidades.Colores import COLOR_AZUL as COLOR_AZUL, COLOR_AZUL_ACERO as COLOR_AZUL_ACERO, COLOR_AZUL_INTENSO as COLOR_AZUL_INTENSO, COLOR_AZUL_MARINO_MEDIO as COLOR_AZUL_MARINO_MEDIO, COLOR_AZUL_MARINO_OSCURO as COLOR_AZUL_MARINO_OSCURO, COLOR_AZUL_PETROLEO as COLOR_AZUL_PETROLEO, COLOR_BANNER as COLOR_BANNER, COLOR_BLANCO as COLOR_BLANCO, COLOR_FONDO as COLOR_FONDO, COLOR_GRIS as COLOR_GRIS, COLOR_GRIS_CLARO as COLOR_GRIS_CLARO, COLOR_NARANJA as COLOR_NARANJA, COLOR_NARANJA_OSCURO as COLOR_NARANJA_OSCURO, COLOR_NARANJA_SUAVE as COLOR_NARANJA_SUAVE, COLOR_NEGRO as COLOR_NEGRO, COLOR_ROJO as COLOR_ROJO, COLOR_SIDEBAR as COLOR_SIDEBAR, COLOR_VERDE as COLOR_VERDE
-from fuente.utilidades.Componentes import COLOR_AZUL as COLOR_AZUL, COLOR_AZUL_ACERO as COLOR_AZUL_ACERO, COLOR_AZUL_INTENSO as COLOR_AZUL_INTENSO, COLOR_AZUL_MARINO_MEDIO as COLOR_AZUL_MARINO_MEDIO, COLOR_AZUL_MARINO_OSCURO as COLOR_AZUL_MARINO_OSCURO, COLOR_AZUL_PETROLEO as COLOR_AZUL_PETROLEO, COLOR_BANNER as COLOR_BANNER, COLOR_BLANCO as COLOR_BLANCO, COLOR_FONDO as COLOR_FONDO, COLOR_GRIS as COLOR_GRIS, COLOR_GRIS_CLARO as COLOR_GRIS_CLARO, COLOR_NARANJA as COLOR_NARANJA, COLOR_NARANJA_OSCURO as COLOR_NARANJA_OSCURO, COLOR_NARANJA_SUAVE as COLOR_NARANJA_SUAVE, COLOR_NEGRO as COLOR_NEGRO, COLOR_ROJO as COLOR_ROJO, COLOR_SIDEBAR as COLOR_SIDEBAR, COLOR_VERDE as COLOR_VERDE, Herramientas as Herramientas, agregar_panel_flotante as agregar_panel_flotante, avatar_inicial as avatar_inicial, badge_estado as badge_estado, banner_imagen_desvanecida as banner_imagen_desvanecida, banner_modulo as banner_modulo, barra_busqueda as barra_busqueda, boton as boton, boton_exportacion as boton_exportacion, boton_icono_enmarcado as boton_icono_enmarcado, boton_vista as boton_vista, campo as campo, campo_detalle as campo_detalle, card as card, dialogo_confirmacion as dialogo_confirmacion, estado_vacio as estado_vacio, etiqueta_categoria as etiqueta_categoria, fila_catalogo as fila_catalogo, fila_producto as fila_producto, ft as ft, ftd as ftd, menu_exportacion as menu_exportacion, mostrar_notificacion as mostrar_notificacion, paginacion as paginacion, panel_filtros as panel_filtros, quitar_panel_flotante as quitar_panel_flotante, seccion_opciones_filtro as seccion_opciones_filtro, selector_catalogo as selector_catalogo, sombra_suave as sombra_suave, tabla as tabla, tarjeta_catalogo as tarjeta_catalogo, tarjeta_detalle as tarjeta_detalle, tarjeta_producto as tarjeta_producto
+from fuente.utilidades.Componentes import COLOR_AZUL as COLOR_AZUL, COLOR_AZUL_ACERO as COLOR_AZUL_ACERO, COLOR_AZUL_INTENSO as COLOR_AZUL_INTENSO, COLOR_AZUL_MARINO_MEDIO as COLOR_AZUL_MARINO_MEDIO, COLOR_AZUL_MARINO_OSCURO as COLOR_AZUL_MARINO_OSCURO, COLOR_AZUL_PETROLEO as COLOR_AZUL_PETROLEO, COLOR_BANNER as COLOR_BANNER, COLOR_BLANCO as COLOR_BLANCO, COLOR_FONDO as COLOR_FONDO, COLOR_GRIS as COLOR_GRIS, COLOR_GRIS_CLARO as COLOR_GRIS_CLARO, COLOR_NARANJA as COLOR_NARANJA, COLOR_NARANJA_OSCURO as COLOR_NARANJA_OSCURO, COLOR_NARANJA_SUAVE as COLOR_NARANJA_SUAVE, COLOR_NEGRO as COLOR_NEGRO, COLOR_ROJO as COLOR_ROJO, COLOR_SIDEBAR as COLOR_SIDEBAR, COLOR_VERDE as COLOR_VERDE, Herramientas as Herramientas, agregar_panel_flotante as agregar_panel_flotante, avatar_inicial as avatar_inicial, badge_estado as badge_estado, banner_imagen_desvanecida as banner_imagen_desvanecida, banner_modulo as banner_modulo, barra_busqueda as barra_busqueda, boton as boton, boton_exportacion as boton_exportacion, boton_icono_enmarcado as boton_icono_enmarcado, boton_vista as boton_vista, campo as campo, campo_detalle as campo_detalle, card as card, estado_vacio as estado_vacio, etiqueta_categoria as etiqueta_categoria, fila_catalogo as fila_catalogo, fila_producto as fila_producto, ft as ft, ftd as ftd, menu_exportacion as menu_exportacion, mostrar_notificacion as mostrar_notificacion, paginacion as paginacion, panel_filtros as panel_filtros, quitar_panel_flotante as quitar_panel_flotante, seccion_opciones_filtro as seccion_opciones_filtro, selector_catalogo as selector_catalogo, sombra_suave as sombra_suave, tabla as tabla, tarjeta_catalogo as tarjeta_catalogo, tarjeta_detalle as tarjeta_detalle, tarjeta_producto as tarjeta_producto
 from fuente.utilidades.Componentes import (
     campo_con_mensaje_error,
     crear_feedback_dialogo,
@@ -23,7 +23,10 @@ from fuente.utilidades.Componentes import (
     validador_telefono,
     vincular_validacion_campo,
 )
-from fuente.utilidades.feedback import reproducir_sonido
+from fuente.utilidades.feedback import (
+    avisar_eliminacion_no_implementada,
+    reproducir_sonido,
+)
 from fuente.utilidades.ExportacionExcel import exportar_excel
 from fuente.utilidades.ExportacionPDF import exportar_pdf
 from fuente.negocio.controlador.ControladorClientes import ControladorClientes
@@ -1178,48 +1181,10 @@ class PantallaClientes(ft.Container):
         )
 
     def pedir_confirmacion_eliminacion(self, e):
-        cliente = self.cliente_seleccionado
-        self._page.show_dialog(
-            dialogo_confirmacion(
-                page=self._page,
-                titulo="Confirmar eliminación",
-                mensaje=(
-                    f"¿Deseas eliminar el cliente '{cliente.razon_social}'? "
-                    "Esta acción no se puede deshacer."
-                ),
-                on_confirmar=lambda: self._confirmar_eliminacion(cliente),
-                texto_confirmar="Eliminar",
-            )
-        )
+        avisar_eliminacion_no_implementada(self._page)
 
     def _confirmar_eliminacion(self, cliente):
-        try:
-            self.controlador.eliminar_cliente(cliente)
-        except Exception as error:
-            mostrar_notificacion(
-                self._page,
-                f"No se pudo eliminar el cliente: {error}",
-                COLOR_ROJO,
-            )
-            return
-
-        self._page.pop_dialog()
-        if self.pagina_actual > 1:
-            clientes, _ = self.controlador.obtener_clientes(
-                texto=self.busqueda,
-                limit=self.registros_por_pagina,
-                offset=(self.pagina_actual - 1) * self.registros_por_pagina,
-                filtros=self.filtros_seleccionados,
-            )
-            if not clientes:
-                self.pagina_actual -= 1
-        self.actualizar_directorio()
-        mostrar_notificacion(
-            self._page,
-            "Cliente eliminado correctamente.",
-            COLOR_VERDE,
-            sonido="eliminacion",
-        )
+        avisar_eliminacion_no_implementada(self._page)
 
     def cerrar_ficha(self, e):
         self._page.pop_dialog()
@@ -1299,60 +1264,10 @@ class PantallaClientes(ft.Container):
         self._actualizar_vista_seleccion(claves)
 
     def confirmar_eliminar_seleccionados(self, e=None):
-        cantidad = len(self.clientes_seleccionados)
-        if not cantidad:
-            return
-        self._page.show_dialog(
-            dialogo_confirmacion(
-                page=self._page,
-                titulo="Eliminar clientes seleccionados",
-                mensaje=(
-                    f"¿Deseas eliminar {cantidad} cliente(s) seleccionado(s)? "
-                    "Esta acción no se puede deshacer."
-                ),
-                on_confirmar=self._eliminar_seleccionados,
-                texto_confirmar="Eliminar",
-                texto_cancelar="Cancelar",
-                color_confirmar=COLOR_ROJO,
-            )
-        )
+        avisar_eliminacion_no_implementada(self._page)
 
     def _eliminar_seleccionados(self):
-        seleccionados = list(self.clientes_seleccionados.values())
-        eliminados = 0
-        try:
-            for cliente in seleccionados:
-                self.controlador.eliminar_cliente(cliente)
-                eliminados += 1
-        except Exception as error:
-            # No se modifica el controlador; se informa el fallo desde la pantalla.
-            for cliente in seleccionados[:eliminados]:
-                self.clientes_seleccionados.pop(
-                    self.controlador.clave_cliente(cliente),
-                    None,
-                )
-            self.actualizar_directorio()
-            mostrar_notificacion(
-                self._page,
-                f"Se eliminaron {eliminados}; ocurrió un error: {error}",
-                COLOR_ROJO,
-            )
-            return
-
-        self.clientes_seleccionados.clear()
-        paginas = max(
-            1,
-            (max(0, self.total_clientes - eliminados) + self.registros_por_pagina - 1)
-            // self.registros_por_pagina,
-        )
-        self.pagina_actual = min(self.pagina_actual, paginas)
-        self.actualizar_directorio()
-        mostrar_notificacion(
-            self._page,
-            f"Se eliminaron {eliminados} cliente(s).",
-            COLOR_VERDE,
-            sonido="eliminacion",
-        )
+        avisar_eliminacion_no_implementada(self._page)
 
     def directorio(self):
         offset = (self.pagina_actual - 1) * self.registros_por_pagina

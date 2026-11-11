@@ -38,7 +38,7 @@ from fuente.infraestructura.servicios_externos.ServicioPaises import ServicioPai
 from fuente.utilidades.feedback import precargar_sonidos
 
 IMAGENES_ESTATICAS = (
-    "fondo_puerto.jpg",
+    "fondo_puerto.jpg", 
     "fondo_PantallaClientes.jpg",
     "fondo_PantallaRegistrarClientes.jpg",
     "fondo_menulateral.jpg",

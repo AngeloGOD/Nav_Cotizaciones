@@ -29,7 +29,6 @@ from fuente.utilidades.Componentes import (
     card,
     agregar_panel_flotante,
     crear_mensaje_validacion,
-    dialogo_confirmacion,
     mostrar_dialogo_seleccionados,
     limpiar_error_campo,
     paginacion,
@@ -45,7 +44,11 @@ from fuente.utilidades.Componentes import (
 from fuente.utilidades.ExportacionExcel import exportar_excel
 from fuente.utilidades.ExportacionPDF import exportar_pdf, exportar_proforma_pdf
 from fuente.utilidades.contenedores import menu_exportacion
-from fuente.utilidades.feedback import mostrar_notificacion, validar_registros_exportacion
+from fuente.utilidades.feedback import (
+    avisar_eliminacion_no_implementada,
+    mostrar_notificacion,
+    validar_registros_exportacion,
+)
 
 
 class PantallaCotizaciones(ft.Container):
@@ -1752,68 +1755,10 @@ class PantallaCotizaciones(ft.Container):
         self._actualizar_vista_seleccion(claves)
 
     def confirmar_eliminar_seleccionadas(self, e=None):
-        cantidad = len(self.cotizaciones_seleccionadas)
-        if not cantidad:
-            return
-        self.main_page.show_dialog(
-            dialogo_confirmacion(
-                page=self.main_page,
-                titulo="Eliminar cotizaciones seleccionadas",
-                mensaje=(
-                    f"¿Deseas eliminar {cantidad} cotización(es) seleccionada(s)? "
-                    "Esta acción no se puede deshacer."
-                ),
-                on_confirmar=self._eliminar_seleccionadas,
-                texto_confirmar="Eliminar",
-                texto_cancelar="Cancelar",
-                color_confirmar=COLOR_ROJO,
-            )
-        )
+        avisar_eliminacion_no_implementada(self.main_page)
 
     def _eliminar_seleccionadas(self):
-        ids: list[int] = []
-        for cotizacion in self.cotizaciones_seleccionadas.values():
-            id_cotizacion = getattr(cotizacion, "id", None)
-            if not isinstance(id_cotizacion, int):
-                mostrar_notificacion(
-                    self.main_page,
-                    "No se pudieron identificar todas las cotizaciones seleccionadas.",
-                    COLOR_ROJO,
-                )
-                return
-            ids.append(id_cotizacion)
-        try:
-            eliminadas = self.controlador.eliminar_cotizaciones(ids)
-        except Exception as error:
-            mostrar_notificacion(
-                self.main_page,
-                f"No se pudieron eliminar las cotizaciones: {error}",
-                COLOR_ROJO,
-            )
-            return
-
-        self.cotizaciones_seleccionadas.clear()
-        self.pagina_actual = min(
-            self.pagina_actual,
-            max(
-                1,
-                (
-                    max(0, self.total_registros - eliminadas)
-                    + self.registros_por_pagina - 1
-                )
-                // self.registros_por_pagina,
-            ),
-        )
-        self.actualizar_historial()
-        self._actualizar_vista_seleccion(
-            set(self._claves_cotizaciones_pagina)
-        )
-        mostrar_notificacion(
-            self.main_page,
-            f"Se eliminaron {eliminadas} cotización(es).",
-            COLOR_VERDE,
-            sonido="eliminacion",
-        )
+        avisar_eliminacion_no_implementada(self.main_page)
 
     def _actualizar_vista_seleccion(self, claves_actualizadas):
         for clave in claves_actualizadas:

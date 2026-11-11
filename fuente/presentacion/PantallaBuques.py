@@ -1228,48 +1228,10 @@ class PantallaBuques(ft.Container):
         )
 
     def pedir_confirmacion_eliminacion_ficha_buque(self, e):
-        buque = self.buque_en_detalle
-        self._page.show_dialog(
-            dialogo_confirmacion(
-                page=self._page,
-                titulo="Confirmar eliminación",
-                mensaje=f"¿Deseas eliminar el buque '{buque.nombre}'? Esta acción no se puede deshacer.",
-                on_confirmar=lambda: self._confirmar_eliminacion_ficha_buque(buque),
-                texto_confirmar="Eliminar",
-                texto_cancelar="Cancelar",
-                color_confirmar=COLOR_ROJO,
-            )
-        )
+        avisar_eliminacion_no_implementada(self._page)
 
     def _confirmar_eliminacion_ficha_buque(self, buque):
-        try:
-            self.controlador.servicio_buque.eliminar_buque(buque)
-        except Exception as error:
-            mostrar_notificacion(
-                self._page,
-                f"No se pudo eliminar el buque: {error}",
-                COLOR_ROJO,
-            )
-            return
-
-        self._page.pop_dialog()  # cierra la ficha que queda debajo de la confirmación
-        self.buques_seleccionados.pop(self._clave_buque(buque), None)
-        if self.pagina_actual > 1:
-            registros, _ = self.controlador.obtener_buques(
-                texto=self.busqueda,
-                limit=self.registros_por_pagina,
-                offset=(self.pagina_actual - 1) * self.registros_por_pagina,
-                filtros=self.filtros_seleccionados,
-            )
-            if not registros:
-                self.pagina_actual -= 1
-        self.actualizar_directorio()
-        mostrar_notificacion(
-            self._page,
-            f"Buque '{buque.nombre}' eliminado correctamente.",
-            COLOR_VERDE,
-            sonido="eliminacion",
-        )
+        avisar_eliminacion_no_implementada(self._page)
 
     def cerrar_ficha_buque(self, e):
         self._page.pop_dialog()
@@ -1279,37 +1241,7 @@ class PantallaBuques(ft.Container):
     # ---------------------------------------------------------
 
     def eliminar_buque(self, buque):
-        self.buque_seleccionado = buque
-
-        self.dialogo_confirmacion = ft.AlertDialog(
-            modal=True,
-            title=ft.Text(
-                "Confirmar eliminación",
-                weight=ft.FontWeight.BOLD,
-                color=COLOR_BANNER,
-            ),
-            content=ft.Text(
-                f"¿Estás seguro de que deseas eliminar el buque "
-                f"'{buque.nombre}'? Esta acción no se puede deshacer.",
-                color=COLOR_NEGRO,
-            ),
-            actions=[
-                ft.TextButton(
-                    "Cancelar",
-                    on_click=self.cancelar_eliminacion,
-                ),
-                ft.TextButton(
-                    "Eliminar",
-                    on_click=self.confirmar_eliminacion,
-                    style=ft.ButtonStyle(
-                        color=COLOR_ROJO,
-                    ),
-                ),
-            ],
-            actions_alignment=ft.MainAxisAlignment.END,
-        )
-
-        self._page.show_dialog(self.dialogo_confirmacion)
+        avisar_eliminacion_no_implementada(self._page)
 
     def cancelar_eliminacion(self, e):
         self._page.pop_dialog()
@@ -1317,50 +1249,7 @@ class PantallaBuques(ft.Container):
         self.dialogo_confirmacion = None
 
     def confirmar_eliminacion(self, e):
-        buque = self.buque_seleccionado
-
-        self._page.pop_dialog()
-        self.dialogo_confirmacion = None
-        self.buque_seleccionado = None
-
-        if buque is None:
-            return
-
-        try:
-            self.controlador.servicio_buque.eliminar_buque(buque)
-            self.buques_seleccionados.pop(self._clave_buque(buque), None)
-
-            mostrar_notificacion(
-                self._page,
-                f"Buque '{buque.nombre}' eliminado correctamente.",
-                COLOR_VERDE,
-                sonido="eliminacion",
-            )
-
-            # Si eliminamos el último registro de una página,
-            # regresamos a la página anterior cuando corresponda.
-            if (
-                self.pagina_actual > 1
-                and len(
-                    self.controlador.obtener_buques(
-                        texto=self.busqueda,
-                        limit=self.registros_por_pagina,
-                        offset=(self.pagina_actual - 1)
-                        * self.registros_por_pagina,
-                        filtros=self.filtros_seleccionados,
-                    )[0]
-                ) == 0
-            ):
-                self.pagina_actual -= 1
-
-            self.actualizar_directorio()
-
-        except Exception as error:
-            mostrar_notificacion(
-                self._page,
-                f"No se pudo eliminar el buque: {error}",
-                COLOR_ROJO,
-            )
+        avisar_eliminacion_no_implementada(self._page)
 
     def _mostrar_notificacion(self, mensaje, color):
         mostrar_notificacion(self._page, mensaje, color)
@@ -1403,58 +1292,10 @@ class PantallaBuques(ft.Container):
         self.actualizar_directorio()
 
     def confirmar_eliminar_buques_seleccionados(self, e=None):
-        cantidad = len(self.buques_seleccionados)
-        if not cantidad:
-            return
-
-        self._page.show_dialog(
-            dialogo_confirmacion(
-                page=self._page,
-                titulo="Eliminar buques seleccionados",
-                mensaje=(
-                    f"¿Deseas eliminar {cantidad} buque(s) seleccionado(s)? "
-                    "Esta acción no se puede deshacer."
-                ),
-                on_confirmar=self._eliminar_buques_seleccionados,
-                texto_confirmar="Eliminar",
-                texto_cancelar="Cancelar",
-                color_confirmar=COLOR_ROJO,
-            )
-        )
+        avisar_eliminacion_no_implementada(self._page)
 
     def _eliminar_buques_seleccionados(self):
-        seleccionados = list(self.buques_seleccionados.values())
-        eliminados = 0
-
-        try:
-            for buque in seleccionados:
-                self.controlador.servicio_buque.eliminar_buque(buque)
-                eliminados += 1
-        except Exception as error:
-            for buque in seleccionados[:eliminados]:
-                self.buques_seleccionados.pop(self._clave_buque(buque), None)
-            self.actualizar_directorio()
-            mostrar_notificacion(
-                self._page,
-                f"Se eliminaron {eliminados}; ocurrió un error: {error}",
-                COLOR_ROJO,
-            )
-            return
-
-        self.buques_seleccionados.clear()
-        paginas = max(
-            1,
-            (max(0, self.total_buques - eliminados) + self.registros_por_pagina - 1)
-            // self.registros_por_pagina,
-        )
-        self.pagina_actual = min(self.pagina_actual, paginas)
-        self.actualizar_directorio()
-        mostrar_notificacion(
-            self._page,
-            f"Se eliminaron {eliminados} buque(s).",
-            COLOR_VERDE,
-            sonido="eliminacion",
-        )
+        avisar_eliminacion_no_implementada(self._page)
 
     def crear_tabla_buques(self, buques):
         claves_pagina = [self._clave_buque(b) for b in buques]

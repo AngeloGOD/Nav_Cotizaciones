@@ -23,10 +23,10 @@ from fuente.utilidades.Componentes import (
     boton,
     boton_vista,
     card,
-    dialogo_confirmacion,
     estado_vacio,
     fila_catalogo,
     panel_filtros,
+    paginacion,
     seccion_opciones_filtro,
     agregar_panel_flotante,
     quitar_panel_flotante,
@@ -35,6 +35,7 @@ from fuente.utilidades.Componentes import (
     tarjeta_detalle,
     tarjeta_catalogo,
 )
+from fuente.utilidades.feedback import avisar_eliminacion_no_implementada
 
 COLOR_AZUL_OSCURO = "#0d1b2a" 
 
@@ -305,33 +306,13 @@ class PantallaServicios(ft.Container):
                     color=COLOR_GRIS,
                 ),
                 ft.Row(
-                    spacing=4,
-                    controls=[
-                        ft.Text(
-                            self._texto_pagina_catalogo(),
-                            size=12,
-                            color=COLOR_GRIS,
-                        ),
-                        ft.Container(
-                            width=34,
-                            height=34,
-                            alignment=ft.Alignment(0, 0),
-                            bgcolor=COLOR_AZUL,
-                            border_radius=8,
-                            content=ft.Text(
-                                str(self.pagina_actual),
-                                size=13,
-                                color=COLOR_BLANCO,
-                                weight=ft.FontWeight.BOLD,
-                            ),
-                        ),
-                    ],
+                    controls=[],
                 ),
             ],
         )
         self._texto_pie = pie_catalogo.controls[0]
-        self._texto_paginacion = pie_catalogo.controls[1].controls[0]
-        self._texto_numero_pagina = pie_catalogo.controls[1].controls[1].content
+        self._pie_catalogo = pie_catalogo
+        self._actualizar_pie_catalogo()
 
         contenido_principal = ft.Column(
             expand=True,
@@ -715,13 +696,31 @@ class PantallaServicios(ft.Container):
         )
         return f"Mostrando {primero}–{ultimo} de {self.total_servicios} servicios"
 
-    def _texto_pagina_catalogo(self):
+    def _crear_control_paginacion(self):
+        return paginacion(
+            total_registros=self.total_servicios,
+            registros_por_pagina=self.registros_por_pagina,
+            pagina_actual=self.pagina_actual,
+            on_change=self.cambiar_pagina,
+        )
+
+    def _actualizar_pie_catalogo(self):
+        self._texto_pie.value = self._texto_pie_catalogo()
+        self._pie_catalogo.controls[1] = self._crear_control_paginacion()
+
+    def cambiar_pagina(self, pagina):
         total_paginas = max(
             1,
             (self.total_servicios + self.registros_por_pagina - 1)
             // self.registros_por_pagina,
         )
-        return f"Página {self.pagina_actual} de {total_paginas}"
+        if pagina < 1 or pagina > total_paginas or pagina == self.pagina_actual:
+            return
+        self.pagina_actual = pagina
+        self._actualizar_pie_catalogo()
+        self._contenido_servicios.content = self._crear_vista_servicios()
+        if self.main_page is not None:
+            self.main_page.update()
 
     def recargar_catalogo(self):
         try:
@@ -731,6 +730,12 @@ class PantallaServicios(ft.Container):
             self._contenido_servicios.content = self._crear_vista_servicios()
             raise
         self._error_catalogo = None
+        total_paginas = max(
+            1,
+            (self.total_servicios + self.registros_por_pagina - 1)
+            // self.registros_por_pagina,
+        )
+        self.pagina_actual = min(self.pagina_actual, total_paginas)
         self._texto_total_servicios.value = (
             f"{self.total_servicios} servicios en el catálogo"
         )
@@ -739,9 +744,7 @@ class PantallaServicios(ft.Container):
         self._texto_resumen_fija.value = str(conteos["fija"])
         self._texto_resumen_factor.value = str(conteos["factor"])
         self._texto_resumen_variable.value = str(conteos["variable"])
-        self._texto_pie.value = self._texto_pie_catalogo()
-        self._texto_paginacion.value = self._texto_pagina_catalogo()
-        self._texto_numero_pagina.value = str(self.pagina_actual)
+        self._actualizar_pie_catalogo()
         self._contenido_servicios.content = self._crear_vista_servicios()
         if self.main_page is not None:
             self.main_page.update()
@@ -779,7 +782,10 @@ class PantallaServicios(ft.Container):
                 "Revisa la conexión con la base de datos e inténtalo de nuevo.",
             )
 
-        servicios = self.servicios_catalogo[:self.registros_por_pagina]
+        inicio = (self.pagina_actual - 1) * self.registros_por_pagina
+        servicios = self.servicios_catalogo[
+            inicio:inicio + self.registros_por_pagina
+        ]
         if not servicios:
             con_filtros = bool(self.busqueda) or any(
                 self.filtros_seleccionados.values()
@@ -888,9 +894,7 @@ class PantallaServicios(ft.Container):
         self._vista_servicios = vista
         self.registros_por_pagina = 16 if vista == "lista" else 8
         self.pagina_actual = 1
-        self._texto_pie.value = self._texto_pie_catalogo()
-        self._texto_paginacion.value = self._texto_pagina_catalogo()
-        self._texto_numero_pagina.value = str(self.pagina_actual)
+        self._actualizar_pie_catalogo()
         self._contenido_servicios.content = self._crear_vista_servicios()
         self._botones_vista.controls = self._crear_botones_vista()
         if self.main_page is not None:
@@ -1062,50 +1066,10 @@ class PantallaServicios(ft.Container):
         )
 
     def pedir_confirmacion_eliminacion(self, servicio):
-        self.main_page.show_dialog(
-            dialogo_confirmacion(
-                page=self.main_page,
-                titulo="Confirmar eliminación",
-                mensaje=(
-                    f"¿Deseas eliminar el servicio '{servicio['nombre']}'? "
-                    "Esta acción no se puede deshacer."
-                ),
-                on_confirmar=lambda: self._eliminar_servicio(servicio),
-                texto_confirmar="Eliminar",
-            )
-        )
+        avisar_eliminacion_no_implementada(self.main_page)
 
     def _eliminar_servicio(self, servicio):
-        try:
-            self.controlador_servicios.eliminar_servicio(servicio["id"])
-        except ValueError as error:
-            mostrar_notificacion(self.main_page, str(error), ft.Colors.RED_600)
-            return
-        except SQLAlchemyError:
-            logging.exception("No se pudo eliminar el servicio.")
-            mostrar_notificacion(
-                self.main_page,
-                "No se pudo eliminar el servicio. Puede estar asociado a una cotización.",
-                ft.Colors.RED_600,
-            )
-            return
-
-        self.main_page.pop_dialog()
-        try:
-            self.recargar_catalogo()
-        except SQLAlchemyError:
-            logging.exception("El servicio se eliminó, pero el catálogo no se actualizó.")
-            mostrar_notificacion(
-                self.main_page,
-                "El servicio se eliminó, pero no se pudo actualizar el catálogo.",
-                ft.Colors.RED_600,
-            )
-            return
-        mostrar_notificacion(
-            self.main_page,
-            "Servicio eliminado correctamente.",
-            sonido="eliminacion",
-        )
+        avisar_eliminacion_no_implementada(self.main_page)
 
     def editar_servicio(self, servicio):
         self.main_page.pop_dialog()

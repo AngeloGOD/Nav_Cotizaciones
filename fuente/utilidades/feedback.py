@@ -165,6 +165,15 @@ def mostrar_notificacion(page, mensaje, color=COLOR_VERDE, sonido=None):
         reproducir_sonido(page, sonido)
 
 
+def avisar_eliminacion_no_implementada(page):
+    mostrar_notificacion(
+        page,
+        "La eliminación no está implementada; requiere autorización y verificación de permisos de usuario.",
+        COLOR_NARANJA,
+        sonido="error",
+    )
+
+
 def crear_feedback_dialogo(page=None):
     feedback = ft.Container(
         visible=False,

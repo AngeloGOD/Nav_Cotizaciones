@@ -86,17 +86,14 @@ class RegimenAduanero(str, enum.Enum):
 
 
 class Moneda(str, enum.Enum):
-    USD = "USD"
     MXN = "MXN"
+    USD = "USD"
 
 
 class EstadoCotizacion(str, enum.Enum):
-    BORRADOR = "BORRADOR"
-    PROFORMA = "PROFORMA"
-    ANTICIPO_RECIBIDO = "ANTICIPO_RECIBIDO"
-    EN_OPERACION = "EN_OPERACION"
-    LIQUIDADA_FDA = "LIQUIDADA_FDA"
-    CANCELADA = "CANCELADA"
+    PENDIENTE = "PENDIENTE"
+    APROBADA = "APROBADA"
+    RECHAZADA = "RECHAZADA"
 
 
 class EtapaCobro(str, enum.Enum):

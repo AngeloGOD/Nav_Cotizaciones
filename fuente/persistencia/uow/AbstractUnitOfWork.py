@@ -6,6 +6,7 @@ if TYPE_CHECKING:
     from fuente.persistencia.repositorio.RepositorioBuque import RepositorioBuque
     from fuente.persistencia.repositorio.RepositorioCategoriaBuque import RepositorioCategoriaBuque
     from fuente.persistencia.repositorio.RepositorioCliente import RepositorioCliente
+    from fuente.persistencia.repositorio.RepositorioCotizacion import RepositorioCotizacion
     from fuente.persistencia.repositorio.RepositorioProducto import RepositorioProducto
     from fuente.persistencia.repositorio.RepositorioServicio import RepositorioServicio
 
@@ -16,6 +17,7 @@ class AbstractUnitOfWork(abc.ABC):
     categoria_buque: RepositorioCategoriaBuque
     producto: RepositorioProducto
     servicio: RepositorioServicio
+    cotizacion: RepositorioCotizacion
 
     def __enter__(self):
         return self

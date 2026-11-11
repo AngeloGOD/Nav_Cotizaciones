@@ -26,6 +26,7 @@ from fuente.negocio.modelo.Servicio import (
     ServicioIncremental,
     Tramo,
 )
+from fuente.negocio.modelo.Cotizacion import Cotizacion, DetalleCotizacion
 from fuente.negocio.servicio.ServicioCliente import ServicioCliente
 from fuente.negocio.servicio.ServicioBuque import ServicioBuque
 from fuente.negocio.servicio.ServicioCategoriaBuque import ServicioCategoriaBuque

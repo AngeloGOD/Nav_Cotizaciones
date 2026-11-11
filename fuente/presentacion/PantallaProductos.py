@@ -746,14 +746,32 @@ class PantallaProductos(ft.Container):
             )
 
         if self.vista == "lista":
-            return ft.ListView(
+            tarjetas = [
+                fila_producto(p, on_info=self.ver_producto)
+                for p in productos
+            ]
+            filas = []
+            for inicio in range(0, len(tarjetas), 2):
+                controles_fila = tarjetas[inicio:inicio + 2]
+                if len(controles_fila) == 1:
+                    controles_fila.append(ft.Container(expand=True))
+                filas.append(
+                    ft.Row(
+                        height=120,
+                        spacing=8,
+                        vertical_alignment=ft.CrossAxisAlignment.STRETCH,
+                        controls=controles_fila,
+                    )
+                )
+            return ft.Container(
                 expand=True,
-                spacing=8,
                 padding=ft.Padding(2, 2, 2, 2),
-                controls=[
-                    fila_producto(p, on_info=self.ver_producto)
-                    for p in productos
-                ],
+                content=ft.Column(
+                    expand=True,
+                    spacing=8,
+                    scroll=ft.ScrollMode.AUTO,
+                    controls=filas,
+                ),
             )
 
         tarjetas = [

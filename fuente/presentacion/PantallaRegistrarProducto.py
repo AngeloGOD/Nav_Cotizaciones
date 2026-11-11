@@ -123,7 +123,7 @@ class PantallaRegistrarProducto(ft.Container):
         )
 
         self._errores_validacion = {
-            campo: crear_mensaje_validacion()
+            campo: crear_mensaje_validacion(reservar_espacio=True)
             for campo in (
                 "nombre",
                 "categoria",
@@ -253,6 +253,8 @@ class PantallaRegistrarProducto(ft.Container):
     def campo_etiquetado(
         self, titulo, icono, control, expand=True, mensaje_error=None
     ):
+        if mensaje_error is None:
+            mensaje_error = crear_mensaje_validacion(reservar_espacio=True)
         return ft.Container(
             expand=expand,
             content=ft.Column(
@@ -276,11 +278,7 @@ class PantallaRegistrarProducto(ft.Container):
                             ),
                         ],
                     ),
-                    (
-                        campo_con_mensaje_error(control, mensaje_error)
-                        if mensaje_error is not None
-                        else control
-                    ),
+                    campo_con_mensaje_error(control, mensaje_error),
                 ],
             ),
         )
@@ -493,6 +491,9 @@ class PantallaRegistrarProducto(ft.Container):
     # FORMULARIO
     # ---------------------------------------------------------
     def formulario(self):
+        altura_fila_superior = 172
+        altura_fila_inferior = 150
+
         informacion_basica = self.seccion(
             ft.Icons.ASSIGNMENT_OUTLINED,
             "Información básica del producto",
@@ -550,7 +551,7 @@ class PantallaRegistrarProducto(ft.Container):
                     ),
                 ],
             ),
-            altura=151,
+            altura=altura_fila_superior,
         )
 
         costos = self.seccion(
@@ -593,7 +594,7 @@ class PantallaRegistrarProducto(ft.Container):
                     "costo y el margen. Puedes ajustarlo manualmente."
                 ),
             ),
-            altura=151,
+            altura=altura_fila_inferior,
         )
         descripciones = card(
             ft.Column(
@@ -668,7 +669,7 @@ class PantallaRegistrarProducto(ft.Container):
             border_color="#E2EDF9",
             shadow=sombra_suave(),
         )
-        descripciones.height = 172
+        descripciones.height = altura_fila_superior
         logistica = self.seccion(
             ft.Icons.ROUTE_OUTLINED,
             "Logística, conservación y estado",
@@ -700,7 +701,7 @@ class PantallaRegistrarProducto(ft.Container):
                     ),
                 ],
             ),
-            altura=145,
+            altura=altura_fila_inferior,
         )
 
         columna_izquierda = ft.Column(
@@ -734,6 +735,7 @@ class PantallaRegistrarProducto(ft.Container):
                         ),
                     ],
                 ),
+                ft.Container(height=16),
             ],
         )
 

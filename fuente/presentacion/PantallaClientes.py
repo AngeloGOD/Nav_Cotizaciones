@@ -764,7 +764,7 @@ class PantallaClientes(ft.Container):
         )
 
         datos_generales = ft.Column(
-            spacing=12,
+            spacing=4,
             controls=[
                 ft.Row(
                     spacing=12,
@@ -841,7 +841,7 @@ class PantallaClientes(ft.Container):
 
         return ft.Column(
             tight=True,
-            spacing=10,
+            spacing=3,
             controls=tarjetas,
         )
 
@@ -908,7 +908,9 @@ class PantallaClientes(ft.Container):
                 evento = "on_change"
 
             if not switch:
-                mensaje_error = crear_mensaje_validacion()
+                mensaje_error = crear_mensaje_validacion(
+                    reservar_espacio=True
+                )
                 self._errores_ficha[nombre] = mensaje_error
                 self._validaciones_ficha[nombre] = (
                     control,

@@ -63,7 +63,7 @@ class PantallaRegistrarCliente(ft.Container):
         self.direccion_fiscal.text_size = 14
 
         self._errores_validacion = {
-            campo: crear_mensaje_validacion()
+            campo: crear_mensaje_validacion(reservar_espacio=True)
             for campo in (
                 "nombre",
                 "rfc",
@@ -189,7 +189,7 @@ class PantallaRegistrarCliente(ft.Container):
 
     def formulario(self):
         datos_generales = ft.Column(
-            spacing=10,
+            spacing=4,
             controls=[
                 ft.Row(
                     spacing=18,
@@ -267,7 +267,7 @@ class PantallaRegistrarCliente(ft.Container):
         contenido_desplazable = ft.Column(
             expand=True,
             scroll=ft.ScrollMode.AUTO,
-            spacing=12,
+            spacing=4,
             horizontal_alignment=ft.CrossAxisAlignment.STRETCH,
             controls=[
                 self.seccion(ft.Icons.ASSIGNMENT_OUTLINED, "Datos generales", datos_generales),
@@ -433,70 +433,70 @@ class PantallaRegistrarCliente(ft.Container):
             self._page.update()
 
     def guardar(self, e):
-        if not validar_campos(self._validaciones):
-            self._page.update()
-            return
+            if not validar_campos(self._validaciones):
+                self._page.update()
+                return
 
-        razon_social = self.nombre.value
-        rfc = self.rfc.value
-        direccion = self.direccion_fiscal.value
-        telefono = self.telefono.value
-        correo = self.correo.value
-        tipo_persona = self.tipo_persona.value
-        es_nuevo_cliente = bool(self.es_nuevo_cliente.value)
-        activo = bool(self.activo.value)
+            razon_social = self.nombre.value
+            rfc = self.rfc.value
+            direccion = self.direccion_fiscal.value
+            telefono = self.telefono.value
+            correo = self.correo.value
+            tipo_persona = self.tipo_persona.value
+            es_nuevo_cliente = bool(self.es_nuevo_cliente.value)
+            activo = bool(self.activo.value)
 
-        try:
-            cliente = self.controlador.registrar_cliente(
-                razon_social=razon_social,
-                tipo_persona=tipo_persona,
-                direccion=direccion,
-                rfc=rfc,
-                telefono=telefono,
-                correo_elect=correo,
-                es_nuevo_cliente=es_nuevo_cliente,
-                activo=activo,
+            try:
+                cliente = self.controlador.registrar_cliente(
+                    razon_social=razon_social,
+                    tipo_persona=tipo_persona,
+                    direccion=direccion,
+                    rfc=rfc,
+                    telefono=telefono,
+                    correo_elect=correo,
+                    es_nuevo_cliente=es_nuevo_cliente,
+                    activo=activo,
+                )
+            except ValueError as error:
+                mostrar_notificacion(self._page, str(error), COLOR_ROJO)
+                return
+            except ErrorRegistroCliente as error:
+                mostrar_notificacion(self._page, str(error), COLOR_ROJO)
+                return
+
+            mostrar_notificacion(
+                self._page,
+                "Cliente registrado correctamente.",
+                COLOR_VERDE,
             )
-        except ValueError as error:
-            mostrar_notificacion(self._page, str(error), COLOR_ROJO)
-            return
-        except ErrorRegistroCliente as error:
-            mostrar_notificacion(self._page, str(error), COLOR_ROJO)
-            return
-
-        mostrar_notificacion(
-            self._page,
-            "Cliente registrado correctamente.",
-            COLOR_VERDE,
-        )
-        if self.vista_anterior:
-            self.vista_anterior.build_ui()
-            if hasattr(self.vista_anterior, "cliente_busqueda"):
-                cliente_seleccionado = cliente
-                try:
-                    cliente_id = getattr(cliente_seleccionado, "id", None)
-                except Exception:
-                    cliente_id = None
-                if cliente_id is None and hasattr(
-                    self.controlador, "servicio_cliente"
-                ):
+            if self.vista_anterior:
+                self.vista_anterior.build_ui()
+                if hasattr(self.vista_anterior, "cliente_busqueda"):
+                    cliente_seleccionado = cliente
                     try:
-                        encontrados = (
-                            self.controlador.servicio_cliente.buscar_por_rfc(
-                                (rfc or "").strip().upper()
+                        cliente_id = getattr(cliente_seleccionado, "id", None)
+                    except Exception:
+                        cliente_id = None
+                    if cliente_id is None and hasattr(
+                        self.controlador, "servicio_cliente"
+                    ):
+                        try:
+                            encontrados = (
+                                self.controlador.servicio_cliente.buscar_por_rfc(
+                                    (rfc or "").strip().upper()
+                                )
                             )
-                        )
-                        if encontrados:
-                            cliente_seleccionado = encontrados[-1]
+                            if encontrados:
+                                cliente_seleccionado = encontrados[-1]
+                        except Exception:
+                            pass
+                    try:
+                        if getattr(cliente_seleccionado, "id", None) is not None:
+                            self.vista_anterior.cliente_busqueda.establecer_cliente(
+                                cliente_seleccionado
+                            )
                     except Exception:
                         pass
-                try:
-                    if getattr(cliente_seleccionado, "id", None) is not None:
-                        self.vista_anterior.cliente_busqueda.establecer_cliente(
-                            cliente_seleccionado
-                        )
-                except Exception:
-                    pass
-            if hasattr(self.vista_anterior, "actualizar_directorio"):
-                self.vista_anterior.actualizar_directorio()
-        self._page.update()
+                if hasattr(self.vista_anterior, "actualizar_directorio"):
+                    self.vista_anterior.actualizar_directorio()
+            self._page.update()

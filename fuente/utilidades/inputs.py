@@ -32,12 +32,18 @@ class Herramientas:
             control.value = valor
 
 
-def crear_mensaje_validacion():
+def crear_mensaje_validacion(reservar_espacio=False):
     return ft.Text(
-        "",
+        " " if reservar_espacio else "",
         size=11,
         color=COLOR_ROJO,
-        visible=False,
+        height=14 if reservar_espacio else None,
+        visible=reservar_espacio,
+        opacity=0 if reservar_espacio else 1,
+        data={
+            "reservar_espacio": reservar_espacio,
+            "hay_error": False,
+        },
     )
 
 
@@ -56,8 +62,16 @@ def validar_campo(
     marco=None,
 ):
     error = validador(control.value)
-    mensaje_error.value = error or ""
-    mensaje_error.visible = bool(error)
+    reserva = (
+        isinstance(mensaje_error.data, dict)
+        and mensaje_error.data.get("reservar_espacio", False)
+    )
+    hay_error = bool(error)
+    mensaje_error.value = error or (" " if reserva else "")
+    mensaje_error.visible = hay_error or reserva
+    mensaje_error.opacity = 1 if hay_error else 0
+    if isinstance(mensaje_error.data, dict):
+        mensaje_error.data["hay_error"] = hay_error
     color = COLOR_ROJO if error else COLOR_GRIS_CLARO
     if marco is not None:
         marco.border = ft.Border.all(1, color if error else "#C9DDF7")
@@ -76,10 +90,23 @@ def limpiar_error_campo(
     controles_relacionados=(),
     marco=None,
 ):
-    if not mensaje_error.visible:
+    data = mensaje_error.data
+    hay_error = (
+        data.get("hay_error", mensaje_error.visible)
+        if isinstance(data, dict)
+        else mensaje_error.visible
+    )
+    if not hay_error:
         return False
-    mensaje_error.value = ""
-    mensaje_error.visible = False
+    reserva = (
+        isinstance(data, dict)
+        and data.get("reservar_espacio", False)
+    )
+    mensaje_error.value = " " if reserva else ""
+    mensaje_error.visible = reserva
+    mensaje_error.opacity = 0 if reserva else 1
+    if isinstance(data, dict):
+        data["hay_error"] = False
     if marco is not None:
         marco.border = ft.Border.all(1, "#C9DDF7")
     for campo_control in (control, *controles_relacionados):
@@ -161,8 +188,22 @@ def validador_correo():
     def validar(valor):
         if valor is None or not str(valor).strip():
             return "El correo electrónico es obligatorio."
-        if not patron.fullmatch(str(valor).strip()):
-            return "Escribe un correo válido, por ejemplo nombre@empresa.com."
+        correo = str(valor).strip()
+        if any(caracter.isspace() for caracter in correo):
+            return "El correo no debe contener espacios."
+        if correo.count("@") != 1:
+            return "Escribe el nombre, una sola @ y el dominio."
+        nombre, dominio = correo.split("@")
+        if not nombre or not nombre[0].isalpha():
+            return "Antes de @, el correo debe comenzar con una letra."
+        if not dominio:
+            return "Después de @, escribe el dominio, por ejemplo empresa.com."
+        if "." not in dominio:
+            return "Después de @, agrega un punto y la terminación del dominio."
+        if dominio.startswith(".") or dominio.endswith(".") or ".." in dominio:
+            return "Completa el dominio después del punto, por ejemplo empresa.com."
+        if not patron.fullmatch(correo):
+            return "Usa el formato nombre@empresa.com."
         return None
 
     return validar
